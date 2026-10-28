@@ -576,7 +576,7 @@ const cine = new ShaderPass({
     uBars: { value: 1 }, uAspect: { value: innerWidth / innerHeight }, uFade: { value: 0 }, uSat: { value: 1.22 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uTime,uAberr,uGrain,uVig,uBars,uAspect,uFade,uSat; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uTime,uAberr,uGrain,uVig,uBars,uAspect,uFade,uSat,uPanelA,uMsgA; uniform sampler2D tPanel,tMsg; varying vec2 vUv;
     float hash(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }
     void main(){
       vec2 uv=vUv, c=uv-.5; vec2 ca=c*vec2(uAspect,1.);
@@ -588,6 +588,8 @@ const cine = new ShaderPass({
       col+=(hash(uv*vec2(1731.,977.)+fract(uTime*13.17))-.5)*uGrain*(1.-lum*.5);
       { float l=dot(col,vec3(.2126,.7152,.0722)); float ch=max(max(col.r,col.g),col.b)-min(min(col.r,col.g),col.b); col=mix(vec3(l),col,1.+(uSat-1.)*smoothstep(.02,.15,ch)); col=max(col,0.); }
       col*=1.-uFade;
+      if(uPanelA+uMsgA>.001){ float k=uAspect/(16./9.); vec2 o=(uv-.5)*vec2(max(k,1.),max(1./k,1.))+.5;
+        if(o.x>0.&&o.x<1.&&o.y>0.&&o.y<1.){ vec4 a=texture2D(tPanel,o), b=texture2D(tMsg,o); col=mix(col,a.rgb,a.a*uPanelA); col=mix(col,b.rgb,b.a*uMsgA); } }
       if(uBars>.5){ float vis=min(1.,uAspect/2.39); float e=(1.-vis)*.5; if(uv.y<e||uv.y>1.-e) col=vec3(0.); }
       gl_FragColor=vec4(col,1.);
     }`
@@ -599,7 +601,7 @@ composer.setSize(innerWidth, innerHeight);
 /* =====================================================================
    3. UNIFORMES PARTAGÉES & OMBRES DU RELIEF
    ===================================================================== */
-const MAXP = 64;
+const MAXP = 96;
 const PU = {
   uPA: { value: Array.from({ length: MAXP }, () => new THREE.Vector4()) },   // croissance, éclat, pulsation, -
   uPB: { value: Array.from({ length: MAXP }, () => new THREE.Vector4()) },   // couleur bioluminescente, phase
@@ -972,17 +974,21 @@ function buildWorld(seed, startMs) {
       cristaux biseautés, pierres taillées ; dégradés bicolores et translucidité.
    ===================================================================== */
 const SPECIES = {
-  cristal:    { label: 'Cristaux d’anorthosite', court: 'cristaux', band: 'bass', dur: 15, r: 2.6 },
-  gemme:      { label: 'Gemmes taillées', court: 'gemmes', band: 'bass', dur: 10, r: 2.2 },
-  succulente: { label: 'Rosettes de quartz', court: 'rosettes', band: 'bass', dur: 14, r: 2.2 },
-  arbre:      { label: 'Arbres-lanternes', court: 'arbres', band: 'vol', dur: 32, r: 6 },
-  saule:      { label: 'Saules de basalte', court: 'saules', band: 'mid', dur: 26, r: 5.5 },
-  fougere:    { label: 'Fougères d’ilménite', court: 'fougères', band: 'mid', dur: 22, r: 4.5 },
-  arbuste:    { label: 'Arbustes à baies', court: 'arbustes', band: 'mid', dur: 16, r: 3 },
-  filament:   { label: 'Filaments de verre', court: 'filaments', band: 'high', dur: 12, r: 2.6 },
-  herbe:      { label: 'Herbes stellaires', court: 'herbes', band: 'high', dur: 9, r: 2 },
-  fleur:      { label: 'Lys de régolithe', court: 'lys', band: 'cent', dur: 14, r: 2.4 },
-  corolle:    { label: 'Corolles héliotropes', court: 'corolles', band: 'cent', dur: 18, r: 3.5 },
+  cristal:      { label: 'Cristaux d’anorthosite', court: 'cristaux', chem: 'CaAl₂Si₂O₈', band: 'bass', dur: 15, r: 2.6 },
+  amethyste:    { label: 'Géodes d’améthyste', court: 'géodes', chem: 'SiO₂ : Fe³⁺', band: 'bass', dur: 16, r: 2.4 },
+  gemme:        { label: 'Gemmes de spinelle', court: 'gemmes', chem: 'MgAl₂O₄', band: 'bass', dur: 10, r: 2.2 },
+  succulente:   { label: 'Rosettes de quartz', court: 'rosettes', chem: 'SiO₂', band: 'bass', dur: 14, r: 2.2 },
+  mycelium:     { label: 'Rhizomes et champignons d’argon', court: 'rhizomes', chem: '⁴⁰Ar · Na · Ne', band: 'bass', dur: 12, r: 1.2 },
+  arbre:        { label: 'Arbres-lanternes à hélium', court: 'arbres', chem: '⁴He', band: 'vol', dur: 32, r: 6 },
+  saule:        { label: 'Saules de pyroxène', court: 'saules', chem: '(Ca,Mg,Fe)SiO₃', band: 'mid', dur: 26, r: 5.5 },
+  arborescente: { label: 'Fougères arborescentes d’olivine', court: 'fougères arborescentes', chem: '(Mg,Fe)₂SiO₄', band: 'mid', dur: 28, r: 5 },
+  fougere:      { label: 'Fougères d’ilménite', court: 'fougères', chem: 'FeTiO₃', band: 'mid', dur: 22, r: 4.5 },
+  eventail:     { label: 'Fougères-éventails de troïlite', court: 'éventails', chem: 'FeS', band: 'mid', dur: 18, r: 3 },
+  arbuste:      { label: 'Arbustes à baies de sodium', court: 'arbustes', chem: 'Na', band: 'mid', dur: 16, r: 3 },
+  filament:     { label: 'Filaments de verre volcanique', court: 'filaments', chem: 'verre · TiO₂', band: 'high', dur: 12, r: 2.6 },
+  herbe:        { label: 'Herbes stellaires au néon', court: 'herbes', chem: '²⁰Ne', band: 'high', dur: 9, r: 2 },
+  fleur:        { label: 'Lys de KREEP', court: 'lys', chem: 'K · REE · P', band: 'cent', dur: 14, r: 2.4 },
+  corolle:      { label: 'Corolles hydroxylées', court: 'corolles', chem: 'OH · H₂O', band: 'cent', dur: 18, r: 3.5 },
 };
 // Familles de couleurs : a = base (ombre), b = pointe (lumière), g = lueur
 const FOLIAGE = [
@@ -1164,10 +1170,10 @@ const GEM_GLSL = FLORA_COMMON + `
   }`;
 // Lueur : pulsations le long des structures ; teinte mêlée à la couleur propre de chaque élément
 const EMIS = {
-  tube: `float glowAmt=iRad.z; float cmix=segH;`,
-  pearl: `float glowAmt=iRad.y; float cmix=segH;`,
-  crystal: `float glowAmt=iShape.z*(.32+.68*pow(segH,2.)); float cmix=segH;`,
-  gem: `float glowAmt=iS.w*(.4+.6*segH); float cmix=segH;`,
+  tube: `float glowAmt=iRad.z; float cmix=segH; float bodyGlow=0.;`,
+  pearl: `float glowAmt=iRad.y; float cmix=segH; float bodyGlow=0.;`,
+  crystal: `float glowAmt=iShape.z*(.32+.68*pow(segH,2.)); float cmix=segH; float bodyGlow=.2+.25*iMat.z;`,
+  gem: `float glowAmt=iS.w*(.4+.6*segH); float cmix=segH; float bodyGlow=.06;`,
 };
 const RIM = { tube: '.12', pearl: '.3', crystal: '1.1', gem: '1.8' };
 function floraMaterial(key, glsl, emisPre, phys, rim) {
@@ -1188,7 +1194,8 @@ function floraMaterial(key, glsl, emisPre, phys, rim) {
         float breath=.62+.38*sin(uTime*1.25+pb.w*6.283+segT*5.);
         vec3 ecol=mix(pb.rgb,iCol2*1.25,.5);
         vEmis=ecol*uBio*1.5*(glowAmt*(.12+.88*pa.y)*breath + wave*(.25+glowAmt)*1.3)*step(.001,segF);
-        vEmis+=base*max(dot(-segN,uSunL),0.)*iMat.z*uDay*1.1;          // lumière traversant feuilles et pétales
+        vEmis+=base*max(dot(-segN,uSunL),0.)*iMat.z*uDay*1.1;
+        vEmis+=base*bodyGlow*(.3+.7*uDay)*step(.001,segF);           // couleur dans la masse des minéraux translucides          // lumière traversant feuilles et pétales
         vRim=iCol2*${rim}*(.35+.65*uDay+uBio*.3)*step(.001,segF);
       `);
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vCol; varying vec2 vMat; varying vec3 vEmis; varying vec3 vRim;')
@@ -1211,7 +1218,7 @@ function floraDepth(key, glsl) {
 }
 const tubeMat = floraMaterial('tube', TUBE_GLSL, EMIS.tube, { clearcoat: .6, clearcoatRoughness: .2, iridescence: .25, iridescenceIOR: 1.5 }, RIM.tube);
 const pearlMat = floraMaterial('pearl', PEARL_GLSL, EMIS.pearl, { clearcoat: .22, clearcoatRoughness: .25, iridescence: .12, iridescenceIOR: 1.4, envMapIntensity: .55 }, RIM.pearl);
-const crystalMat = floraMaterial('crystal', CRYSTAL_GLSL, EMIS.crystal, { clearcoat: 1, clearcoatRoughness: .03, iridescence: .85, iridescenceIOR: 1.55, ior: 1.56, specularIntensity: 1 }, RIM.crystal);
+const crystalMat = floraMaterial('crystal', CRYSTAL_GLSL, EMIS.crystal, { clearcoat: .8, clearcoatRoughness: .04, iridescence: .4, iridescenceIOR: 1.55, ior: 1.56, specularIntensity: .8, envMapIntensity: .7 }, RIM.crystal);
 const gemMat = floraMaterial('gem', GEM_GLSL, EMIS.gem, { clearcoat: 1, clearcoatRoughness: .01, iridescence: .45, iridescenceIOR: 1.8, ior: 2.4, specularIntensity: 1, flatShading: true, envMapIntensity: .7 }, RIM.gem);
 const FLORA_MATS = [tubeMat, pearlMat, crystalMat, gemMat];
 for (const [I, mat, glsl, key] of [[TUBES, tubeMat, TUBE_GLSL, 'tube'], [PEARLS, pearlMat, PEARL_GLSL, 'pearl'], [CRYST, crystalMat, CRYSTAL_GLSL, 'crystal'], [GEMS, gemMat, GEM_GLSL, 'gem']]) {
@@ -1414,6 +1421,94 @@ function genPlant(pl, rng, sunDir, W) {
     }
     pl.col = F2.g.slice();
     break; }
+  case 'arborescente': {                       // fougères arborescentes d'olivine : stipe écailleux, couronne de frondes arquées, crosses au cœur
+    const OL = { a: [.04, .16, .02], b: [.52, .82, .16] };
+    const tr = stroke(base, V((rng() - .5) * .2, 1, (rng() - .5) * .2), 3 + rng() * 3.5, .3, .2, 6, 0, .3, randH(), (rng() - .5) * .1, M([.12, .1, .06], mixC([.12, .1, .06], OL.a, .6), .55, .2, 0), .02, (k, pos) => {
+      for (let i = 0; i < 5; i++) { const sd = randH(); pearl(pos.clone().addScaledVector(sd, .2), V(0, -1, 0).addScaledVector(sd, .5).normalize(), .07, 1.8, .05 + k * .04, .03, M([.07, .05, .03], [.2, .13, .06], .75, .1, 0), null, sd, .35); }   // écailles
+    });
+    const leafM = M(OL.a, OL.b, .4, 0, .75), stemM = M(mixC([.12, .1, .06], OL.a, .5), OL.a, .4, .1, .3);
+    const nf = 8 + Math.floor(rng() * 5), a0 = rng() * 6.283;
+    for (let i = 0; i < nf; i++) {
+      const az = a0 + i / nf * 6.283 + rng() * .2, d = tilted(az, .6 + rng() * .4), droop = new THREE.Vector3().crossVectors(d, V(0, 1, 0)).normalize();
+      stroke(tr.pos, d, 3 + rng() * 1.8, .05, .012, 11, .3, .75 + rng() * .1, droop, .07 + rng() * .035, stemM, .05, (k, pos, dir, tb) => {
+        if (k < 1) return;
+        const side = new THREE.Vector3().crossVectors(dir, V(0, 1, 0)).normalize(), L = .62 * Math.sin(Math.PI * (k + 1) / 12) + .08;
+        for (const s of [-1, 1]) for (let j = 0; j < 2; j++) {
+          const ld = side.clone().multiplyScalar(s).addScaledVector(dir, .45).add(V(0, -.12, 0)).normalize();
+          pearl(pos.clone().addScaledVector(dir, -j * .13).addScaledVector(ld, L * .5), ld, L * .13 + .015, 4, tb, .2, leafM, null, V(0, 1, 0), .2);
+        }
+      });
+    }
+    for (let i = 0; i < 3; i++) {             // crosses (jeunes frondes enroulées)
+      const d = tilted(rng() * 6.283, rng() * .25), ax = new THREE.Vector3().crossVectors(d, randH()).normalize();
+      const c = stroke(tr.pos, d, 1.1 + rng() * .5, .05, .025, 6, .6, .9, ax, .55, stemM, .3);
+      pearl(c.pos, c.dir, .07, 1, c.t, 1, M(OL.b, F.g, .3, 0, .6));
+    }
+    pl.col = [.55, 1, .25];
+    break; }
+  case 'eventail': {                           // fougères-éventails de troïlite : frondes en éventail, reflets dorés métalliques
+    const TR = { a: [.32, .2, .05], b: [.95, .62, .16] }, n = 6 + Math.floor(rng() * 6);
+    const fanM = M(TR.a, TR.b, .3, .7, .15), stemM = M([.08, .06, .04], TR.a, .3, .8);
+    for (let i = 0; i < n; i++) {
+      const az = rng() * 6.283, d = tilted(az, .25 + rng() * .5), ax = new THREE.Vector3().crossVectors(d, V(0, 1, 0)).normalize();
+      const st = stroke(base.clone().add(V(Math.cos(az) * .15, 0, Math.sin(az) * .15)), d, .9 + rng() * 1.3, .025, .012, 3, rng() * .2, .5, ax, .12, stemM, .05);
+      const nb = 7 + Math.floor(rng() * 5), spread = 1.1 + rng() * .5, R = .28 + rng() * .25;
+      for (let j = 0; j < nb; j++) {
+        const a = (j / (nb - 1) - .5) * spread, fd = st.dir.clone().applyAxisAngle(ax, a).normalize();
+        pearl(st.pos.clone().addScaledVector(fd, R * .55), fd, R * .5, 1.7, st.t + j * .01, .35, fanM, null, ax, .12);
+      }
+    }
+    pl.col = [1, .78, .3];
+    break; }
+  case 'amethyste': {                          // géodes d'améthyste : coquille basaltique, druse violette, sceptres au centre
+    const AM = { a: [.16, .02, .34], b: [.66, .22, 1] }, R = .9 + rng() * .8;
+    const shell = M([.09, .085, .08], [.22, .2, .19], .85, .05, 0), druse = M(AM.a, AM.b, .14, 0, .28);
+    for (let i = 0; i < 16; i++) {           // coquille
+      const a = i / 16 * 6.283, out = V(Math.cos(a), 0, Math.sin(a));
+      pearl(base.clone().addScaledVector(out, R).add(V(0, .05, 0)), out.clone().add(V(0, .6, 0)).normalize(), R * .32, 1.5, i * .01, .02, shell, null, out, .55);
+    }
+    const nd = 40 + Math.floor(rng() * 30);   // druse : cristaux pointés vers l'intérieur et le ciel
+    for (let i = 0; i < nd; i++) {
+      const a = rng() * 6.283, rr = R * (.35 + rng() * .62), p = base.clone().add(V(Math.cos(a) * rr, -.05 + rr / R * .25, Math.sin(a) * rr));
+      const d = V(-Math.cos(a) * .6, 1, -Math.sin(a) * .6).add(randH().multiplyScalar(.25)).normalize();
+      crystal(p, d, .18 + rng() * .4, .05 + rng() * .06, .1 + rng() * .3, .6 + rng() * .3, .7, rng() * 6, druse);
+    }
+    const ns = 3 + Math.floor(rng() * 5);    // sceptres
+    for (let i = 0; i < ns; i++) {
+      const az = rng() * 6.283, d = tilted(az, i === 0 ? rng() * .1 : .15 + rng() * .35), off = i === 0 ? 0 : .15 + rng() * .4;
+      crystal(base.clone().add(V(Math.cos(az) * off, -.1, Math.sin(az) * off)), d, i === 0 ? 1.6 + rng() * 1.6 : .6 + rng() * 1.1, i === 0 ? .2 + rng() * .1 : .09 + rng() * .08, .15 + i * .05, .85, 1, rng() * 6, M(AM.a, mixC(AM.b, [.9, .7, 1], .3), .1, 0, .32));
+    }
+    pl.col = [.78, .45, 1];
+    break; }
+  case 'mycelium': {                           // rhizome énergétique au sol entre deux plantes, champignons d'argon le long du flux
+    const A = V(pl.ax, 0, pl.az), Bp = V(pl.bx, 0, pl.bz), dist = A.distanceTo(Bp), N = Math.max(4, Math.round(dist / 1.1));
+    const perp = V(-(Bp.z - A.z), 0, Bp.x - A.x).normalize(), amp = (rng() - .5) * dist * .35, ph = rng() * 6;
+    const nodes = [];
+    for (let i = 0; i <= N; i++) { const t = i / N, p = A.clone().lerp(Bp, t).addScaledVector(perp, Math.sin(Math.PI * t) * amp + Math.sin(t * 9 + ph) * .25); p.y = W.h(p.x, p.z) + .035; nodes.push(p); }
+    const GAS = pick([{ g: [.72, .5, 1], b: [.8, .62, 1] }, { g: [1, .62, .12], b: [1, .72, .3] }, { g: [1, .35, .12], b: [1, .5, .3] }]);   // argon, sodium, néon
+    const veinM = M(mixC([.1, .08, .12], GAS.g, .35), GAS.b, .3, .2, .3);
+    const tan = i => (i === 0 ? nodes[1].clone().sub(nodes[0]) : i === N ? nodes[N].clone().sub(nodes[N - 1]) : nodes[i + 1].clone().sub(nodes[i - 1])).normalize();
+    for (let i = 0; i < N; i++) {
+      const [a, b] = cl(i / N * .8, (i + 1) / N * .8), ta = tan(i), tb = tan(i + 1), c0 = mixC(veinM.col, veinM.col2, i / N), c1 = mixC(veinM.col, veinM.col2, (i + 1) / N);
+      T.push([nodes[i].x, nodes[i].y, nodes[i].z, nodes[i + 1].x, nodes[i + 1].y, nodes[i + 1].z, ta.x, ta.y, ta.z, tb.x, tb.y, tb.z, .055, .055, .9, 0, a, b, c0, c1, [veinM.rough, veinM.metal, veinM.trans], [0, 0, 0, 0]]);
+      if (rng() < .45) {                      // radicelles
+        const sd = V(-ta.z, 0, ta.x).multiplyScalar(rng() < .5 ? -1 : 1).addScaledVector(ta, .4).normalize(), L = .5 + rng() * 1.2, e = nodes[i].clone().addScaledVector(sd, L); e.y = W.h(e.x, e.z) + .02;
+        T.push([nodes[i].x, nodes[i].y, nodes[i].z, e.x, e.y, e.z, sd.x, 0, sd.z, sd.x, 0, sd.z, .03, .008, .7, 0, b, Math.min(1, b + .08), veinM.col, veinM.col2, [veinM.rough, veinM.metal, veinM.trans], [0, 0, 0, 0]]);
+      }
+    }
+    const capM = M(GAS.g, pick([[.3, .2, .35], [.55, .35, .25], [.2, .18, .3], [.75, .7, .78]]), .45, 0, .7);   // dessous lumineux, chapeau sombre
+    for (let i = 1; i < N; i++) {
+      if (rng() > .4) continue;
+      const kind = rng(), cnt = 2 + Math.floor(rng() * 5), t0 = i / N * .8 + .05;
+      for (let k = 0; k < cnt; k++) {
+        const off = randH().multiplyScalar(.15 + rng() * .5), p = nodes[i].clone().add(off); p.y = W.h(p.x, p.z) - .02;
+        const tall = kind < .45, h = tall ? .35 + rng() * .7 : .12 + rng() * .3, R = tall ? .06 + rng() * .07 : .12 + rng() * .25;
+        const st = stroke(p, tilted(rng() * 6.283, rng() * .25), h, R * (tall ? .25 : .35), R * (tall ? .18 : .28), 2, t0, t0 + .12, randH(), .1, M([.75, .72, .7], mixC([.8, .78, .75], GAS.b, .4), .5, 0, .6), .2);
+        pearl(st.pos.clone().addScaledVector(st.dir, -R * .1), V(0, 1, 0), R, 1, st.t, .9, capM, null, V(0, 1, 0), tall ? .55 : .3);
+      }
+    }
+    pl.col = GAS.g.slice();
+    break; }
   default: {                                   // corolles héliotropes : coupoles de nervures qui suivent le Soleil
     const n = 2 + Math.floor(rng() * 4), mir = M([.88, .8, .6], mixC([.88, .8, .6], F.b, .4), .08, 1), stemM = M(B.col, mixC(B.col, F.a, .5), .32, .75);
     for (let i = 0; i < n; i++) {
@@ -1550,8 +1645,8 @@ class Sim {
   spawn(bass, mid, high, cent) {
     const r = this.rL, W = this.W;
     const br = cent > .35 ? mid * .5 + cent * .8 : .04, cnt = countSpecies();
-    const sc = { cristal: bass * 1.05, gemme: bass * .95, succulente: bass * .75 + mid * .2, arbre: this.f.vol > .4 ? this.f.vol * 1.1 : .02, saule: mid * .8 + bass * .2,
-      fougere: mid * .9, arbuste: mid * .85, filament: high * 1.25, herbe: high * 1.1, fleur: br * .95, corolle: br * .85 };
+    const sc = { cristal: bass * 1.05, gemme: bass * .95, succulente: bass * .75 + mid * .2, arbre: this.f.vol > .4 ? this.f.vol * 1.1 : .02, saule: mid * .8 + bass * .2, amethyste: bass * .9 + high * .15,
+      arborescente: mid * .85 + bass * .15, eventail: mid * .6 + high * .45, fougere: mid * .9, arbuste: mid * .85, filament: high * 1.25, herbe: high * 1.1, fleur: br * .95, corolle: br * .85 };
     let tot = 0; for (const k in sc) { sc[k] = Math.pow(sc[k] + .02, 3) / (1 + .45 * cnt[k]); tot += sc[k]; }   // la diversité est encouragée
     let x = r() * tot, sp = 'fougere'; for (const k in sc) { x -= sc[k]; if (x <= 0) { sp = k; break; } }
     let px, pz;
@@ -1571,6 +1666,18 @@ class Sim {
     pl.height = Math.max(1, G.height);
     this.plants.push(pl); this.lastSpawn = this.t;
     if (idx === 0 && !this.intro) this.cut('ras', pl);
+    if (r() < .32 && this.plants.length < MAXP - 12) this.spawnRhizome(pl);
+  }
+  // Rhizome énergétique : un flux de gaz piégés court sous le régolithe d'une plante à sa voisine, des champignons y percent
+  spawnRhizome(a) {
+    const r = this.rL, W = this.W; let best = null, bd = 1e9;
+    for (const q of this.plants) { if (q === a || q.sp === 'mycelium') continue; const d = Math.hypot(q.x - a.x, q.z - a.z); if (d > 3.5 && d < 28 && d < bd) { bd = d; best = q; } }
+    if (!best || this.plants.length >= MAXP) return;
+    const idx = this.plants.length, mx = (a.x + best.x) / 2, mz = (a.z + best.z) / 2;
+    const pl = { idx, sp: 'mycelium', x: mx, z: mz, y: W.h(mx, mz) - .15, growth: 0, glow: 0, pulse: 1, col: a.col.slice(), phase: r(), height: 0, sun0: a.sun0, ax: a.x, az: a.z, bx: best.x, bz: best.z };
+    const G = genPlant(pl, mulberry32(Math.floor(r() * 4294967296)), a.sun0, W);
+    if (!writePlant(G, idx)) { this.full = true; return; }
+    pl.height = Math.max(.6, G.height); this.plants.push(pl);
   }
   cut(force, plant) {
     const r = this.rC, n = this.plants.length, prev = this.shot && this.shot.type;
@@ -1967,6 +2074,7 @@ $('pBaseIn').addEventListener('change', e => { try { localStorage.setItem('herba
    9 ter. OUVERTURE ET FINAL — de la Terre au site lunaire ; dézoom et épilogue
    ===================================================================== */
 const INTRO_SPACE = 16, INTRO_END = 28, FINALE_T = 210;      // secondes de composition
+const _dbv = new THREE.Vector2();
 const SPACE = { scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(40, innerWidth / innerHeight, .005, 9000), I: null, seed: -1 };
 SPACE.scene.background = new THREE.Color(0x000000);
 {
@@ -2083,6 +2191,117 @@ function updateSpace(T, f = { bass: 0, high: 0, vol: 0 }, kick = 0) {
   SKY.starMat.uniforms.uGain.value = .7 + .7 * f.high; SKY.mwMat.uniforms.uGain.value = .8 + .5 * f.vol; SKY.dsoMat.uniforms.uGain.value = .8;
 }
 
+
+/* ---- La graine : elle quitte la Terre, traverse l'espace devant nous et se pose sur le site ---- */
+const GRAIN_N = 120;
+function grainMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: { uCol: { value: new THREE.Color(1, .85, .5) }, uSize: { value: 26 }, uPx: { value: 1 }, uI: { value: 3 }, uOn: { value: 1 } },
+    vertexShader: `attribute float aAge; uniform float uSize,uPx,uOn; varying float vA;
+      void main(){ vA=pow(1.-aAge,1.6)*uOn; vec4 mv=modelViewMatrix*vec4(position,1.); gl_Position=projectionMatrix*mv;
+        gl_PointSize=max(1.5,uSize*uPx*(aAge<.001?1.:.14+.3*(1.-aAge))); vA*=aAge<.001?1.:.55; }`,
+    fragmentShader: `uniform vec3 uCol; uniform float uI; varying float vA;
+      void main(){ float d=length(gl_PointCoord-.5)*2.; if(d>1.) discard; float g=exp(-d*d*9.)*1.2+exp(-d*3.5)*.3; g*=1.-smoothstep(.85,1.,d);
+        vec3 c=mix(uCol,vec3(1.),exp(-d*d*30.)*.8); gl_FragColor=vec4(c*g*vA*uI,1.); }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+}
+function grainPoints(n) {
+  const g = new THREE.BufferGeometry(), age = new Float32Array(n);
+  for (let i = 0; i < n; i++) age[i] = i / Math.max(1, n - 1);
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3)); g.setAttribute('aAge', new THREE.BufferAttribute(age, 1));
+  const p = new THREE.Points(g, grainMaterial()); p.frustumCulled = false; p.renderOrder = 5; return p;
+}
+SPACE.grain = grainPoints(GRAIN_N); SPACE.scene.add(SPACE.grain);
+const landedGrain = grainPoints(1); scene.add(landedGrain);
+function seedPos(I, T) {
+  const ez = x => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+  const e0 = I.dirA.clone().applyAxisAngle(I.q, -.1).normalize(), lift = e0.clone().multiplyScalar(.35).add(I.u).normalize();
+  const kE = clamp((T - 1.2) / 6, 0, 1), earthP = e0.clone().multiplyScalar(6.371 * 1.004).addScaledVector(lift, 34 * kE * kE);
+  if (T < 4.5) return earthP;
+  const k = spaceCamera(I, Math.min(T, 15)), fwd = k.look.clone().sub(k.pos).normalize(), dM = k.pos.distanceTo(I.M) - I.R * .98;
+  const right = new THREE.Vector3().crossVectors(fwd, k.up).normalize();
+  const ahead = k.pos.clone().addScaledVector(fwd, dM * .3).addScaledVector(k.up, -dM * .035).addScaledVector(right, dM * .03 * Math.sin(T * 1.3));
+  if (T < 13.5) return earthP.lerp(ahead, ez((T - 4.5) / 3.6));
+  return ahead.lerp(I.M.clone().addScaledVector(I.site, I.R * 1.0008), ez((T - 13.5) / 1.4));   // posée vers T ≈ 14,9
+}
+function updateGrain(I, T, kick, vh) {
+  const pos = SPACE.grain.geometry.attributes.position;
+  for (let j = 0; j < GRAIN_N; j++) { const p = seedPos(I, Math.max(0, T - j * .014)); pos.setXYZ(j, p.x, p.y, p.z); }
+  pos.needsUpdate = true;
+  const u = SPACE.grain.material.uniforms, flash = Math.exp(-Math.pow((T - 14.95) / .18, 2));
+  u.uCol.value.setRGB(...mixC([1, .86, .55], world.palette.a, .35)); u.uPx.value = vh / 1080;
+  u.uSize.value = 22 + 10 * kick + 70 * flash + 4 * Math.sin(T * 6); u.uI.value = 2.6 + 6 * flash;
+}
+
+/* ---- Textes de l'ouverture : message et formules des gaz traversés (dessinés dans l'image, donc dans les exports) ---- */
+const GAS_ZONES = [
+  { t0: .4, t1: 4.6, titre: 'Atmosphère terrestre', alt: '0 – 100 km', f: 'N₂ · O₂ · Ar · CO₂ · H₂O',
+    l1: 'N₂ 78,08 % · O₂ 20,95 % · Ar 0,93 % · CO₂ 0,04 %', l2: '≈ 2,5 × 10¹⁹ molécules / cm³ au niveau de la mer' },
+  { t0: 4.6, t1: 7.6, titre: 'Thermosphère et géocouronne', alt: '100 – 600 000 km', f: 'O · N₂ · He · H',
+    l1: 'oxygène atomique en haut de l’atmosphère, puis halo d’hydrogène', l2: 'la géocouronne d’hydrogène s’étend au-delà de l’orbite lunaire' },
+  { t0: 7.6, t1: 12.4, titre: 'Espace cislunaire — vent solaire', alt: '384 400 km', f: 'H⁺ · He²⁺ · e⁻',
+    l1: 'protons 95 % · particules α 4 % · ions lourds 1 %', l2: '≈ 5 particules / cm³ filant à ≈ 400 km/s' },
+  { t0: 12.4, t1: 1e9, titre: 'Exosphère lunaire', alt: 'surface', f: '⁴⁰Ar · ⁴He · ²⁰Ne · Na · K',
+    l1: 'Ar 2–10 × 10⁴ · He 0,5–3 × 10⁴ · Ne ≤ 2 × 10⁴ · Na 70 · K 17 atomes / cm³', l2: '≈ 10¹⁴ fois moins dense que l’air terrestre — on y fait pousser des gaz' },
+];
+const OVW = 2560, OVH = 1440;
+const ovPanel = document.createElement('canvas'), ovMsg = document.createElement('canvas');
+ovPanel.width = ovMsg.width = OVW; ovPanel.height = ovMsg.height = OVH;
+const texPanel = new THREE.CanvasTexture(ovPanel), texMsg = new THREE.CanvasTexture(ovMsg);
+[texPanel, texMsg].forEach(t => { t.colorSpace = THREE.NoColorSpace; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; });
+const SUBS = '₀₁₂₃₄₅₆₇₈₉', SUPS = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+// écriture chimique : indices et exposants composés à la main (nets à toute résolution, quelle que soit la police)
+function chemText(g, s, x, y, size, font, measure) {
+  let w = 0;
+  for (const ch of s) {
+    let t = ch, sz = size, dy = 0, i;
+    if ((i = SUBS.indexOf(ch)) >= 0) { t = String(i); sz = size * .62; dy = size * .2; }
+    else if ((i = SUPS.indexOf(ch)) >= 0) { t = String(i); sz = size * .6; dy = -size * .38; }
+    else if (ch === '⁺') { t = '+'; sz = size * .6; dy = -size * .38; }
+    else if (ch === '⁻') { t = '−'; sz = size * .6; dy = -size * .38; }
+    g.font = font.replace('#', Math.round(sz) + 'px');
+    if (!measure) g.fillText(t, x + w, y + dy);
+    w += g.measureText(t).width;
+  }
+  return w;
+}
+let ovZone = -2;
+function drawPanel(zi) {
+  ovZone = zi; const g = ovPanel.getContext('2d'); g.clearRect(0, 0, OVW, OVH);
+  const Z = GAS_ZONES[zi]; if (!Z) { texPanel.needsUpdate = true; return; }
+  const x = 190, y = 1010;
+  g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 18; g.textBaseline = 'alphabetic';
+  g.fillStyle = 'rgba(235,225,205,.55)'; g.fillRect(x - 34, y - 70, 2, 268);
+  g.fillStyle = 'rgba(235,228,212,.78)'; g.font = 'italic 300 40px "Cormorant Garamond", serif';
+  g.fillText(Z.titre + '   ·   ' + Z.alt, x, y - 32);
+  g.fillStyle = 'rgba(255,248,232,.97)'; chemText(g, Z.f, x, y + 54, 78, '200 # Inter, system-ui, sans-serif');
+  g.fillStyle = 'rgba(225,218,205,.82)'; chemText(g, Z.l1, x, y + 118, 31, '300 # Inter, system-ui, sans-serif');
+  g.fillStyle = 'rgba(205,198,188,.62)'; chemText(g, Z.l2, x, y + 166, 29, 'italic 300 # "Cormorant Garamond", serif');
+  texPanel.needsUpdate = true;
+}
+function drawMsg() {
+  const g = ovMsg.getContext('2d'); g.clearRect(0, 0, OVW, OVH);
+  g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.shadowColor = 'rgba(0,0,0,.9)'; g.shadowBlur = 30;
+  g.fillStyle = 'rgba(255,246,226,.98)'; g.font = '400 150px Corinthia, "Cormorant Garamond", cursive';
+  g.fillText('Le temps d’une musique,', OVW / 2, 400); g.fillText('la Lune apprend à fleurir', OVW / 2, 545);
+  g.fillStyle = 'rgba(232,224,208,.8)'; g.font = 'italic 300 44px "Cormorant Garamond", serif';
+  g.fillText('Vivons l’instant où une graine venue de la Terre éveille le premier jardin lunaire', OVW / 2, 635);
+  texMsg.needsUpdate = true;
+}
+drawMsg(); drawPanel(-1);
+if (document.fonts) document.fonts.ready.then(() => { drawMsg(); if (ovZone >= 0) drawPanel(ovZone); });
+cine.uniforms.tPanel = { value: texPanel }; cine.uniforms.tMsg = { value: texMsg };
+cine.uniforms.uPanelA = { value: 0 }; cine.uniforms.uMsgA = { value: 0 };
+function updateOverlay(Tv, sinceArr, on) {
+  let zi = -1, a = 0;
+  if (on) for (let i = 0; i < GAS_ZONES.length; i++) { const Z = GAS_ZONES[i]; if (Tv >= Z.t0 && Tv < Z.t1) { zi = i; a = smoothstep(Z.t0, Z.t0 + .6, Tv) * (1 - smoothstep(Z.t1 - .6, Z.t1, Tv)); } }
+  if (on && zi === 3) a *= 1 - smoothstep(5, 7, sinceArr);
+  if (zi !== ovZone && zi >= 0) drawPanel(zi);
+  cine.uniforms.uPanelA.value = a;
+  cine.uniforms.uMsgA.value = on ? smoothstep(7.9, 8.9, Tv) * (1 - smoothstep(11.6, 12.6, Tv)) : 0;
+}
+
 /* ---- Épilogue ---- */
 let epiShownAt = 0;
 function showEpilogue(rec) {
@@ -2193,7 +2412,15 @@ function updateVisuals(dt, withUI) {
   }
   updateSky(C);
   dof.u.uFocus.value = camOut.focus; dof.u.uAperture.value = S.dof;
-  if (inSpace) { updateSpace(Tv, f, sim.kick); dof.u.uAperture.value = 0; renderer.toneMappingExposure = 1; }
+  const vh = renderer.getDrawingBufferSize(_dbv).y;
+  if (inSpace) { updateSpace(Tv, f, sim.kick); updateGrain(SPACE.I, Tv, sim.kick, vh); dof.u.uAperture.value = 0; renderer.toneMappingExposure = 1; }
+  updateOverlay(Tv, sim.introDone ? renderT - sim.introDoneAt : 0, sim.intro);
+  {  // la graine posée au cœur du site, jusqu'à ce que la première plante en sorte
+    const p0 = sim.plants[0], on = sim.intro && sim.introDone ? (p0 ? 1 - smoothstep(0, .35, p0.growth) : 1) : 0;
+    landedGrain.visible = on > .001;
+    if (on > .001) { const gx = p0 ? p0.x : 0, gz = p0 ? p0.z : 0; landedGrain.geometry.attributes.position.setXYZ(0, gx, world.h(gx, gz) + .12, gz); landedGrain.geometry.attributes.position.needsUpdate = true;
+      const u = landedGrain.material.uniforms; u.uPx.value = vh / 1080; u.uSize.value = 26 + 12 * f.bass + 6 * Math.sin(renderT * 3); u.uI.value = 3.2; u.uOn.value = on; u.uCol.value.setRGB(...mixC([1, .86, .55], world.palette.a, .35)); }
+  }
   bloom.strength = .32 + f.bass * .18 + f.vol * .1;
   cine.uniforms.uTime.value = renderT; cine.uniforms.uGrain.value = S.grain; cine.uniforms.uBars.value = S.scope ? 1 : 0;
 
@@ -2201,7 +2428,7 @@ function updateVisuals(dt, withUI) {
     if (++hudTick % 3 === 0) {
       [f.bass, f.mid, f.high, f.vol, f.cent].forEach((v, i) => meters[i].style.width = Math.min(100, v * 100) + '%');
       const c = countSpecies();
-      $('flora').innerHTML = `<b>${sim.plants.length}</b> spécimens${sim.full ? ' — jardin complet' : ''}` + Object.keys(SPECIES).filter(k => c[k]).map(k => `<br>${SPECIES[k].label} <b>${c[k]}</b>`).join('');
+      $('flora').innerHTML = `<b>${sim.plants.length}</b> spécimens${sim.full ? ' — jardin complet' : ''}` + Object.keys(SPECIES).filter(k => c[k]).map(k => `<br>${SPECIES[k].label} <i style="opacity:.6">${SPECIES[k].chem}</i> <b>${c[k]}</b>`).join('');
       if (mode !== 'intro') updateCarnet();
     }
     if (S.annot && !inSpace) updateLabels(C); else if (inSpace) $('labels').innerHTML = '';

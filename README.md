@@ -6,16 +6,37 @@ Application web audio-réactive : la musique (micro de l'ordinateur, fichier aud
 
 ## La flore
 
-Onze familles, choisies par la musique (graves, médiums, aigus, brillance, intensité) avec une préférence pour la diversité :
-cristaux d'anorthosite, gemmes taillées, rosettes de quartz, arbres‑lanternes, saules de basalte, fougères d'ilménite,
-arbustes à baies, filaments de verre, herbes stellaires, lys de régolithe et corolles héliotropes.
+Quinze familles, choisies par la musique (graves, médiums, aigus, brillance, intensité) avec une préférence pour la diversité.
+Chacune est associée à un minéral ou à un gaz réellement présent sur la Lune :
+
+| Famille | Chimie |
+|---|---|
+| Cristaux d'anorthosite | CaAl₂Si₂O₈ (plagioclase des hautes terres) |
+| Géodes d'améthyste | SiO₂ : Fe³⁺ (quartz coloré par le fer irradié) |
+| Gemmes de spinelle | MgAl₂O₄ |
+| Rosettes de quartz | SiO₂ |
+| Rhizomes et champignons d'argon | ⁴⁰Ar · Na · Ne — flux lumineux sous le régolithe reliant les plantes |
+| Arbres‑lanternes | ⁴He |
+| Saules de pyroxène | (Ca,Mg,Fe)SiO₃ |
+| Fougères arborescentes d'olivine | (Mg,Fe)₂SiO₄ |
+| Fougères d'ilménite | FeTiO₃ |
+| Fougères‑éventails de troïlite | FeS |
+| Arbustes à baies de sodium | Na |
+| Filaments de verre volcanique | verre · TiO₂ |
+| Herbes stellaires au néon | ²⁰Ne |
+| Lys de KREEP | K · REE · P |
+| Corolles hydroxylées | OH · H₂O |
 
 ## Déroulé d'une composition
 
-1. **Ouverture** — départ de la Terre réelle du jour, traversée vers la Lune au rythme de la musique, plongée sur le site choisi.
-2. **Ensemencement** — les premières graines germent une fois le site révélé.
+1. **Ouverture** — une graine lumineuse quitte la Terre réelle du jour et traverse l'espace jusqu'au site choisi, au rythme de la musique.
+   À l'écran : les formules des gaz traversés (atmosphère terrestre, géocouronne, vent solaire, exosphère lunaire) et le message
+   « Le temps d'une musique, la Lune apprend à fleurir ».
+2. **Ensemencement** — la graine posée luit au cœur du site ; la première plante en sort.
 3. **Création** — plans variés, dont des vues plongeantes sur l'ensemble de l'œuvre.
 4. **Final** — à 3 min 30, dézoom lent sur l'œuvre entière ; après 10 s de silence, la création s'arrête d'elle‑même.
+
+Sources des valeurs de l'exosphère lunaire et du vent solaire : NASA (mission LADEE).
 
 ## Fichiers
 
