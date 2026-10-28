@@ -573,10 +573,10 @@ composer.addPass(bloom);
 composer.addPass(new OutputPass());
 const cine = new ShaderPass({
   uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uAberr: { value: .0012 }, uGrain: { value: .05 }, uVig: { value: .85 },
-    uBars: { value: 1 }, uAspect: { value: innerWidth / innerHeight }, uFade: { value: 0 } },
+    uBars: { value: 1 }, uAspect: { value: innerWidth / innerHeight }, uFade: { value: 0 }, uSat: { value: 1.22 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uTime,uAberr,uGrain,uVig,uBars,uAspect,uFade; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uTime,uAberr,uGrain,uVig,uBars,uAspect,uFade,uSat; varying vec2 vUv;
     float hash(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }
     void main(){
       vec2 uv=vUv, c=uv-.5; vec2 ca=c*vec2(uAspect,1.);
@@ -586,6 +586,7 @@ const cine = new ShaderPass({
       col*=mix(1.,smoothstep(1.2,.12,r2),uVig);
       float lum=dot(col,vec3(.299,.587,.114));
       col+=(hash(uv*vec2(1731.,977.)+fract(uTime*13.17))-.5)*uGrain*(1.-lum*.5);
+      { float l=dot(col,vec3(.2126,.7152,.0722)); float ch=max(max(col.r,col.g),col.b)-min(min(col.r,col.g),col.b); col=mix(vec3(l),col,1.+(uSat-1.)*smoothstep(.02,.15,ch)); col=max(col,0.); }
       col*=1.-uFade;
       if(uBars>.5){ float vis=min(1.,uAspect/2.39); float e=(1.-vis)*.5; if(uv.y<e||uv.y>1.-e) col=vec3(0.); }
       gl_FragColor=vec4(col,1.);
@@ -606,7 +607,7 @@ const PU = {
   uPP: { value: Array.from({ length: MAXP }, () => new THREE.Vector4()) },   // x, z, rayon du biofilm, intensité
   uN: { value: 0 }, uTime: { value: 0 }, uBio: { value: 1 },
   uSunL: { value: new THREE.Vector3(0, 1, 0) },
-  tHN: { value: null }, tHF: { value: null }, uTSteps: { value: 44 }, uPxs: { value: 1.5 },
+  tHN: { value: null }, tHF: { value: null }, uTSteps: { value: 44 }, uPxs: { value: 1.5 }, uDay: { value: 1 },
 };
 // Ombres portées du relief : marche le long du rayon solaire dans une carte de hauteurs (suit le Soleil en temps réel)
 const TERR_GLSL = `
@@ -848,6 +849,7 @@ function buildWorld(seed, startMs) {
   W.lat = best.lat; W.lon = best.lon;
   W.name = LAT_A[Math.floor(rng() * LAT_A.length)] + ' ' + LAT_B[Math.floor(rng() * LAT_B.length)];
   W.palette = PALETTES[Math.floor(rng() * PALETTES.length)];
+  { const fams = FOLIAGE.slice(); W.flora = []; for (let k = 0; k < 5; k++) W.flora.push(fams.splice(Math.floor(rng() * fams.length), 1)[0]); }   // 5 familles de couleurs par monde
   W.sunDir = new THREE.Vector3(0, 1, 0); W.earthDir = new THREE.Vector3(0, 1, 0);
 
   // --- Relief
@@ -965,15 +967,66 @@ function buildWorld(seed, startMs) {
 }
 
 /* =====================================================================
-   6. LA FLORE — tiges en courbes continues (Hermite), perles lisses, cristaux biseautés
+   6. LA FLORE — onze familles : minéraux, gemmes, arbres, saules, fougères, arbustes,
+      filaments, herbes, lys, corolles, rosettes. Courbes continues, perles lisses,
+      cristaux biseautés, pierres taillées ; dégradés bicolores et translucidité.
    ===================================================================== */
 const SPECIES = {
-  cristal: { label: 'Cristaux d’anorthosite', dur: 15 },
-  fougere: { label: 'Fougères d’ilménite', dur: 22 },
-  filament: { label: 'Filaments de verre', dur: 12 },
-  corolle: { label: 'Corolles héliotropes', dur: 18 },
+  cristal:    { label: 'Cristaux d’anorthosite', court: 'cristaux', band: 'bass', dur: 15, r: 2.6 },
+  gemme:      { label: 'Gemmes taillées', court: 'gemmes', band: 'bass', dur: 10, r: 2.2 },
+  succulente: { label: 'Rosettes de quartz', court: 'rosettes', band: 'bass', dur: 14, r: 2.2 },
+  arbre:      { label: 'Arbres-lanternes', court: 'arbres', band: 'vol', dur: 32, r: 6 },
+  saule:      { label: 'Saules de basalte', court: 'saules', band: 'mid', dur: 26, r: 5.5 },
+  fougere:    { label: 'Fougères d’ilménite', court: 'fougères', band: 'mid', dur: 22, r: 4.5 },
+  arbuste:    { label: 'Arbustes à baies', court: 'arbustes', band: 'mid', dur: 16, r: 3 },
+  filament:   { label: 'Filaments de verre', court: 'filaments', band: 'high', dur: 12, r: 2.6 },
+  herbe:      { label: 'Herbes stellaires', court: 'herbes', band: 'high', dur: 9, r: 2 },
+  fleur:      { label: 'Lys de régolithe', court: 'lys', band: 'cent', dur: 14, r: 2.4 },
+  corolle:    { label: 'Corolles héliotropes', court: 'corolles', band: 'cent', dur: 18, r: 3.5 },
 };
-// Reflets : un environnement lunaire (sol gris, ciel noir, Soleil, Terre) précalculé et mis à jour quand le Soleil bouge
+// Familles de couleurs : a = base (ombre), b = pointe (lumière), g = lueur
+const FOLIAGE = [
+  { a: [.01, .16, .1], b: [.12, .86, .5], g: [.1, 1, .6] },          // jade
+  { a: [.12, .02, .26], b: [.6, .22, .95], g: [.7, .3, 1] },         // améthyste
+  { a: [.26, .08, .01], b: [1, .58, .1], g: [1, .55, .1] },          // ambre
+  { a: [.01, .03, .2], b: [.12, .48, 1], g: [.2, .55, 1] },          // abysse
+  { a: [.28, .01, .04], b: [1, .28, .26], g: [1, .3, .32] },         // corail
+  { a: [.06, .18, .01], b: [.58, .95, .12], g: [.6, 1, .15] },       // absinthe
+  { a: [.12, .16, .26], b: [.72, .84, 1], g: [.6, .8, 1] },          // givre
+  { a: [.22, .06, .02], b: [.95, .42, .18], g: [1, .45, .2] },       // cuivre
+  { a: [.2, .01, .16], b: [.95, .32, .74], g: [1, .35, .75] },       // orchidée
+  { a: [.01, .12, .16], b: [.1, .88, .82], g: [.15, 1, .9] },        // lagon
+];
+const BARK = [
+  { col: [.05, .045, .06], rough: .34, metal: .6 },                  // obsidienne
+  { col: [.34, .22, .12], rough: .3, metal: .85 },                   // bronze
+  { col: [.6, .6, .64], rough: .24, metal: .9 },                     // argent
+  { col: [.07, .19, .21], rough: .3, metal: .7 },                    // patine
+  { col: [.52, .32, .28], rough: .27, metal: .9 },                   // or rose
+  { col: [.16, .1, .2], rough: .3, metal: .75 },                     // basalte violet
+];
+const JEWELS = [
+  { a: [.12, .01, .3], b: [.6, .18, .96] },   // améthyste
+  { a: [.0, .18, .06], b: [.04, .86, .34] },  // émeraude
+  { a: [.3, .0, .02], b: [.96, .04, .16] },   // rubis
+  { a: [.0, .03, .3], b: [.06, .3, 1] },      // saphir
+  { a: [.35, .16, .0], b: [1, .72, .08] },    // citrine
+  { a: [.4, .1, .01], b: [1, .44, .1] },      // topaze impériale
+  { a: [.03, .22, .3], b: [.25, .86, .96] },  // aigue-marine
+  { a: [.14, .3, .0], b: [.55, .96, .08] },   // péridot
+  { a: [.4, .12, .2], b: [1, .48, .64] },     // quartz rose
+  { a: [.55, .58, .64], b: [.96, .98, 1] },   // diamant
+];
+const QUARTZ = [
+  { a: [.55, .62, .7], b: [.92, .96, 1] },    // cristal de roche
+  { a: [.14, .12, .11], b: [.5, .44, .4] },   // quartz fumé
+  { a: [.5, .24, .32], b: [1, .62, .74] },    // quartz rose
+  { a: [.16, .05, .32], b: [.66, .34, .95] }, // améthyste
+  { a: [.42, .26, .04], b: [1, .78, .25] },   // citrine
+  { a: [.16, .4, .48], b: [.55, .94, 1] },    // céleste
+];
+
+// Reflets : un environnement lunaire (sol gris, ciel noir, Soleil, Terre), mis à jour quand le Soleil bouge
 const pmrem = new THREE.PMREMGenerator(renderer);
 const envScene = new THREE.Scene();
 const envMat = new THREE.ShaderMaterial({
@@ -990,43 +1043,41 @@ const envMat = new THREE.ShaderMaterial({
 envScene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 48, 24), envMat));
 const ENV = { tex: null, sun: new THREE.Vector3(9, 9, 9), day: -1 };
 function updateEnv(C) {
+  PU.uDay.value = C.sunUp;
   if (ENV.tex && ENV.sun.angleTo(C.sunL) < .035 && Math.abs(ENV.day - C.sunUp) < .05) return;
   envMat.uniforms.uSun.value.copy(C.sunL); envMat.uniforms.uEarth.value.copy(C.earthL);
   envMat.uniforms.uDay.value = C.sunUp; envMat.uniforms.uEL.value = C.s.earthLit;
   const rt = pmrem.fromScene(envScene, 0, .1, 50);
   if (ENV.rt) ENV.rt.dispose();
   ENV.rt = rt; ENV.tex = rt.texture; ENV.sun.copy(C.sunL); ENV.day = C.sunUp;
-  for (const m of [tubeMat, pearlMat, crystalMat]) { m.envMap = ENV.tex; m.needsUpdate = m.needsUpdate || !m.userData.envSet; m.userData.envSet = true; }
+  for (const m of FLORA_MATS) { m.envMap = ENV.tex; if (!m.userData.envSet) { m.needsUpdate = true; m.userData.envSet = true; } }
 }
 
 // --- Géométries de base (deux niveaux de détail)
 function tubeBase(radial, rings) { const g = new THREE.CylinderGeometry(1, 1, 1, radial, rings, true); g.translate(0, .5, 0); return g; }
-function crystalBase(nA) {                    // prisme hexagonal aux arêtes adoucies, terminaison pyramidale lissée
+function crystalBase(nA) {
   const prof = [[1, 0], [1, .66], [.985, .72], [.9, .78], [.66, .86], [.38, .93], [.14, .978], [.03, .997], [0, 1]];
   const hex = []; for (let i = 0; i < nA; i++) { const a = i / nA * Math.PI * 2, m = (a % (Math.PI / 3)) - Math.PI / 6; hex.push(Math.cos(Math.PI / 6) / Math.cos(m)); }
-  for (let pass = 0; pass < 3; pass++) for (let i = 0; i < nA; i++) hex[i] = (hex[(i + nA - 1) % nA] + 2 * hex[i] + hex[(i + 1) % nA]) / 4;   // arrondi des arêtes
+  for (let pass = 0; pass < 3; pass++) for (let i = 0; i < nA; i++) hex[i] = (hex[(i + nA - 1) % nA] + 2 * hex[i] + hex[(i + 1) % nA]) / 4;
   const pos = [], idx = [];
-  for (let j = 0; j < prof.length; j++) for (let i = 0; i <= nA; i++) {
-    const a = i / nA * Math.PI * 2, r = hex[i % nA] * prof[j][0];
-    pos.push(Math.cos(a) * r, prof[j][1], Math.sin(a) * r);
-  }
-  for (let j = 0; j < prof.length - 1; j++) for (let i = 0; i < nA; i++) {
-    const a = j * (nA + 1) + i, b = a + nA + 1;
-    idx.push(a, b, a + 1, a + 1, b, b + 1);
-  }
+  for (let j = 0; j < prof.length; j++) for (let i = 0; i <= nA; i++) { const a = i / nA * Math.PI * 2, r = hex[i % nA] * prof[j][0]; pos.push(Math.cos(a) * r, prof[j][1], Math.sin(a) * r); }
+  for (let j = 0; j < prof.length - 1; j++) for (let i = 0; i < nA; i++) { const a = j * (nA + 1) + i, b = a + nA + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
-  // couture : moyenne des normales de la première et de la dernière colonne
   const n = g.attributes.normal;
   for (let j = 0; j < prof.length; j++) { const a = j * (nA + 1), b = a + nA; const x = (n.getX(a) + n.getX(b)) / 2, y = (n.getY(a) + n.getY(b)) / 2, z = (n.getZ(a) + n.getZ(b)) / 2; n.setXYZ(a, x, y, z); n.setXYZ(b, x, y, z); }
   return g;
 }
+function gemBase(facets) {                    // taille brillant : table, couronne, rondiste, pavillon — facettes nettes
+  const g = new THREE.LatheGeometry([new THREE.Vector2(0, -.95), new THREE.Vector2(.6, -.42), new THREE.Vector2(1, 0), new THREE.Vector2(1, .08), new THREE.Vector2(.78, .26), new THREE.Vector2(.56, .38), new THREE.Vector2(0, .38)], facets).toNonIndexed();
+  g.deleteAttribute('uv'); g.computeVertexNormals(); return g;
+}
 const LOD = {
-  haute: { tube: tubeBase(14, 8), pearl: new THREE.SphereGeometry(1, 22, 16), crystal: crystalBase(48) },
-  fluide: { tube: tubeBase(7, 4), pearl: new THREE.SphereGeometry(1, 10, 8), crystal: crystalBase(18) },
+  haute: { tube: tubeBase(12, 6), pearl: new THREE.SphereGeometry(1, 16, 11), crystal: crystalBase(48), gem: gemBase(16) },
+  fluide: { tube: tubeBase(7, 3), pearl: new THREE.SphereGeometry(1, 8, 6), crystal: crystalBase(18), gem: gemBase(8) },
 };
 function makeInstanced(base, cap, spec) {
   const g = new THREE.InstancedBufferGeometry();
-  g.setIndex(base.index); g.setAttribute('position', base.attributes.position); g.setAttribute('normal', base.attributes.normal);
+  if (base.index) g.setIndex(base.index); g.setAttribute('position', base.attributes.position); g.setAttribute('normal', base.attributes.normal);
   const A = {};
   for (const [n, s] of spec) { const at = new THREE.InstancedBufferAttribute(new Float32Array(cap * s), s); at.setUsage(THREE.DynamicDrawUsage); g.setAttribute(n, at); A[n] = at; }
   g.instanceCount = 0;
@@ -1034,22 +1085,26 @@ function makeInstanced(base, cap, spec) {
 }
 function setLOD(level) {
   const L = LOD[level];
-  for (const [I, b] of [[TUBES, L.tube], [PEARLS, L.pearl], [CRYST, L.crystal]]) {
-    I.g.setIndex(b.index); I.g.setAttribute('position', b.attributes.position); I.g.setAttribute('normal', b.attributes.normal);
+  for (const [I, b] of [[TUBES, L.tube], [PEARLS, L.pearl], [CRYST, L.crystal], [GEMS, L.gem]]) {
+    I.g.setIndex(b.index || null); I.g.setAttribute('position', b.attributes.position); I.g.setAttribute('normal', b.attributes.normal);
   }
 }
-const TUBES = makeInstanced(LOD.haute.tube, 30000, [['iP0', 3], ['iP1', 3], ['iT0', 3], ['iT1', 3], ['iRad', 4], ['iTime', 4], ['iCol', 3], ['iMat', 2], ['iPivot', 4]]);
-const PEARLS = makeInstanced(LOD.haute.pearl, 14000, [['iC', 3], ['iD', 4], ['iRad', 4], ['iTime', 4], ['iCol', 3], ['iMat', 2], ['iPivot', 4]]);
-const CRYST = makeInstanced(LOD.haute.crystal, 2500, [['iB', 3], ['iD', 3], ['iShape', 4], ['iTime', 4], ['iCol', 3], ['iMat', 2]]);
+const COLS = [['iCol', 3], ['iCol2', 3], ['iMat', 3]];
+const TUBES = makeInstanced(LOD.haute.tube, 60000, [['iP0', 3], ['iP1', 3], ['iT0', 3], ['iT1', 3], ['iRad', 4], ['iTime', 4], ['iPivot', 4], ...COLS]);
+const PEARLS = makeInstanced(LOD.haute.pearl, 50000, [['iC', 3], ['iD', 4], ['iF', 4], ['iRad', 4], ['iTime', 4], ['iPivot', 4], ...COLS]);
+const CRYST = makeInstanced(LOD.haute.crystal, 3000, [['iB', 3], ['iD', 3], ['iShape', 4], ['iTime', 4], ...COLS]);
+const GEMS = makeInstanced(LOD.haute.gem, 6000, [['iC', 3], ['iD', 4], ['iS', 4], ['iTime', 4], ...COLS]);
+const FLORA_SETS = [TUBES, PEARLS, CRYST, GEMS];
 
 const FLORA_COMMON = `
-  uniform vec4 uPA[${MAXP}]; uniform vec4 uPB[${MAXP}]; uniform vec4 uPC[${MAXP}]; uniform float uTime; uniform float uBio; uniform vec3 uSunL;
+  uniform vec4 uPA[${MAXP}]; uniform vec4 uPB[${MAXP}]; uniform vec4 uPC[${MAXP}]; uniform float uTime; uniform float uBio; uniform float uDay; uniform vec3 uSunL;
+  attribute vec3 iCol, iCol2, iMat;
   vec3 segPos; vec3 segN; float segT; float segF; float segH; int segI;
   vec3 rotAB(vec3 v, vec3 a, vec3 b){ vec3 k=cross(a,b); float s=length(k), c=dot(a,b); if(s<1e-5) return v; k/=s; return v*c+cross(k,v)*s+k*dot(k,v)*(1.-c); }
   vec3 sunTarget(){ return normalize(vec3(uSunL.x,max(uSunL.y,.1),uSunL.z)); }
   void frameOf(vec3 t, out vec3 X, out vec3 Z){ vec3 ref=abs(dot(t,vec3(.53,0.,.848)))>.97?vec3(0.,1.,0.):vec3(.53,0.,.848); X=normalize(cross(ref,t)); Z=cross(t,X); }`;
 const TUBE_GLSL = FLORA_COMMON + `
-  attribute vec3 iP0, iP1, iT0, iT1; attribute vec4 iRad, iTime, iPivot; attribute vec3 iCol; attribute vec2 iMat;
+  attribute vec3 iP0, iP1, iT0, iT1; attribute vec4 iRad, iTime, iPivot;
   vec3 herm(vec3 p0,vec3 p1,vec3 m0,vec3 m1,float s){ float s2=s*s,s3=s2*s; return (2.*s3-3.*s2+1.)*p0+(s3-2.*s2+s)*m0+(-2.*s3+3.*s2)*p1+(s3-s2)*m1; }
   vec3 hermD(vec3 p0,vec3 p1,vec3 m0,vec3 m1,float s){ float s2=s*s; return (6.*s2-6.*s)*p0+(3.*s2-4.*s+1.)*m0+(-6.*s2+6.*s)*p1+(3.*s2-2.*s)*m1; }
   void floraCompute(vec3 p, vec3 n){
@@ -1062,58 +1117,85 @@ const TUBE_GLSL = FLORA_COMMON + `
     vec3 c=herm(P0,P1,M0,M1,s); vec3 tg=normalize(hermD(P0,P1,M0,M1,s)+vec3(1e-6));
     vec3 X,Z; frameOf(tg,X,Z);
     float r=mix(iRad.x,iRad.y,s)*smoothstep(0.,.12,f)*(.5+.5*clamp(G*1.3,0.,1.));
-    if(f<.999) r*=mix(.28,1.,smoothstep(0.,.14,f-s));        // pointe arrondie pendant la pousse
+    if(f<.999) r*=mix(.28,1.,smoothstep(0.,.14,f-s));
     vec2 cs=normalize(p.xz+vec2(1e-6));
     segPos=c+(X*cs.x+Z*cs.y)*r;
     segN=normalize(X*cs.x+Z*cs.y+tg*((iRad.x-iRad.y)/max(L,1e-3)));
     segF=f; segT=mix(iTime.x,iTime.y,s); segH=s;
   }`;
 const PEARL_GLSL = FLORA_COMMON + `
-  attribute vec3 iC; attribute vec4 iD, iRad, iTime, iPivot; attribute vec3 iCol; attribute vec2 iMat;
+  attribute vec3 iC; attribute vec4 iD, iF, iRad, iTime, iPivot;
   void floraCompute(vec3 p, vec3 n){
     segI=int(iTime.z+.5); vec4 pa=uPA[segI]; float G=pa.x;
     float f=smoothstep(iTime.x,iTime.y,G);
-    vec3 C=iC, d=normalize(iD.xyz);
-    if(iPivot.w>.5){ vec3 a=uPC[segI].xyz,b=sunTarget(); C=iPivot.xyz+rotAB(C-iPivot.xyz,a,b); d=rotAB(d,a,b); }
-    float e=iD.w; float r=iRad.x*f*(1.+iTime.w*pa.z*.3);
-    vec3 q=p+d*dot(p,d)*(e-1.);                         // ellipsoïde allongé selon d
+    vec3 C=iC, d=normalize(iD.xyz), fn=iF.xyz;
+    if(iPivot.w>.5){ vec3 a=uPC[segI].xyz,b=sunTarget(); C=iPivot.xyz+rotAB(C-iPivot.xyz,a,b); d=rotAB(d,a,b); fn=rotAB(fn,a,b); }
+    float e=iD.w, fl=iF.w; float r=iRad.x*f*(1.+iTime.w*pa.z*.3);
+    vec3 q=p+d*dot(p,d)*(e-1.);                       // allongé selon d
+    q+=fn*dot(q,fn)*(fl-1.);                          // aplati selon fn (pétales, feuilles)
     segPos=C+q*r;
-    segN=normalize(n-d*dot(n,d)*(1.-1./e));
+    vec3 nn=n-d*dot(n,d)*(1.-1./e); nn-=fn*dot(nn,fn)*(1.-1./max(fl,.05));
+    segN=normalize(nn);
     segF=f; segT=iTime.y; segH=clamp(dot(p,d)*.5+.5,0.,1.);
   }`;
 const CRYSTAL_GLSL = FLORA_COMMON + `
-  attribute vec3 iB, iD; attribute vec4 iShape, iTime; attribute vec3 iCol; attribute vec2 iMat;
+  attribute vec3 iB, iD; attribute vec4 iShape, iTime;
   void floraCompute(vec3 p, vec3 n){
     segI=int(iTime.z+.5); float G=uPA[segI].x;
     float f=clamp((G-iTime.x)/max(iTime.y-iTime.x,1e-4),0.,1.);
     vec3 d=normalize(iD); vec3 X,Z; frameOf(d,X,Z);
-    float ca=cos(iShape.w), sa=sin(iShape.w); vec3 X2=X*ca+Z*sa, Z2=Z*ca-X*sa; X=X2; Z=Z2;   // rotation propre à chaque cristal
+    float ca=cos(iShape.w), sa=sin(iShape.w); vec3 X2=X*ca+Z*sa, Z2=Z*ca-X*sa; X=X2; Z=Z2;
     float L=max(iShape.x*f,1e-4), r=iShape.y*smoothstep(0.,.25,f)*(.55+.45*f);
     segPos=iB+X*(p.x*r)+d*(p.y*L)+Z*(p.z*r);
     segN=normalize(X*(n.x/max(r,1e-4))+d*(n.y/L)+Z*(n.z/max(r,1e-4)));
     segF=f; segT=mix(iTime.x,iTime.y,p.y); segH=p.y;
   }`;
-// Émission : pulsations qui montent le long des structures, lueur intérieure des cristaux
-const EMIS_TUBE = `float glowAmt=iRad.z;`, EMIS_PEARL = `float glowAmt=iRad.y;`, EMIS_CRYST = `float glowAmt=iShape.z*(.32+.68*pow(segH,2.));`;
-function floraMaterial(key, glsl, emisPre, phys) {
+const GEM_GLSL = FLORA_COMMON + `
+  attribute vec3 iC; attribute vec4 iD, iS, iTime;
+  void floraCompute(vec3 p, vec3 n){
+    segI=int(iTime.z+.5); vec4 pa=uPA[segI]; float G=pa.x;
+    float f=smoothstep(iTime.x,iTime.y,G);
+    vec3 d=normalize(iD.xyz); vec3 X,Z; frameOf(d,X,Z);
+    float ca=cos(iD.w), sa=sin(iD.w); vec3 X2=X*ca+Z*sa, Z2=Z*ca-X*sa; X=X2; Z=Z2;
+    vec3 s=max(iS.xyz*f*(1.+pa.z*.12),vec3(1e-4));
+    segPos=iC+X*(p.x*s.x)+d*(p.y*s.y)+Z*(p.z*s.z);
+    segN=normalize(X*(n.x/s.x)+d*(n.y/s.y)+Z*(n.z/s.z));
+    segF=f; segT=iTime.y; segH=clamp(p.y*.75+.7,0.,1.);
+  }`;
+// Lueur : pulsations le long des structures ; teinte mêlée à la couleur propre de chaque élément
+const EMIS = {
+  tube: `float glowAmt=iRad.z; float cmix=segH;`,
+  pearl: `float glowAmt=iRad.y; float cmix=segH;`,
+  crystal: `float glowAmt=iShape.z*(.32+.68*pow(segH,2.)); float cmix=segH;`,
+  gem: `float glowAmt=iS.w*(.4+.6*segH); float cmix=segH;`,
+};
+const RIM = { tube: '.12', pearl: '.3', crystal: '1.1', gem: '1.8' };
+function floraMaterial(key, glsl, emisPre, phys, rim) {
   const m = new THREE.MeshPhysicalMaterial(Object.assign({ color: 0xffffff, roughness: .3, metalness: 0, envMapIntensity: 1 }, phys));
-  m.customProgramCacheKey = () => 'flora-' + key;      // sinon les trois matériaux partageraient le même programme GPU
+  m.customProgramCacheKey = () => 'flora-' + key;
   m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, { uPA: PU.uPA, uPB: PU.uPB, uPC: PU.uPC, uTime: PU.uTime, uBio: PU.uBio });
+    Object.assign(sh.uniforms, { uPA: PU.uPA, uPB: PU.uPB, uPC: PU.uPC, uTime: PU.uTime, uBio: PU.uBio, uDay: PU.uDay });
     addTerrainShadow(sh);
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + glsl + '\nvarying vec3 vCol; varying vec2 vMat; varying vec3 vEmis;')
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + glsl + '\nvarying vec3 vCol; varying vec2 vMat; varying vec3 vEmis; varying vec3 vRim;')
       .replace('#include <beginnormal_vertex>', 'floraCompute(position,normal); vec3 objectNormal=segN;')
       .replace('#include <begin_vertex>', 'vec3 transformed=segPos;')
       .replace('#include <fog_vertex>', `#include <fog_vertex>
-        vCol=iCol; vMat=iMat; vec4 pa=uPA[segI]; vec4 pb=uPB[segI]; ${emisPre}
+        ${emisPre}
+        vec3 base=mix(iCol,iCol2,clamp(cmix,0.,1.));
+        vCol=base*mix(.5,1.,smoothstep(0.,.22,segT));                  // ombrage au pied : les parties anciennes, basses, sont plus sombres
+        vMat=iMat.xy; vec4 pa=uPA[segI]; vec4 pb=uPB[segI];
         float wave=exp(-pow((segT-pa.x*(1.-pa.z))*7.,2.))*pa.z;
         float breath=.62+.38*sin(uTime*1.25+pb.w*6.283+segT*5.);
-        vEmis=pb.rgb*uBio*1.5*(glowAmt*(.12+.88*pa.y)*breath + wave*(.25+glowAmt)*1.3)*step(.001,segF);`);
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vCol; varying vec2 vMat; varying vec3 vEmis;')
+        vec3 ecol=mix(pb.rgb,iCol2*1.25,.5);
+        vEmis=ecol*uBio*1.5*(glowAmt*(.12+.88*pa.y)*breath + wave*(.25+glowAmt)*1.3)*step(.001,segF);
+        vEmis+=base*max(dot(-segN,uSunL),0.)*iMat.z*uDay*1.1;          // lumière traversant feuilles et pétales
+        vRim=iCol2*${rim}*(.35+.65*uDay+uBio*.3)*step(.001,segF);
+      `);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vCol; varying vec2 vMat; varying vec3 vEmis; varying vec3 vRim;')
       .replace('#include <color_fragment>', 'diffuseColor.rgb=vCol;')
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor=vMat.x;')
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor=vMat.y;')
-      .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance=vEmis;');
+      .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance=vEmis+vRim*pow(1.-abs(dot(normal,normalize(vViewPosition))),2.5);');
   };
   return m;
 }
@@ -1121,16 +1203,18 @@ function floraDepth(key, glsl) {
   const m = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
   m.customProgramCacheKey = () => 'flora-depth-' + key;
   m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, { uPA: PU.uPA, uPB: PU.uPB, uPC: PU.uPC, uTime: PU.uTime, uBio: PU.uBio, uSunL: PU.uSunL });
+    Object.assign(sh.uniforms, { uPA: PU.uPA, uPB: PU.uPB, uPC: PU.uPC, uTime: PU.uTime, uBio: PU.uBio, uDay: PU.uDay, uSunL: PU.uSunL });
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + glsl)
       .replace('#include <begin_vertex>', 'floraCompute(position,normal); vec3 transformed=segPos;');
   };
   return m;
 }
-const tubeMat = floraMaterial('tube', TUBE_GLSL, EMIS_TUBE, { clearcoat: .65, clearcoatRoughness: .18, iridescence: .3, iridescenceIOR: 1.5 });
-const pearlMat = floraMaterial('pearl', PEARL_GLSL, EMIS_PEARL, { clearcoat: 1, clearcoatRoughness: .05, iridescence: .7, iridescenceIOR: 1.6, sheen: .4, sheenColor: new THREE.Color(1, 1, 1) });
-const crystalMat = floraMaterial('crystal', CRYSTAL_GLSL, EMIS_CRYST, { clearcoat: 1, clearcoatRoughness: .03, iridescence: .85, iridescenceIOR: 1.55, ior: 1.56, specularIntensity: 1 });
-for (const [I, mat, glsl, key] of [[TUBES, tubeMat, TUBE_GLSL, 'tube'], [PEARLS, pearlMat, PEARL_GLSL, 'pearl'], [CRYST, crystalMat, CRYSTAL_GLSL, 'crystal']]) {
+const tubeMat = floraMaterial('tube', TUBE_GLSL, EMIS.tube, { clearcoat: .6, clearcoatRoughness: .2, iridescence: .25, iridescenceIOR: 1.5 }, RIM.tube);
+const pearlMat = floraMaterial('pearl', PEARL_GLSL, EMIS.pearl, { clearcoat: .22, clearcoatRoughness: .25, iridescence: .12, iridescenceIOR: 1.4, envMapIntensity: .55 }, RIM.pearl);
+const crystalMat = floraMaterial('crystal', CRYSTAL_GLSL, EMIS.crystal, { clearcoat: 1, clearcoatRoughness: .03, iridescence: .85, iridescenceIOR: 1.55, ior: 1.56, specularIntensity: 1 }, RIM.crystal);
+const gemMat = floraMaterial('gem', GEM_GLSL, EMIS.gem, { clearcoat: 1, clearcoatRoughness: .01, iridescence: .45, iridescenceIOR: 1.8, ior: 2.4, specularIntensity: 1, flatShading: true, envMapIntensity: .7 }, RIM.gem);
+const FLORA_MATS = [tubeMat, pearlMat, crystalMat, gemMat];
+for (const [I, mat, glsl, key] of [[TUBES, tubeMat, TUBE_GLSL, 'tube'], [PEARLS, pearlMat, PEARL_GLSL, 'pearl'], [CRYST, crystalMat, CRYSTAL_GLSL, 'crystal'], [GEMS, gemMat, GEM_GLSL, 'gem']]) {
   const mesh = new THREE.Mesh(I.g, mat);
   mesh.customDepthMaterial = floraDepth(key, glsl); mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
   scene.add(mesh); I.mesh = mesh;
@@ -1139,20 +1223,19 @@ for (const [I, mat, glsl, key] of [[TUBES, tubeMat, TUBE_GLSL, 'tube'], [PEARLS,
 // La nuit, les plus lumineuses des plantes éclairent réellement leur voisinage
 const plantLights = Array.from({ length: 6 }, () => { const l = new THREE.PointLight(0xffffff, 0, 30, 2); scene.add(l); return l; });
 
-// Matières plausibles : silice, ilménite (FeTiO3), verre d'impact, miroir métallique
-const MAT = {
-  cristal: { col: [.46, .52, .58], rough: .05, metal: 0 },
-  ilmenite: { col: [.06, .06, .07], rough: .24, metal: .92 },
-  verre: { col: [.6, .63, .68], rough: .07, metal: .05 },
-  tige: { col: [.36, .3, .22], rough: .32, metal: .75 },
-  miroir: { col: [.88, .8, .6], rough: .08, metal: 1 },
-};
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
-function genPlant(pl, rng, sunDir) {
-  const T = [], P = [], K = [];
+const mixC = (a, b, k) => a.map((c, i) => c + (b[i] - c) * k);
+const deep = (c, k = .62) => { const m = Math.max(...c, 1e-3); return c.map(x => Math.pow(x / m, 1.35) * m * k); };   // couleur plus dense, plus saturée
+// Matière : couleur de base, couleur de pointe, rugosité, métal, translucidité
+const M = (col, col2, rough, metal, trans = 0) => ({ col: metal > .5 ? col : deep(col, .8), col2: metal > .5 ? (col2 || col) : deep(col2 || col), rough, metal, trans });
+
+function genPlant(pl, rng, sunDir, W) {
+  const T = [], P = [], K = [], J = [];
   const cl = (t0, t1) => { t0 = clamp(t0, 0, .99); return [t0, clamp(Math.max(t1, t0 + .01), 0, 1)]; };
   const piv4 = piv => piv ? [piv.x, piv.y, piv.z, 1] : [0, 0, 0, 0];
-  // Trait continu : n tronçons d'Hermite partageant positions et tangentes aux nœuds
+  const pick = a => a[Math.floor(rng() * a.length)];
+  const fam = () => W.flora[Math.floor(rng() * W.flora.length)];
+  // Trait continu (tronçons d'Hermite) ; la couleur glisse de col à col2 sur toute sa longueur
   const stroke = (p, d, len, r0, r1, n, t0, t1, axis, curl, m, glow, onNode, piv) => {
     const nodes = [p.clone()], dirs = [], dir = d.clone().normalize(), sl = len / n;
     for (let k = 0; k < n; k++) { dirs.push(dir.clone()); nodes.push(nodes[k].clone().addScaledVector(dir, sl)); if (axis) dir.applyAxisAngle(axis, curl).normalize(); }
@@ -1160,115 +1243,225 @@ function genPlant(pl, rng, sunDir) {
     for (let k = 0; k < n; k++) {
       const [a, b] = cl(t0 + (t1 - t0) * k / n, t0 + (t1 - t0) * (k + 1) / n);
       const A = nodes[k], B = nodes[k + 1], ta = tan(k), tb = tan(k + 1);
-      T.push([A.x, A.y, A.z, B.x, B.y, B.z, ta.x, ta.y, ta.z, tb.x, tb.y, tb.z, r0 + (r1 - r0) * k / n, r0 + (r1 - r0) * (k + 1) / n, glow, 0, a, b, m, piv4(piv)]);
+      const c0 = mixC(m.col, m.col2, k / n), c1 = mixC(m.col, m.col2, (k + 1) / n);
+      T.push([A.x, A.y, A.z, B.x, B.y, B.z, ta.x, ta.y, ta.z, tb.x, tb.y, tb.z, r0 + (r1 - r0) * k / n, r0 + (r1 - r0) * (k + 1) / n, glow, 0, a, b, c0, c1, [m.rough, m.metal, m.trans], piv4(piv)]);
+      seeTop(B.y);
       if (onNode) onNode(k, B.clone(), tb.clone(), b);
     }
     return { pos: nodes[n], dir: tan(n), t: t1 };
   };
-  const pearl = (c, d, R, el, t0, glow, m, piv, pulse = 1) => { const [a, b] = cl(t0, t0 + .08); P.push([c.x, c.y, c.z, d.x, d.y, d.z, el, R, glow, a, b, pulse, m, piv4(piv)]); };
-  const crystal = (b, d, len, r, t0, t1, glow, rot, m) => { const [a, c] = cl(t0, t1); K.push([b.x, b.y, b.z, d.x, d.y, d.z, len, r, glow, rot, a, c, m]); };
+  const pearl = (c, d, R, el, t0, glow, m, piv, flatN, flat = 1, pulse = 1) => {
+    const [a, b] = cl(t0, t0 + .08); const fn = flatN ? flatN.clone().normalize() : V(0, 0, 0);
+    P.push([c.x, c.y, c.z, d.x, d.y, d.z, el, fn.x, fn.y, fn.z, flat, R, glow, a, b, pulse, m, piv4(piv)]); seeTop(c.y + R * el);
+  };
+  const crystal = (b, d, len, r, t0, t1, glow, rot, m) => { const [a, c] = cl(t0, t1); K.push([b.x, b.y, b.z, d.x, d.y, d.z, len, r, glow, rot, a, c, m]); seeTop(b.y + d.y * len); };
+  const gem = (c, d, sx, sy, sz, rot, t0, glow, m) => { const [a, b] = cl(t0, t0 + .12); J.push([c.x, c.y, c.z, d.x, d.y, d.z, rot, sx, sy, sz, glow, a, b, m]); seeTop(c.y + sy * .4); };
   const randH = () => { const a = rng() * Math.PI * 2; return V(Math.cos(a), 0, Math.sin(a)); };
-  const tint = (m, k) => ({ ...m, col: m.col.map((c, i) => c * (1 - k) + Math.min(1, pl.col[i]) * k * .8) });   // teinte minérale prise à la palette
-  const MC = tint(MAT.cristal, .4), MV = tint(MAT.verre, .25);
+  const tilted = (az, tilt) => V(Math.sin(tilt) * Math.cos(az), Math.cos(tilt), Math.sin(tilt) * Math.sin(az));
   const base = V(pl.x, pl.y, pl.z);
   let top = 0; const seeTop = y => { top = Math.max(top, y - pl.y); };
+  const F = fam(), B = pick(BARK);
+  pl.col = F.g.slice();
 
-  if (pl.sp === 'cristal') {                 // grappe de cristaux biseautés, élancés par la faible gravité
+  switch (pl.sp) {
+  case 'cristal': {                            // grappes de quartz : de roche, fumé, rose, améthyste, citrine
+    const Q = pick(QUARTZ), m = M(Q.a, Q.b, .05, 0, .35); pl.col = mixC(Q.b, W.palette.a, .4);
     const n = 4 + Math.floor(rng() * 6);
     for (let i = 0; i < n; i++) {
-      const az = rng() * 6.283, tilt = i === 0 ? rng() * .1 : .15 + rng() * .55;
-      const d = V(Math.sin(tilt) * Math.cos(az), Math.cos(tilt), Math.sin(tilt) * Math.sin(az));
-      const off = i === 0 ? 0 : .3 + rng() * 1.4;
-      const p = base.clone().add(V(Math.cos(az) * off, -.35, Math.sin(az) * off));
-      const len = i === 0 ? 5 + rng() * 7 : 1.4 + rng() * 4.5, r = i === 0 ? .5 + rng() * .35 : .16 + rng() * .32;
-      const t0 = i * .055 + rng() * .05;
-      crystal(p, d, len, r, t0, Math.min(1, t0 + .6 + rng() * .25), .55 + rng() * .45, rng() * 6.283, MC);
-      seeTop(p.y + d.y * len);
+      const az = rng() * 6.283, tilt = i === 0 ? rng() * .1 : .15 + rng() * .55, d = tilted(az, tilt);
+      const off = i === 0 ? 0 : .3 + rng() * 1.4, p = base.clone().add(V(Math.cos(az) * off, -.35, Math.sin(az) * off));
+      const len = i === 0 ? 5 + rng() * 7 : 1.4 + rng() * 4.5, r = i === 0 ? .5 + rng() * .35 : .16 + rng() * .32, t0 = i * .055 + rng() * .05;
+      crystal(p, d, len, r, t0, Math.min(1, t0 + .6 + rng() * .25), .55 + rng() * .45, rng() * 6.283, m);
     }
-  } else if (pl.sp === 'fougere') {          // crosses spiralées fluides, folioles en perles allongées
-    const ax = randH();
-    const tr = stroke(base, V(0, 1, 0), 2.5 + rng() * 3.5, .2, .1, 5, 0, .3, ax, (rng() - .5) * .12, MAT.ilmenite, .04);
-    seeTop(tr.pos.y);
-    const frond = (p, d, len, r, depth, t0, t1) => {
-      const side = randH(); const axis = new THREE.Vector3().crossVectors(d, side).normalize();
-      if (axis.lengthSq() < .01) axis.set(1, 0, 0);
-      const curl = (.2 + rng() * .16) * (depth === 2 ? 1 : 1.4) * (rng() < .5 ? -1 : 1);
-      const n = depth === 2 ? 6 : 5;
-      const end = stroke(p, d, len, r, r * .35, n, t0, t1, axis, curl, MAT.ilmenite, .05, (k, pos, dir, tb) => {
-        seeTop(pos.y);
-        if (depth > 0 && k >= 1 && k <= n - 2 && k % 2 === 1) for (const s of [-1, 1]) {
-          const cd = dir.clone().applyAxisAngle(axis, s * (.9 + rng() * .4));
-          frond(pos, cd, len * .42, r * .55, depth - 1, tb, tb + (t1 - t0) * .7);
+    break; }
+  case 'gemme': {                              // pierres taillées posées, enchâssées dans le régolithe
+    const j1 = pick(JEWELS), j2 = rng() < .5 ? j1 : pick(JEWELS); pl.col = j1.b.slice();
+    const n = 5 + Math.floor(rng() * 9);
+    for (let i = 0; i < n; i++) {
+      const J1 = rng() < .7 ? j1 : j2, big = i === 0, s = big ? .6 + rng() * .6 : .12 + Math.pow(rng(), 1.5) * .45;
+      const az = rng() * 6.283, off = big ? 0 : .4 + rng() * 1.8;
+      const d = tilted(rng() * 6.283, rng() * (big ? .5 : 1.4));
+      const c = base.clone().add(V(Math.cos(az) * off, s * (.25 + rng() * .35), Math.sin(az) * off));
+      gem(c, d, s, s * (.85 + rng() * .4), s * (.9 + rng() * .2), rng() * 6.283, i * .05, .7 + rng() * .3, M(J1.a, mixC(J1.a, J1.b, .7), .02, .05, .6));
+    }
+    // couronne de petits prismes autour de la pierre maîtresse
+    const Q = pick(QUARTZ), mq = M(Q.a, Q.b, .05, 0, .3);
+    for (let i = 0; i < 6; i++) { const az = i / 6 * 6.283 + rng(); crystal(base.clone().add(V(Math.cos(az) * .8, -.2, Math.sin(az) * .8)), tilted(az, .5 + rng() * .4), .5 + rng() * .9, .07 + rng() * .08, .3, .7, .4, rng() * 6, mq); }
+    break; }
+  case 'succulente': {                         // rosettes de lobes charnus et translucides
+    const nr = 1 + Math.floor(rng() * 3), m = M(mixC(F.a, [.8, .9, .85], .5), F.b, .25, 0, .7);
+    for (let k = 0; k < nr; k++) {
+      const c0 = base.clone().add(k ? randH().multiplyScalar(.8 + rng() * 1.2) : V(0, 0, 0)), sc = (k ? .6 : 1) * (.8 + rng() * .5);
+      for (let ring = 0; ring < 4; ring++) {
+        const cnt = 5 + ring * 3, tilt = .25 + ring * .32, len = (.18 + ring * .12) * sc;
+        for (let i = 0; i < cnt; i++) {
+          const az = i / cnt * 6.283 + ring * .4, d = tilted(az, tilt), side = V(-Math.sin(az), 0, Math.cos(az));
+          pearl(c0.clone().addScaledVector(d, len * .9), d, len * .55, 2.1, (3 - ring) * .12 + i * .004, .25, m, null, new THREE.Vector3().crossVectors(d, side), .45);
         }
-        if (depth === 0 && k < n - 1 && k % 2 === 0) for (const s of [-1, 1]) {   // folioles fines, en écailles
-          const ld = dir.clone().applyAxisAngle(axis, s * 1.05);
-          pearl(pos.clone().addScaledVector(ld, len * .07), ld, len * .028 + .012, 4.2, tb, .3, MV);
+      }
+      const J1 = pick(JEWELS); gem(c0.clone().add(V(0, .12 * sc, 0)), V(0, 1, 0), .12 * sc, .14 * sc, .12 * sc, 0, .5, 1, M(J1.a, J1.b, .02, .05, .5));
+    }
+    break; }
+  case 'arbre': {                              // arbres-lanternes : tronc métallique, couronne de feuilles, fruits lumineux
+    const tr = stroke(base, V((rng() - .5) * .15, 1, (rng() - .5) * .15), 3.5 + rng() * 3.5, .42 + rng() * .18, .22, 5, 0, .25, randH(), (rng() - .5) * .08, M(B.col, mixC(B.col, F.a, .5), B.rough, B.metal), .03);
+    const leafM = M(F.a, F.b, .35, 0, .75), fruitJ = pick(JEWELS);
+    const branch = (p, d, len, r, depth, t0, t1) => {
+      const end = stroke(p, d, len, r, r * .6, 3, t0, t1, randH(), .08 + rng() * .1, M(mixC(B.col, F.a, .3 + (3 - depth) * .15), mixC(B.col, F.a, .45 + (3 - depth) * .15), B.rough, B.metal * .8), .04);
+      if (depth > 0) {
+        const k = 2 + (rng() < .45 ? 1 : 0);
+        for (let i = 0; i < k; i++) {
+          const ax = new THREE.Vector3().crossVectors(end.dir, randH()).normalize();
+          const cd = end.dir.clone().applyAxisAngle(ax, .45 + rng() * .45).add(V(0, .25, 0)).normalize();
+          branch(end.pos, cd, len * (.62 + rng() * .15), r * .62, depth - 1, end.t, end.t + (t1 - t0) * .9);
+        }
+      } else {
+        const nl = 5 + Math.floor(rng() * 5);
+        for (let i = 0; i < nl; i++) {
+          const ld = end.dir.clone().add(randH().multiplyScalar(1.2)).add(V(0, rng() * .6, 0)).normalize();
+          pearl(end.pos.clone().addScaledVector(ld, .25 + rng() * .3), ld, .16 + rng() * .1, 2.3, end.t + rng() * .05, .3, leafM, null, new THREE.Vector3().crossVectors(ld, randH()), .22);
+        }
+        if (rng() < .4) pearl(end.pos.clone().add(V(0, -.35, 0)), V(0, -1, 0), .16 + rng() * .1, 1.35, end.t + .05, 1.1, M(fruitJ.a, fruitJ.b, .1, 0, .6), null, null, 1, 1);
+      }
+    };
+    const nb = 3 + Math.floor(rng() * 2), a0 = rng() * 6.28;
+    for (let i = 0; i < nb; i++) branch(tr.pos, tilted(a0 + i / nb * 6.283, .5 + rng() * .4), 2 + rng() * 1.6, .2, 3, .25, .45);
+    pl.col = mixC(F.g, fruitJ.b, .5);
+    break; }
+  case 'saule': {                              // saules : branches arquées, longues chevelures lumineuses qui retombent
+    const tr = stroke(base, V(0, 1, 0), 2.5 + rng() * 2, .35, .22, 4, 0, .22, randH(), (rng() - .5) * .1, M(B.col, mixC(B.col, F.a, .4), B.rough, B.metal), .03);
+    const hairM = M(mixC(F.a, F.b, .3), F.b, .2, .1, .6);
+    const nb = 5 + Math.floor(rng() * 3), a0 = rng() * 6.28;
+    for (let i = 0; i < nb; i++) {
+      const az = a0 + i / nb * 6.283, d = tilted(az, .55 + rng() * .3), droop = new THREE.Vector3().crossVectors(d, V(0, 1, 0)).normalize();
+      stroke(tr.pos, d, 3 + rng() * 2.5, .14, .04, 6, .22, .55, droop, .14 + rng() * .06, M(mixC(B.col, F.a, .3), mixC(B.col, F.a, .6), B.rough, B.metal * .8), .05, (k, pos, dir, tb) => {
+        if (k < 1) return;
+        for (let s = 0; s < 2; s++) {
+          const hl = Math.min(pos.y - pl.y - .3, 1.8 + rng() * 2.8); if (hl < .4) continue;
+          const hd = V((rng() - .5) * .15, -1, (rng() - .5) * .15).normalize();
+          const h = stroke(pos.clone().add(randH().multiplyScalar(.15)), hd, hl, .025, .008, 4, tb, tb + .25, randH(), .03, hairM, .25);
+          pearl(h.pos, hd, .045, 1.4, h.t, 1, M(F.b, F.g, .1, 0, .5));
         }
       });
-      pearl(end.pos, end.dir, r * 1.5 + .035, 1.5, end.t, depth === 0 ? 1 : .7, MV);
+    }
+    break; }
+  case 'fougere': {                            // crosses spiralées, folioles fines en écailles
+    const tr = stroke(base, V(0, 1, 0), 2.5 + rng() * 3.5, .2, .1, 5, 0, .3, randH(), (rng() - .5) * .12, M(B.col, mixC(B.col, F.a, .5), .24, .9), .04);
+    const leafM = M(F.a, F.b, .3, .05, .6), stemM = M(mixC(B.col, F.a, .4), F.a, .26, .8);
+    const frond = (p, d, len, r, depth, t0, t1) => {
+      const axis = new THREE.Vector3().crossVectors(d, randH()).normalize(); if (axis.lengthSq() < .01) axis.set(1, 0, 0);
+      const curl = (.2 + rng() * .16) * (depth === 2 ? 1 : 1.4) * (rng() < .5 ? -1 : 1), n = depth === 2 ? 6 : 5;
+      const end = stroke(p, d, len, r, r * .35, n, t0, t1, axis, curl, stemM, .05, (k, pos, dir, tb) => {
+        if (depth > 0 && k >= 1 && k <= n - 2 && k % 2 === 1) for (const s of [-1, 1]) frond(pos, dir.clone().applyAxisAngle(axis, s * (.9 + rng() * .4)), len * .42, r * .55, depth - 1, tb, tb + (t1 - t0) * .7);
+        if (depth === 0 && k < n - 1 && k % 2 === 0) for (const s of [-1, 1]) { const ld = dir.clone().applyAxisAngle(axis, s * 1.05); pearl(pos.clone().addScaledVector(ld, len * .07), ld, len * .028 + .012, 4.2, tb, .3, leafM, null, axis, .3); }
+      });
+      pearl(end.pos, end.dir, r * 1.5 + .035, 1.5, end.t, depth === 0 ? 1 : .7, M(F.b, F.g, .1, 0, .5));
     };
     const nf = 3 + Math.floor(rng() * 3), a0 = rng() * 6.28;
-    for (let i = 0; i < nf; i++) {
-      const az = a0 + i / nf * 6.283, tilt = .45 + rng() * .65;
-      frond(tr.pos, V(Math.sin(tilt) * Math.cos(az), Math.cos(tilt), Math.sin(tilt) * Math.sin(az)), 2.2 + rng() * 2.8, .09, 2, .3 + rng() * .05, .72 + rng() * .1);
+    for (let i = 0; i < nf; i++) frond(tr.pos, tilted(a0 + i / nf * 6.283, .45 + rng() * .65), 2.2 + rng() * 2.8, .09, 2, .3 + rng() * .05, .72 + rng() * .1);
+    break; }
+  case 'arbuste': {                            // buissons denses : rameaux, feuilles et grappes de baies-gemmes
+    const ns = 7 + Math.floor(rng() * 8), leafM = M(F.a, F.b, .35, 0, .7), berry = pick(JEWELS);
+    const stemM = M(mixC(B.col, F.a, .2), mixC(B.col, F.a, .55), B.rough, B.metal * .7);
+    for (let i = 0; i < ns; i++) {
+      const az = rng() * 6.283, d = tilted(az, .25 + rng() * .7);
+      const s1 = stroke(base.clone().add(V(Math.cos(az) * .2, -.05, Math.sin(az) * .2)), d, .7 + rng() * 1.1, .06, .03, 3, rng() * .15, .45, randH(), .1, stemM, .04);
+      for (let c = 0; c < 2; c++) {
+        const cd = s1.dir.clone().add(randH().multiplyScalar(.7)).add(V(0, .3, 0)).normalize();
+        const s2 = stroke(s1.pos, cd, .4 + rng() * .6, .03, .012, 3, s1.t, s1.t + .3, randH(), .15, stemM, .05);
+        for (let l = 0; l < 4; l++) { const ld = s2.dir.clone().add(randH().multiplyScalar(1.4)).normalize(); pearl(s2.pos.clone().addScaledVector(ld, .1), ld, .07 + rng() * .05, 2.1, s2.t + l * .01, .25, leafM, null, new THREE.Vector3().crossVectors(ld, randH()), .25); }
+        if (rng() < .5) for (let b = 0; b < 3 + Math.floor(rng() * 3); b++) gem(s2.pos.clone().add(randH().multiplyScalar(.12)).add(V(0, -.05 - rng() * .1, 0)), V(0, 1, 0), .05, .06, .05, rng() * 6, s2.t + .05, 1, M(berry.a, berry.b, .05, 0, .6));
+      }
     }
-  } else if (pl.sp === 'filament') {         // tiges de verre souples, sporanges luminescents
-    const n = 4 + Math.floor(rng() * 6);
+    pl.col = mixC(F.g, berry.b, .5);
+    break; }
+  case 'filament': {                           // tiges de verre souples, sporanges luminescents
+    const n = 4 + Math.floor(rng() * 6), glass = M(mixC([.6, .63, .68], F.a, .25), mixC([.85, .9, .95], F.b, .3), .07, .05, .5);
     for (let i = 0; i < n; i++) {
-      const az = rng() * 6.283, tilt = .02 + rng() * .28, off = .2 + rng() * 1.1;
-      const d = V(Math.sin(tilt) * Math.cos(az), Math.cos(tilt), Math.sin(tilt) * Math.sin(az));
-      const t0 = rng() * .25, r = .05 + rng() * .04;
-      const res = stroke(base.clone().add(V(Math.cos(az) * off, 0, Math.sin(az) * off)), d, 6 + rng() * 15, r, r * .3, 6, t0, t0 + .5 + rng() * .2, randH(), .04 + rng() * .05, MAT.verre, .06);
-      pearl(res.pos, res.dir, .13 + rng() * .17, 1.6, res.t, 1, MV);
-      seeTop(res.pos.y);
+      const az = rng() * 6.283, d = tilted(az, .02 + rng() * .28), off = .2 + rng() * 1.1, t0 = rng() * .25, r = .05 + rng() * .04;
+      const res = stroke(base.clone().add(V(Math.cos(az) * off, 0, Math.sin(az) * off)), d, 6 + rng() * 15, r, r * .3, 6, t0, t0 + .5 + rng() * .2, randH(), .04 + rng() * .05, glass, .06);
+      pearl(res.pos, res.dir, .13 + rng() * .17, 1.6, res.t, 1, M(F.b, F.g, .07, 0, .6));
     }
-  } else {                                   // corolles héliotropes : coupoles de nervures qui suivent le Soleil
-    const n = 2 + Math.floor(rng() * 4);
+    break; }
+  case 'herbe': {                              // touffes de brins arqués, épis lumineux
+    const n = 18 + Math.floor(rng() * 24), m = M(F.a, F.b, .4, 0, .75);
     for (let i = 0; i < n; i++) {
-      const az = rng() * 6.283, off = rng() * 1.6;
-      const p = base.clone().add(V(Math.cos(az) * off, 0, Math.sin(az) * off));
-      const d0 = V((rng() - .5) * .3, 1, (rng() - .5) * .3).normalize();
-      const axis = new THREE.Vector3().crossVectors(d0, sunDir).normalize();
-      const total = d0.angleTo(sunDir) * (.35 + rng() * .3);
-      const t0 = i * .08;
-      const st = stroke(p, d0, 3.5 + rng() * 6, .1, .05, 5, t0, t0 + .45, axis, total / 5, MAT.tige, .05);
+      const az = rng() * 6.283, d = tilted(az, .08 + rng() * .5), off = Math.sqrt(rng()) * .5;
+      const ax = new THREE.Vector3().crossVectors(d, V(0, 1, 0)).normalize();
+      const s = stroke(base.clone().add(V(Math.cos(az) * off, -.02, Math.sin(az) * off)), d, .5 + rng() * 1.5, .028 + rng() * .02, .002, 3, rng() * .3, .55 + rng() * .3, ax, .22 + rng() * .3, m, .08);
+      if (rng() < .3) pearl(s.pos, s.dir, .03 + rng() * .02, 2.4, s.t, 1, M(F.b, F.g, .2, 0, .6));
+    }
+    break; }
+  case 'fleur': {                              // lys : pétales translucides en coupe, pistil et étamines lumineux
+    const nf = 2 + Math.floor(rng() * 4), F2 = rng() < .5 ? F : fam();
+    for (let k = 0; k < nf; k++) {
+      const az = rng() * 6.283, p = base.clone().add(V(Math.cos(az) * rng() * .7, 0, Math.sin(az) * rng() * .7));
+      const st = stroke(p, tilted(rng() * 6.283, rng() * .25), .8 + rng() * 1.8, .045, .025, 4, k * .08, k * .08 + .4, randH(), .06, M([.12, .2, .12], mixC([.2, .35, .2], F2.a, .5), .4, 0, .5), .03);
+      const ax = st.dir, np = 5 + Math.floor(rng() * 4), cup = .45 + rng() * .45, R = .35 + rng() * .35, tw = rng() * 6;
+      const petal = M(mixC([.95, .95, .92], F2.b, .25), F2.b, .32, 0, .85);
+      const u = new THREE.Vector3().crossVectors(ax, V(1, 0, 0)).normalize(), w = new THREE.Vector3().crossVectors(ax, u);
+      for (let i = 0; i < np; i++) {
+        const a = i / np * 6.283 + tw, out = u.clone().multiplyScalar(Math.cos(a)).addScaledVector(w, Math.sin(a));
+        const pd = out.clone().multiplyScalar(Math.cos(cup)).addScaledVector(ax, Math.sin(cup)).normalize();
+        const tang = new THREE.Vector3().crossVectors(ax, out);
+        pearl(st.pos.clone().addScaledVector(pd, R * .55), pd, R * .5, 2.2, st.t + i * .01, .45, petal, null, new THREE.Vector3().crossVectors(pd, tang), .18);
+      }
+      for (let i = 0; i < 5; i++) {
+        const sd = ax.clone().add(randH().multiplyScalar(.5)).normalize();
+        const s = stroke(st.pos, sd, R * .55, .008, .005, 2, st.t + .05, st.t + .15, null, 0, M([.9, .85, .6], F2.b, .3, 0, .5), .3);
+        pearl(s.pos, sd, .025, 1.2, s.t, 1, M(F2.b, F2.g, .2, 0, .6));
+      }
+      pearl(st.pos.clone().addScaledVector(ax, .05), ax, .05, 1.8, st.t + .08, 1.2, M(F2.g, [1, 1, .9], .2, 0, .6));
+    }
+    pl.col = F2.g.slice();
+    break; }
+  default: {                                   // corolles héliotropes : coupoles de nervures qui suivent le Soleil
+    const n = 2 + Math.floor(rng() * 4), mir = M([.88, .8, .6], mixC([.88, .8, .6], F.b, .4), .08, 1), stemM = M(B.col, mixC(B.col, F.a, .5), .32, .75);
+    for (let i = 0; i < n; i++) {
+      const az = rng() * 6.283, p = base.clone().add(V(Math.cos(az) * rng() * 1.6, 0, Math.sin(az) * rng() * 1.6));
+      const d0 = V((rng() - .5) * .3, 1, (rng() - .5) * .3).normalize(), axis = new THREE.Vector3().crossVectors(d0, sunDir).normalize();
+      const total = d0.angleTo(sunDir) * (.35 + rng() * .3), t0 = i * .08;
+      const st = stroke(p, d0, 3.5 + rng() * 6, .1, .05, 5, t0, t0 + .45, axis, total / 5, stemM, .05);
       const R = 1.1 + rng() * 1.8, nr = 11 + Math.floor(rng() * 7), piv = st.pos.clone();
       const u = new THREE.Vector3().crossVectors(sunDir, V(0, 1, 0)).normalize(), w = new THREE.Vector3().crossVectors(u, sunDir).normalize();
       for (let j = 0; j < nr; j++) {
-        const a = j / nr * 6.283;
-        const rd = u.clone().multiplyScalar(Math.cos(a)).addScaledVector(w, Math.sin(a)).addScaledVector(sunDir, .38).normalize();
-        const tj = st.t + j * .004;
-        const rib = stroke(st.pos, rd, R, .04, .012, 3, tj, tj + .2, new THREE.Vector3().crossVectors(rd, sunDir).normalize(), -.13, MAT.miroir, .15, null, piv);
-        pearl(rib.pos, rib.dir, .075, 1.3, rib.t, 1, MAT.verre, piv);
+        const a = j / nr * 6.283, rd = u.clone().multiplyScalar(Math.cos(a)).addScaledVector(w, Math.sin(a)).addScaledVector(sunDir, .38).normalize(), tj = st.t + j * .004;
+        const rib = stroke(st.pos, rd, R, .04, .012, 3, tj, tj + .2, new THREE.Vector3().crossVectors(rd, sunDir).normalize(), -.13, mir, .15, null, piv);
+        pearl(rib.pos, rib.dir, .075, 1.3, rib.t, 1, M(F.b, F.g, .07, 0, .5), piv);
       }
-      pearl(st.pos, sunDir, .26, .7, st.t + .05, 1.2, MAT.cristal, piv);
-      seeTop(st.pos.y + R);
+      pearl(st.pos, sunDir, .26, .7, st.t + .05, 1.2, M([.7, .75, .8], F.b, .05, 0, .5), piv);
     }
-  }
-  return { T, P, K, height: top };
+  } }
+  return { T, P, K, J, height: top };
 }
 function writePlant(G, idx) {
-  if (TUBES.n + G.T.length > TUBES.cap || PEARLS.n + G.P.length > PEARLS.cap || CRYST.n + G.K.length > CRYST.cap) return false;
+  if (TUBES.n + G.T.length > TUBES.cap || PEARLS.n + G.P.length > PEARLS.cap || CRYST.n + G.K.length > CRYST.cap || GEMS.n + G.J.length > GEMS.cap) return false;
+  const cols = (A, i, c0, c1, m) => { A.iCol.array.set(c0, i * 3); A.iCol2.array.set(c1, i * 3); A.iMat.array.set(m, i * 3); };
   for (const s of G.T) {
     const i = TUBES.n++, A = TUBES.A;
     A.iP0.array.set(s.slice(0, 3), i * 3); A.iP1.array.set(s.slice(3, 6), i * 3); A.iT0.array.set(s.slice(6, 9), i * 3); A.iT1.array.set(s.slice(9, 12), i * 3);
-    A.iRad.array.set([s[12], s[13], s[14], s[15]], i * 4); A.iTime.array.set([s[16], s[17], idx, 0], i * 4);
-    A.iCol.array.set(s[18].col, i * 3); A.iMat.array.set([s[18].rough, s[18].metal], i * 2); A.iPivot.array.set(s[19], i * 4);
+    A.iRad.array.set([s[12], s[13], s[14], s[15]], i * 4); A.iTime.array.set([s[16], s[17], idx, 0], i * 4); A.iPivot.array.set(s[21], i * 4);
+    cols(A, i, s[18], s[19], s[20]);
   }
   for (const s of G.P) {
-    const i = PEARLS.n++, A = PEARLS.A;
-    A.iC.array.set(s.slice(0, 3), i * 3); A.iD.array.set([s[3], s[4], s[5], s[6]], i * 4); A.iRad.array.set([s[7], s[8], 0, 0], i * 4);
-    A.iTime.array.set([s[9], s[10], idx, s[11]], i * 4); A.iCol.array.set(s[12].col, i * 3); A.iMat.array.set([s[12].rough, s[12].metal], i * 2); A.iPivot.array.set(s[13], i * 4);
+    const i = PEARLS.n++, A = PEARLS.A, m = s[16];
+    A.iC.array.set(s.slice(0, 3), i * 3); A.iD.array.set([s[3], s[4], s[5], s[6]], i * 4); A.iF.array.set([s[7], s[8], s[9], s[10]], i * 4);
+    A.iRad.array.set([s[11], s[12], 0, 0], i * 4); A.iTime.array.set([s[13], s[14], idx, s[15]], i * 4); A.iPivot.array.set(s[17], i * 4);
+    cols(A, i, m.col, m.col2, [m.rough, m.metal, m.trans]);
   }
   for (const s of G.K) {
-    const i = CRYST.n++, A = CRYST.A;
+    const i = CRYST.n++, A = CRYST.A, m = s[12];
     A.iB.array.set(s.slice(0, 3), i * 3); A.iD.array.set(s.slice(3, 6), i * 3); A.iShape.array.set([s[6], s[7], s[8], s[9]], i * 4);
-    A.iTime.array.set([s[10], s[11], idx, 0], i * 4); A.iCol.array.set(s[12].col, i * 3); A.iMat.array.set([s[12].rough, s[12].metal], i * 2);
+    A.iTime.array.set([s[10], s[11], idx, 0], i * 4); cols(A, i, m.col, m.col2, [m.rough, m.metal, m.trans]);
   }
-  for (const I of [TUBES, PEARLS, CRYST]) { for (const k in I.A) I.A[k].needsUpdate = true; I.g.instanceCount = I.n; }
+  for (const s of G.J) {
+    const i = GEMS.n++, A = GEMS.A, m = s[13];
+    A.iC.array.set(s.slice(0, 3), i * 3); A.iD.array.set([s[3], s[4], s[5], s[6]], i * 4); A.iS.array.set([s[7], s[8], s[9], s[10]], i * 4);
+    A.iTime.array.set([s[11], s[12], idx, 0], i * 4); cols(A, i, m.col, m.col2, [m.rough, m.metal, m.trans]);
+  }
+  for (const I of FLORA_SETS) { for (const k in I.A) I.A[k].needsUpdate = true; I.g.instanceCount = I.n; }
   return true;
 }
-function resetFlora() { for (const I of [TUBES, PEARLS, CRYST]) { I.n = 0; I.g.instanceCount = 0; } PU.uN.value = 0; }
+function resetFlora() { for (const I of FLORA_SETS) { I.n = 0; I.g.instanceCount = 0; } PU.uN.value = 0; }
 
 /* ---- Poussière balistique ---- */
 const DCAP = 7000;
@@ -1305,7 +1498,8 @@ function resetDust() { dT0.fill(-1e6); dGeo.attributes.aT0.needsUpdate = true; d
    ===================================================================== */
 class Sim {
   constructor(seed, W, intro) {
-    this.intro = !!intro; this.finale = false; this.silentT = 0; this.loudT = 0;
+    this.intro = !!intro; this.finale = false; this.silentT = 0; this.loudT = 0; this.kick = 0;
+    this.introTv = 0; this.introTvPrev = 0; this.introDone = !intro; this.introDoneAt = 0; this.introEnd = intro ? Infinity : 0;
     this.W = W; this.t = 0; this.tick = 0; this.lunarT = 0; this.rate = TIME_BASE; this.beatEnv = 0; this.tscale = 1;
     this.rL = mulberry32(seed ^ 0xA341316C); this.rC = mulberry32(seed ^ 0xC8013EA4); this.rD = mulberry32(seed ^ 0xAD90777D);
     this.f = { bass: 0, mid: 0, high: 0, vol: 0, cent: 0 }; this.plants = []; this.lastSpawn = -99; this.shot = null; this.full = false;
@@ -1323,32 +1517,42 @@ class Sim {
     this.rate = TIME_BASE * this.tscale * (1 + 30 * f.vol * f.vol + 14 * this.beatEnv + 6 * f.bass * f.bass);   // ~×15 sur une musique moyenne : un jour lunaire complet en 4-5 min
     this.lunarT += DT * this.rate;
     const t = this.t, n = this.plants.length;
+    this.kick = onset ? 1 : this.kick * Math.exp(-DT * 6);
+    if (!this.introDone) {               // ouverture : le voyage avance au rythme de la musique
+      this.introTvPrev = this.introTv;
+      this.introTv += DT * (.35 + .9 * f.vol + .35 * f.bass + .6 * this.kick);
+      if (this.introTv >= INTRO_SPACE) { this.introDone = true; this.introDoneAt = t; this.introEnd = t + 12; this.cut('arrivee'); }
+    }
+    // ensemencement : seulement une fois le site révélé à l'écran
+    const seedOpen = !this.intro || (this.introDone && t > this.introDoneAt + 1.2);
     const sustained = vol > .3 && t - this.lastSpawn > 6;
-    if (!this.full && n < MAXP && ((onset && vol > .08 && t - this.lastSpawn > 1.6) || sustained)) this.spawn(bass, mid, high, cent);
+    if (seedOpen && !this.full && n < MAXP && ((onset && vol > .08 && t - this.lastSpawn > 1.6) || sustained || (n === 0 && vol > .04))) this.spawn(bass, mid, high, cent);
     for (const p of this.plants) {
-      const band = p.sp === 'cristal' ? f.bass : p.sp === 'fougere' ? f.mid : p.sp === 'filament' ? f.high : (f.mid + f.cent) * .5;
+      const bk = SPECIES[p.sp].band, band = bk === 'cent' ? (f.mid + f.cent) * .5 : f[bk];
       p.growth = Math.min(1, p.growth + DT / SPECIES[p.sp].dur * (.18 + 1.7 * band));
       p.glow += (band - p.glow) * .12;
       p.pulse *= Math.exp(-DT * 1.6);
     }
     if (onset) {
-      const dom = bass >= mid && bass >= high ? 'cristal' : mid >= high ? 'fougere' : 'filament';
-      for (const p of this.plants) if (p.sp === dom || this.rL() < .25) p.pulse = 1;
+      const dom = bass >= mid && bass >= high ? 'bass' : mid >= high ? 'mid' : 'high';
+      for (const p of this.plants) if (SPECIES[p.sp].band === dom || this.rL() < .25) p.pulse = 1;
       if (n && bass > .3) { const p = this.plants[Math.floor(this.rD() * n)]; emitDust(this.rD, p.x, p.z, Math.floor(40 + bass * 180), t, this.W.h); }
     }
     if (this.intro) {                     // final : à 3 min 30, ou dès 3 s de silence ; annulé si la musique reprend avant 3 min 30
       this.silentT = silent ? this.silentT + DT : 0; this.loudT = silent ? 0 : this.loudT + DT;
-      if (!this.finale && t > INTRO_END && (t >= FINALE_T || this.silentT > 3)) { this.finale = true; this.cut('finale'); }
+      if (!this.finale && t > this.introEnd && (t >= FINALE_T || this.silentT > 3)) { this.finale = true; this.cut('finale'); }
       else if (this.finale && t < FINALE_T && this.loudT > 2) { this.finale = false; this.cut(); }
     }
-    if (this.intro && this.shot.type === 'arrivee' && t > INTRO_END) this.cut();
-    const free = !this.finale && (!this.intro || t > INTRO_END);
+    if (this.intro && this.shot.type === 'arrivee' && t > this.introEnd) this.cut();
+    const free = !this.finale && t > this.introEnd;
     if (free && ((onset && t - this.shot.t0 > 7) || t - this.shot.t0 > 15)) this.cut();
   }
   spawn(bass, mid, high, cent) {
     const r = this.rL, W = this.W;
-    const sc = { cristal: bass * 1.15, fougere: mid, filament: high * 1.35, corolle: cent > .4 ? mid * .6 + cent * .7 : .05 };
-    let tot = 0; for (const k in sc) { sc[k] = Math.pow(sc[k] + .02, 3); tot += sc[k]; }
+    const br = cent > .35 ? mid * .5 + cent * .8 : .04, cnt = countSpecies();
+    const sc = { cristal: bass * 1.05, gemme: bass * .95, succulente: bass * .75 + mid * .2, arbre: this.f.vol > .4 ? this.f.vol * 1.1 : .02, saule: mid * .8 + bass * .2,
+      fougere: mid * .9, arbuste: mid * .85, filament: high * 1.25, herbe: high * 1.1, fleur: br * .95, corolle: br * .85 };
+    let tot = 0; for (const k in sc) { sc[k] = Math.pow(sc[k] + .02, 3) / (1 + .45 * cnt[k]); tot += sc[k]; }   // la diversité est encouragée
     let x = r() * tot, sp = 'fougere'; for (const k in sc) { x -= sc[k]; if (x <= 0) { sp = k; break; } }
     let px, pz;
     if (!this.plants.length) { px = (r() - .5) * 4; pz = (r() - .5) * 4; }
@@ -1357,12 +1561,12 @@ class Sim {
     if (Math.hypot(px, pz) > 52) { px *= .7; pz *= .7; }
     const idx = this.plants.length;
     const pal = W.palette, mixc = (u, v, k) => u.map((c, i) => c + (v[i] - c) * k);
-    const baseCol = sp === 'cristal' ? pal.a : sp === 'filament' ? mixc(pal.a, [1, 1, 1], .45) : sp === 'fougere' ? pal.b : mixc(pal.a, pal.b, .5);
+    const baseCol = mixc(pal.a, pal.b, r());
     const col = baseCol.map(c => clamp(c * (.85 + r() * .3), 0, 1.2));
     // direction du Soleil à l'instant (déterministe) de la naissance, relevée au-dessus de l'horizon
     const C = celestial(W, this.skyMs()); const sun0 = new THREE.Vector3(C.sunL.x, Math.max(C.sunL.y, .1), C.sunL.z).normalize();
     const pl = { idx, sp, x: px, z: pz, y: W.h(px, pz) - .15, growth: 0, glow: 0, pulse: 1, col, phase: r(), height: 0, sun0 };
-    const G = genPlant(pl, mulberry32(Math.floor(r() * 4294967296)), sun0);
+    const G = genPlant(pl, mulberry32(Math.floor(r() * 4294967296)), sun0, W);
     if (!writePlant(G, idx)) { this.full = true; return; }
     pl.height = Math.max(1, G.height);
     this.plants.push(pl); this.lastSpawn = this.t;
@@ -1406,7 +1610,7 @@ function shotCamera(sim, T, out) {
     pos.copy(gc).addScaledVector(sxz, -R).addScaledVector(side, (s.b - .5) * 20 + el * .4); pos.y = h(pos.x, pos.z) + 1.4 + s.c * 3;
     tgt.copy(gc).add(_v.set(0, 3.5, 0)); fov = 36;
   } else if (s.type === 'arrivee') {          // ouverture : on tombe du ciel sur le site, puis on se pose
-    const k = clamp((T - INTRO_SPACE) / (INTRO_END - INTRO_SPACE), 0, 1), e = 1 - Math.pow(1 - k, 3);
+    const k = clamp((T - sim.introDoneAt) / 12, 0, 1), e = 1 - Math.pow(1 - k, 3);
     const alt = Math.exp(Math.log(320) + (Math.log(11) - Math.log(320)) * e), R = 28 + 30 * e, az = s.b * 6.283 + T * .012;
     pos.set(gc.x + Math.cos(az) * R, 0, gc.z + Math.sin(az) * R); pos.y = h(pos.x, pos.z) + alt;
     tgt.copy(gc).add(_v.set(0, 2, 0)); fov = 52 - 18 * e;
@@ -1433,7 +1637,7 @@ function shotCamera(sim, T, out) {
     out.focus = C.distanceTo(pos);
   }
   if (s.type !== 'arrivee' && s.type !== 'plongee' && s.type !== 'finale') for (let it = 0; it < 3; it++) for (const q of sim.plants) {
-    const rq = (q.sp === 'fougere' ? 4.5 : q.sp === 'corolle' ? 3.5 : 2.6) * Math.max(q.growth, .3);
+    const rq = SPECIES[q.sp].r * Math.max(q.growth, .3);
     const dx = pos.x - q.x, dz = pos.z - q.z, d = Math.hypot(dx, dz);
     if (d < rq && (q !== P || s.type !== 'terre')) { const k = (rq + .01) / Math.max(d, .01); pos.x = q.x + dx * k; pos.z = q.z + dz * k; }
   }
@@ -1473,7 +1677,8 @@ async function finishLive(save) {
   try { await DB.put(rec); } catch (e) { memStore.set(rec.id, rec); }
   showEpilogue(rec);
 }
-function countSpecies() { const c = { cristal: 0, fougere: 0, filament: 0, corolle: 0 }; if (sim) for (const p of sim.plants) c[p.sp]++; return c; }
+function countSpecies() { const c = {}; for (const k in SPECIES) c[k] = 0; if (sim) for (const p of sim.plants) c[p.sp]++; return c; }
+const speciesLine = c => Object.keys(SPECIES).filter(k => c[k]).map(k => c[k] + ' ' + SPECIES[k].court).join(' · ') || 'aucun spécimen';
 
 async function startReplay(rec, exportVideo) {
   closeGallery(); AE.ensure(); AE.stop();
@@ -1600,7 +1805,7 @@ async function renderGallery() {
     const sky = rec.startUTC || Date.parse(rec.date);
     c.innerHTML = `<div class="th" style="background-image:url('${rec.thumb || ''}')"></div>
       <div class="meta"><div class="nm"></div><div class="dt">Ciel du ${dateFR(sky)} · ${mmss(rec.duration)}${rec.lunarT ? ' · ' + durLunaire(rec.lunarT) + ' lunaires' : ''}<br>
-      ${rec.plants} spécimens — ${sp.cristal || 0} cristaux · ${sp.fougere || 0} fougères · ${sp.filament || 0} filaments · ${sp.corolle || 0} corolles</div></div>
+      ${rec.plants} spécimens — ${speciesLine(sp)}</div></div>
       <div class="acts"><button class="small" data-a="play">Rejouer</button><button class="small" data-a="hd">Vidéo 8K</button><button class="small" data-a="video">Vidéo écran</button><button class="small" data-a="json">Sauvegarde</button><button class="small" data-a="del">Supprimer</button></div>`;
     c.querySelector('.nm').textContent = rec.name;
     c.querySelector('[data-a=play]').onclick = () => startReplay(rec, false);
@@ -1791,10 +1996,10 @@ SPACE.scene.background = new THREE.Color(0x000000);
   });
   SPACE.earth = new THREE.Mesh(new THREE.SphereGeometry(6.371, 160, 80), SPACE.earthMat); sg.add(SPACE.earth);
   SPACE.atmo = new THREE.Mesh(new THREE.SphereGeometry(6.371 * 1.022, 96, 48), new THREE.ShaderMaterial({
-    uniforms: { uSunI: SPACE.earthMat.uniforms.uSunI }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    uniforms: { uSunI: SPACE.earthMat.uniforms.uSunI, uAmp: { value: 1 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     vertexShader: `varying vec3 vN; varying vec3 vW; void main(){ vN=normalize(position); vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
-    fragmentShader: `uniform vec3 uSunI; varying vec3 vN; varying vec3 vW; void main(){ vec3 n=normalize(vN), v=normalize(cameraPosition-vW);
-      float fr=pow(1.-abs(dot(n,v)),4.); float l=smoothstep(-.25,.35,dot(n,uSunI)); gl_FragColor=vec4(vec3(.3,.55,1.)*fr*l*1.6,1.); }`
+    fragmentShader: `uniform vec3 uSunI; uniform float uAmp; varying vec3 vN; varying vec3 vW; void main(){ vec3 n=normalize(vN), v=normalize(cameraPosition-vW);
+      float fr=pow(1.-abs(dot(n,v)),4.); float l=smoothstep(-.25,.35,dot(n,uSunI)); gl_FragColor=vec4(vec3(.3,.55,1.)*fr*l*1.6*uAmp,1.); }`
   }));
   sg.add(SPACE.atmo);
   // la Lune : carte réelle, orientée par le modèle IAU, réflectance de Lommel-Seeliger (pas d'assombrissement au bord)
@@ -1857,22 +2062,25 @@ function spaceCamera(I, T) {
   const up = slerpV(I.q, I.site, ez((T - 8) / 7));
   return { pos, look, up, fov };
 }
-function updateSpace(T) {
+function updateSpace(T, f = { bass: 0, high: 0, vol: 0 }, kick = 0) {
   if (SPACE.seed !== world.seed || !SPACE.I || SPACE.I.ms !== world.startMs) { SPACE.I = introSetup(world); SPACE.I.ms = world.startMs; SPACE.seed = world.seed; }
   const I = SPACE.I, c = SPACE.cam, k = spaceCamera(I, T);
-  c.position.copy(k.pos); c.up.copy(k.up); c.lookAt(k.look); c.fov = k.fov; c.aspect = camera.aspect; c.updateProjectionMatrix();
+  const dl = k.pos.distanceTo(k.look), sh = dl * .006 * kick;      // secousse sur les attaques, souffle sur les graves
+  k.pos.add(new THREE.Vector3(Math.sin(T * 41), Math.sin(T * 37 + 1), Math.sin(T * 43 + 2)).multiplyScalar(sh));
+  c.position.copy(k.pos); c.up.copy(k.up); c.lookAt(k.look); c.fov = k.fov - 2.5 * kick + 1.5 * f.bass; c.aspect = camera.aspect; c.updateProjectionMatrix();
+  SPACE.atmo.material.uniforms.uAmp.value = 1 + 2.2 * f.bass + 1.5 * kick;
   SPACE.sky.position.copy(c.position);
   SPACE.earthMat.uniforms.uSunI.value.copy(I.sun); SPACE.earthMat.uniforms.uGmst.value = I.s.gmst + T * 4;   // la Terre tourne doucement pendant l'ouverture
   SPACE.moon.position.copy(I.M);
   const mu = SPACE.moonMat.uniforms;
   mu.uSun.value.copy(I.sun); mu.uXb.value.set(...I.F.xb); mu.uYb.value.set(...I.F.yb); mu.uZb.value.set(...I.F.zb);
   mu.uSite.value.copy(I.site); mu.uToEarth.value.copy(I.M).multiplyScalar(-1).normalize(); mu.uEL.value = I.s.earthLit;
-  mu.uMark.value = smoothstep(8, 13, T); mu.uTime.value = T; mu.uMarkCol.value.setRGB(...world.palette.a);
+  mu.uMark.value = smoothstep(8, 13, T) * (1 + 2.2 * kick); mu.uTime.value = T; mu.uMarkCol.value.setRGB(...world.palette.a);
   const rS = Math.asin(696000 / I.s.sunDist);
   SPACE.sun.position.copy(c.position).addScaledVector(I.sun, 2800); SPACE.sun.scale.setScalar(2800 * Math.tan(rS)); SPACE.sun.lookAt(c.position);
   SPACE.glare.position.copy(c.position).addScaledVector(I.sun, 2790); SPACE.glare.scale.setScalar(2800 * Math.tan(5 * D2R)); SPACE.glare.lookAt(c.position);
   SKY.glare.material.uniforms.uAmt.value = 1;
-  SKY.starMat.uniforms.uGain.value = .8; SKY.mwMat.uniforms.uGain.value = .9; SKY.dsoMat.uniforms.uGain.value = .8;
+  SKY.starMat.uniforms.uGain.value = .7 + .7 * f.high; SKY.mwMat.uniforms.uGain.value = .8 + .5 * f.vol; SKY.dsoMat.uniforms.uGain.value = .8;
 }
 
 /* ---- Épilogue ---- */
@@ -1970,10 +2178,11 @@ function updateVisuals(dt, withUI) {
     l.intensity = (.3 + 5 * C.night) * S.bio * (.25 + p.glow) * Math.min(1, p.growth * 2) * 6;
   });
 
-  const inSpace = sim.intro && renderT < INTRO_SPACE;
+  const inSpace = sim.intro && !sim.introDone;
+  const Tv = inSpace ? sim.introTv + (sim.introTv - sim.introTvPrev) * clamp((renderT - sim.t) / DT, 0, 1) : INTRO_SPACE;
   renderPass.scene = inSpace ? SPACE.scene : scene; renderPass.camera = inSpace ? SPACE.cam : camera;
-  cine.uniforms.uFade.value = !sim.intro ? 0 : renderT < INTRO_SPACE ? smoothstep(15.1, 15.95, renderT) : 1 - smoothstep(16, 17.2, renderT);   // plongée dans le noir, puis révélation du site
-  if (S.autocam || offline || (sim.intro && sim.t < INTRO_END)) {
+  cine.uniforms.uFade.value = !sim.intro ? 0 : inSpace ? smoothstep(15.1, 15.95, Tv) : 1 - smoothstep(0, 1.2, renderT - sim.introDoneAt);   // plongée dans le noir, puis révélation du site
+  if (S.autocam || offline || sim.t < sim.introEnd) {
     shotCamera(sim, renderT, camOut);
     camera.position.copy(camOut.pos); camera.lookAt(camOut.tgt); camTarget.copy(camOut.tgt);
     camera.fov = camOut.fov; camera.updateProjectionMatrix();
@@ -1984,7 +2193,7 @@ function updateVisuals(dt, withUI) {
   }
   updateSky(C);
   dof.u.uFocus.value = camOut.focus; dof.u.uAperture.value = S.dof;
-  if (inSpace) { updateSpace(renderT); dof.u.uAperture.value = 0; renderer.toneMappingExposure = 1; }
+  if (inSpace) { updateSpace(Tv, f, sim.kick); dof.u.uAperture.value = 0; renderer.toneMappingExposure = 1; }
   bloom.strength = .32 + f.bass * .18 + f.vol * .1;
   cine.uniforms.uTime.value = renderT; cine.uniforms.uGrain.value = S.grain; cine.uniforms.uBars.value = S.scope ? 1 : 0;
 
@@ -1992,7 +2201,7 @@ function updateVisuals(dt, withUI) {
     if (++hudTick % 3 === 0) {
       [f.bass, f.mid, f.high, f.vol, f.cent].forEach((v, i) => meters[i].style.width = Math.min(100, v * 100) + '%');
       const c = countSpecies();
-      $('flora').innerHTML = `<b>${sim.plants.length}</b> spécimens${sim.full ? ' — jardin complet' : ''}<br>${SPECIES.cristal.label} <b>${c.cristal}</b> · graves<br>${SPECIES.fougere.label} <b>${c.fougere}</b> · médiums<br>${SPECIES.filament.label} <b>${c.filament}</b> · aigus<br>${SPECIES.corolle.label} <b>${c.corolle}</b> · brillance`;
+      $('flora').innerHTML = `<b>${sim.plants.length}</b> spécimens${sim.full ? ' — jardin complet' : ''}` + Object.keys(SPECIES).filter(k => c[k]).map(k => `<br>${SPECIES[k].label} <b>${c[k]}</b>`).join('');
       if (mode !== 'intro') updateCarnet();
     }
     if (S.annot && !inSpace) updateLabels(C); else if (inSpace) $('labels').innerHTML = '';
