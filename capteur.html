@@ -38,6 +38,7 @@
   .vu i.clip { background:var(--rec); }
   #remote .time { font-variant-numeric:tabular-nums; font-size:34px; font-family:'Cormorant Garamond',serif; text-align:center; margin:4px 0; }
   #remote .site { text-align:center; color:var(--dim); font-size:12px; letter-spacing:.14em; text-transform:uppercase; }
+  .epi { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:21px; line-height:1.4; text-align:center; margin:14px 4px 4px; }
   .note { color:var(--faint); font-size:12px; line-height:1.65; }
   .hidden { display:none !important; }
   .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
@@ -69,6 +70,7 @@
     <div class="lbl">Herba Stellaris</div>
     <div class="time" id="rTime">—</div>
     <div class="site" id="rSite"></div>
+    <p class="epi hidden" id="epi">Cette œuvre fait maintenant partie de votre présent passé sur&nbsp;la&nbsp;Lune</p>
     <button class="big" id="rStart">Lancer la composition</button>
     <div class="row2"><button class="rec" id="rFinish">Terminer et conserver</button><button id="rDiscard">Abandonner</button></div>
   </div>
@@ -174,7 +176,8 @@ const mmss = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(Mat
 function onStatus(m) {
   if (!m || typeof m !== 'object') return;
   const live = m.mode === 'live';
-  $('rTime').textContent = live ? '● ' + mmss(m.t || 0) : m.mode === 'replay' ? '▶ relecture' : m.mode === 'hd' ? 'Rendu HD en cours' : 'Prêt';
+  $('rTime').textContent = live ? '● ' + mmss(m.t || 0) + (m.sil ? ' · fin dans ' + m.sil + ' s' : '') : m.mode === 'replay' ? '▶ relecture' : m.mode === 'hd' ? 'Rendu HD en cours' : 'Prêt';
+  $('epi').classList.toggle('hidden', !m.epi);
   $('rTime').style.color = live ? 'var(--rec)' : '';
   $('rSite').textContent = m.site ? m.site + (m.plants ? ' · ' + m.plants + ' spécimens' : '') : '';
   $('rStart').disabled = !(m.mode === 'intro' || m.mode === 'idle');
