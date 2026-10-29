@@ -140,17 +140,21 @@ La pédale d'expression du GX-1 règle le zoom : pédale levée, on est au sol ;
 (jusqu'à 450 m) ; aux trois quarts, un bref fondu au noir, puis l'orbite, de 40 km jusqu'à 3 600 km, où la Lune entière apparaît, le jardin
 en point de lumière qui bat avec la musique. Relâcher la pédale ramène au sol.
 
+**Le GX-1 n'envoie pas sa pédale en MIDI standard** : il la décrit seulement à son éditeur, BOSS TONE STUDIO, en messages
+exclusifs Roland. Herba Stellaris se présente donc au GX-1 comme son éditeur (même identifiant de modèle 01 06 0D, même
+poignée de main) et lit la position de la pédale dans ces messages. Rien à installer, et aucun réglage du GX-1 n'est modifié.
+
 **Réglage** (panneau Réglages, rubrique *Zoom sur la Lune*), dans Chrome ou Edge :
-1. Brancher le GX-1 en USB-C, pilote Boss installé.
-2. Dans le GX-1, sur un preset dédié, assigner la pédale **EXP1** à l'envoi d'un **Control Change MIDI** (par exemple CC 7 ou CC 11).
-3. **Activer la pédale MIDI** (le navigateur demande l'autorisation), puis **Apprendre la pédale** et la balayer de haut en bas.
-   La pédale est retenue (contrôleur et canal) pour les fois suivantes ; une entrée nommée GX ou BOSS est même reconnue seule au premier balayage.
-   Le dernier message reçu s'affiche : s'il n'en vient aucun, le GX-1 n'émet pas cette pédale en MIDI (voir ci-dessous).
+1. Fermer BOSS TONE STUDIO (un seul éditeur à la fois peut parler au GX-1), brancher le GX-1 en USB-C.
+2. Choisir sur le GX-1 un preset où la pédale EXP1 commande la **Pedal FX** (EXP1 = PEDAL FX). Pour que la pédale ne serve qu'au zoom,
+   laisser le bloc PDL FX éteint dans ce preset.
+3. **Activer la pédale MIDI** (accepter « contrôle total des appareils MIDI »), puis **Apprendre la pédale** et la balayer de haut en bas.
+   La ligne d'état affiche « Boss : mode éditeur actif » puis la pédale retenue. Elle est gardée pour les fois suivantes.
 4. **Inverser le sens** si besoin.
 
-Si le GX-1 n'envoie pas sa pédale en MIDI : une pédale MIDI USB ou sans fil (Boss EV-1-WL, par exemple) fonctionne de la même façon.
-Sinon, le zoom se règle aussi à la **molette** (caméra automatique), au clavier (**+** / **−**, **0** pour revenir au sol), au curseur de la régie
-ou à celui du **téléphone-capteur**. Les mouvements du zoom sont enregistrés et rejoués dans la galerie et les exports.
+Une pédale MIDI standard (CC) fonctionne aussi avec le même bouton d'apprentissage. Sinon, le zoom se règle à la **molette**
+(caméra automatique), au clavier (**+** / **−**, **0** pour revenir au sol), au curseur de la régie ou à celui du **téléphone-capteur**.
+Les mouvements du zoom sont enregistrés et rejoués dans la galerie et les exports.
 
 ## Comment le son agit sur l'image
 
