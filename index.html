@@ -139,8 +139,8 @@
 <script>
 // diagnostic : toute erreur s'affiche discrètement sur l'accueil (pour la repérer sans console)
 window.__errs = [];
-function __showErr(m) { try { window.__errs.push(m); let d = document.getElementById('errBox'); if (!d) { d = document.createElement('div'); d.id = 'errBox'; d.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:99;max-width:640px;font:11px/1.5 monospace;color:#ffb38a;background:rgba(0,0,0,.85);border:1px solid #ffb38a55;padding:8px 10px;white-space:pre-wrap;pointer-events:none'; (document.body || document.documentElement).appendChild(d); } d.textContent = 'Erreur : ' + window.__errs.slice(-4).join('\n'); } catch (e) {} }
-addEventListener('error', e => __showErr((e.message || 'ressource') + (e.filename ? ' @' + String(e.lineno) + ':' + e.colno : e.target && e.target.src ? ' ' + e.target.src : '')), true);
+function __showErr(m) { try { window.__errs.push(m); const it = document.getElementById('intro'); if (it && it.classList.contains('hidden')) return; let d = document.getElementById('errBox'); if (!d) { d = document.createElement('div'); d.id = 'errBox'; d.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:99;max-width:640px;font:11px/1.5 monospace;color:#ffb38a;background:rgba(0,0,0,.85);border:1px solid #ffb38a55;padding:8px 10px;white-space:pre-wrap;pointer-events:none'; (document.body || document.documentElement).appendChild(d); } d.textContent = 'Erreur : ' + window.__errs.slice(-4).join('\n'); } catch (e) {} }
+addEventListener('error', e => { if (e.message) __showErr(e.message + (e.filename ? ' @' + e.lineno + ':' + e.colno : '')); });
 addEventListener('unhandledrejection', e => __showErr('promesse : ' + (e.reason && (e.reason.message || e.reason))));
 </script>
 <script>/* =====================================================================
@@ -3185,9 +3185,10 @@ function testStop() {
 }
 $('btnTest').addEventListener('click', () => TST.st ? testStop() : testStart());
 $('inDev').addEventListener('change', () => { if (TST.st) testStart(); });
-(function testLoop() {
+requestAnimationFrame(function testLoop() {                    // démarre à la première image : tout le module est alors chargé
   requestAnimationFrame(testLoop);
   if (mode !== 'intro') return;
+  try {
   if (S.src === 'ordi' && TST.an) {
     TST.an.getFloatTimeDomainData(TST.buf); let p = 0, q = 0; for (const x of TST.buf) { q += x * x; p = Math.max(p, Math.abs(x)); }
     const db = 10 * Math.log10(q / TST.buf.length + 1e-12), pk = 20 * Math.log10(p + 1e-9); TST.peak = Math.max(pk, TST.peak - .4);
@@ -3197,7 +3198,8 @@ $('inDev').addEventListener('change', () => { if (TST.st) testStart(); });
     $('tLvl').style.width = $('pLvl').style.width || '0%';
     $('tMsg').textContent = PH.stream ? 'Téléphone relié : joue quelques notes, la jauge doit bouger' : 'En attente du téléphone…';
   }
-})();
+  } catch (e) {}
+});
 $('fileLive').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; S.file = f; $('fileName').textContent = f.name; status(''); });
 $('btnPubH').addEventListener('click', () => togglePublic());
 $('btnGo').addEventListener('click', async () => {
