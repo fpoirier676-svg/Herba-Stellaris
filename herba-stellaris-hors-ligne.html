@@ -2588,6 +2588,7 @@ var qrcode = function() {
    <section class="card">
     <h5><b>3</b> Scène et image</h5>
     <div class="brow"><button class="small" id="btnProj" title="Ouvre l’image seule dans une fenêtre à placer sur le projecteur ; cette fenêtre devient la régie">Fenêtre de projection</button><button class="small" id="btnPubH">Graines du public (Q)</button></div>
+    <div class="xnote" id="hdMsg" style="color:var(--faint)"></div>
     <div class="xnote" style="margin-top:10px"><b style="font-weight:400;color:var(--ink)">Lieu du spectacle</b> : le voyage part d’ici vers la Lune et y revient à la conclusion.</div>
     <input id="vName" class="vin" style="width:100%">
     <div style="display:flex;gap:6px;margin-top:6px"><input id="vLat" class="vin" style="flex:1" title="Latitude (nord +)"><input id="vLon" class="vin" style="flex:1" title="Longitude (est +, ouest −)"><button class="small" id="vReset" title="Bar à Pitons, Chicoutimi">↺</button></div>
@@ -2753,11 +2754,11 @@ const VENUE_DEF = { name: 'Bar à Pitons, 110 rue Price Ouest, Chicoutimi', lat:
 const EARTH_GLSL = `
 vec3 earthShade(vec3 n, vec3 v, vec3 L, float gmst, vec3 ven, float venI, float gain){
   float lon=atan(n.y,n.x)-gmst; lon=mod(lon+3.14159265,6.2831853)-3.14159265; float lat=asin(clamp(n.z,-1.,1.));
-  vec2 uv=vec2((lon+3.14159265)/6.2831853,.5+lat/3.14159265);
-  vec3 day=texture2D(tDay,uv).rgb; float lights=texture2D(tNight,uv).r; float sea=smoothstep(.25,.6,texture2D(tSpec,uv).r);
+  vec2 uv=vec2((lon+3.14159265)/6.2831853,.5+lat/3.14159265), gx=dFdx(uv), gy=dFdy(uv); gx.x-=floor(gx.x+.5); gy.x-=floor(gy.x+.5);
+  vec3 day=textureGrad(tDay,uv,gx,gy).rgb; float lights=textureGrad(tNight,uv,gx,gy).r; float sea=smoothstep(.25,.6,texture2D(tSpec,uv).r);
   vec3 e=normalize(vec3(-n.y,n.x,0.)+vec3(1e-5,0.,0.)), no=cross(n,e);
   vec3 nm=texture2D(tNorm,uv).xyz*2.-1.; vec3 nn=normalize(n+(e*nm.x+no*nm.y)*.45*(1.-sea));
-  float cl=texture2D(tCloud,uv).r;
+  float cl=textureGrad(tCloud,uv,gx,gy).r;
   vec3 Lt=L-n*dot(L,n); float k=.006;
   float cls=texture2D(tCloud,uv-vec2(dot(Lt,e)*k/(6.2831853*max(cos(lat),.05)),dot(Lt,no)*k/3.14159265)).r;   // ombre des nuages sur le sol
   float ndl=dot(n,L), lit=smoothstep(-.1,.12,ndl), ndl2=max(dot(nn,L),0.);
@@ -3327,7 +3328,7 @@ function bvToRGB(bv) {                       // couleur d'une étoile depuis son
   const m = Math.max(r, g, b); return [clamp(r / m, 0, 1), clamp(g / m, 0, 1), clamp(b / m, 0, 1)];
 }
 const texLoader = new THREE.TextureLoader();
-const loadTex = (src, srgb = true) => { const t = texLoader.load(src); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
+const loadTex = (src, srgb = true) => { const t = texLoader.load(src); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; };
 const SKY = { group: new THREE.Group(), R: 3000 };
 SKY.group.matrixAutoUpdate = false; scene.add(SKY.group);
 {
@@ -5326,7 +5327,7 @@ function flushZoom() {           // en direct : le zoom devient un événement e
   const now = performance.now(), d = Math.abs(ZM.v - ZM.sent);
   if (d > .004 && (now - ZM.sentT > 33 || ZM.v === 0 || ZM.v === 1)) { LIVE_EV.push({ type: 'zoom', v: Math.round(ZM.v * 1000) / 1000 }); ZM.sent = ZM.v; ZM.sentT = now; }
 }
-const zoomLabel = v => v < .01 ? 'sol' : v < ZOOM_SPLIT ? 'altitude ' + Math.round(8 * Math.pow(450 / 8, v / ZOOM_SPLIT)) + ' m' : 'orbite ' + Math.round(40 * Math.pow(90, (v - ZOOM_SPLIT) / (1 - ZOOM_SPLIT))) + ' km';
+const zoomLabel = v => v < .01 ? 'sol' : v < ZOOM_SPLIT ? 'altitude ' + Math.round(8 * Math.pow(450 / 8, v / ZOOM_SPLIT)) + ' m' : 'orbite ' + Math.round(120 * Math.pow(30, (v - ZOOM_SPLIT) / (1 - ZOOM_SPLIT))) + ' km';
 function updZoomUI() {
   $('oZoom').textContent = zoomLabel(ZM.v); if (document.activeElement !== $('zRange')) $('zRange').value = ZM.v; if (document.activeElement !== $('rgZoom')) $('rgZoom').value = ZM.v;
   const b = !ZM.bind ? 'Pédale non apprise' : ZM.bind.sx ? `Pédale : GX-1 (adresse ${ZM.bind.sx}, ${ZM.bind.lo}–${ZM.bind.hi})` : `Pédale : CC ${ZM.bind.cc}, canal ${ZM.bind.ch + 1}${ZM.bind.name ? ' (' + ZM.bind.name + ')' : ''}`;
@@ -5442,6 +5443,25 @@ function setUI() {
 }
 function status(m) { $('status').textContent = m; }
 
+/* ---- Haute définition : cartes 8K de la Lune et de la Terre (Solar System Scope, CC BY 4.0), chargées sur l'accueil ---- */
+const HD = { state: 'off', done: [] };
+function loadHD() {
+  if (HD.state !== 'off' || !/^https?:$/.test(location.protocol) || S.quality === 'fluide') return;
+  const max = renderer.capabilities.maxTextureSize; if (max < 8192) { HD.state = 'trop grand'; return; }
+  HD.state = 'chargement'; const an = renderer.capabilities.getMaxAnisotropy();
+  const jobs = [['hd/lune_8k.jpg', SPACE.moonMat.uniforms.tMoon, true, 'Lune'], ['hd/terre_jour_8k.jpg', SKY.earthMat.uniforms.tDay, true, 'Terre'], ['hd/terre_nuit_8k.jpg', SKY.earthMat.uniforms.tNight, false, 'villes'], ['hd/nuages_4k.jpg', SKY.earthMat.uniforms.tCloud, false, 'nuages']];
+  const next = () => {
+    const j = jobs.shift(); if (!j) { HD.state = 'ok'; updHD(); return; }
+    if (mode !== 'intro') { jobs.unshift(j); setTimeout(next, 5000); return; }          // jamais pendant une composition : on attend l'accueil
+    texLoader.load(new URL(j[0], location.href).href, t => {
+      if (j[2]) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = an; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter;
+      renderer.initTexture(t); const old = j[1].value; j[1].value = t; if (old && old !== t) old.dispose(); HD.done.push(j[3]); updHD(); setTimeout(next, 300);
+    }, undefined, () => { HD.state = 'partiel'; updHD(); setTimeout(next, 300); });
+  };
+  updHD(); setTimeout(next, 200);
+}
+function updHD() { const e = document.getElementById('hdMsg'); if (e) e.textContent = HD.state === 'ok' ? 'Haute définition : Lune et Terre en 8K' : HD.state === 'chargement' ? 'Chargement de la haute définition… ' + HD.done.join(', ') : HD.state === 'trop grand' ? 'Carte graphique limitée : définition standard' : HD.state === 'partiel' ? 'Haute définition partielle : ' + HD.done.join(', ') : ''; }
+setTimeout(loadHD, 2500);
 /* ---- Accueil : préparer le son, la pédale et la scène avant la composition ---- */
 S.src = 'ordi'; S.file = null;
 try { const v = localStorage.getItem('herba-source'); if (v === 'ordi' || v === 'phone') S.src = v; } catch (e) {}
@@ -5890,9 +5910,16 @@ SPACE.scene.background = new THREE.Color(0x000000);
       uSite: { value: new THREE.Vector3() }, uToEarth: { value: new THREE.Vector3() }, uEL: { value: .5 }, uMark: { value: 0 }, uMarkCol: { value: new THREE.Color(.2, 1, .8) }, uTime: { value: 0 } },
     vertexShader: `varying vec3 vN; varying vec3 vW; void main(){ vN=normalize(position); vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
     fragmentShader: `uniform sampler2D tMoon; uniform vec3 uSun,uXb,uYb,uZb,uSite,uToEarth,uMarkCol; uniform float uEL,uMark,uTime; varying vec3 vN; varying vec3 vW;
+      float h3(vec3 p){ p=fract(p*.3183099+.1); p*=17.; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
+      float vn(vec3 x){ vec3 i=floor(x), f=fract(x); f=f*f*(3.-2.*f);
+        return mix(mix(mix(h3(i),h3(i+vec3(1,0,0)),f.x),mix(h3(i+vec3(0,1,0)),h3(i+vec3(1,1,0)),f.x),f.y),mix(mix(h3(i+vec3(0,0,1)),h3(i+vec3(1,0,1)),f.x),mix(h3(i+vec3(0,1,1)),h3(i+vec3(1,1,1)),f.x),f.y),f.z); }
       void main(){ vec3 n=normalize(vN), v=normalize(cameraPosition-vW);
         float lon=atan(dot(n,uYb),dot(n,uXb)); float lat=asin(clamp(dot(n,uZb),-1.,1.));
-        vec3 alb=texture2D(tMoon,vec2((lon+3.14159265)/6.2831853,.5+lat/3.14159265)).rgb;
+        vec2 uv=vec2((lon+3.14159265)/6.2831853,.5+lat/3.14159265), gx=dFdx(uv), gy=dFdy(uv);
+        gx.x-=floor(gx.x+.5); gy.x-=floor(gy.x+.5);                       // pas de couture au méridien 180°
+        vec3 alb=textureGrad(tMoon,uv,gx,gy).rgb;
+        float dist=length(cameraPosition-vW), amp=smoothstep(.45,.03,dist);   // micro-relief : il apparaît quand on s'approche
+        if(amp>0.){ vec3 q=n*1737.; float m=vn(q*.22)*.5+vn(q*.9)*.3+vn(q*3.6)*.2; alb*=1.+(m-.5)*.32*amp; }
         float mu0=max(dot(n,uSun),0.), mu=max(dot(n,v),0.);
         vec3 col=alb*(mu0/(mu0+mu+1e-4))*2.2 + alb*max(dot(n,uToEarth),0.)*.07*uEL;
         float d=dot(n,uSite); float pulse=.6+.4*sin(uTime*3.);
@@ -5963,7 +5990,7 @@ function updateSpace(T, f = { bass: 0, high: 0, vol: 0 }, kick = 0, kOver, Iover
   SPACE.earthMat.uniforms.uSunI.value.copy(I.sun); const gm = I.s.gmst + .02 * T; SPACE.earthMat.uniforms.uGmst.value = gm;   // la Terre tourne à sa vraie vitesse (à peine)
   { const vd = venueDir(world, gm), vp = vd.clone().multiplyScalar(6.3735), dc = c.position.clone().sub(vp), dist = dc.length();
     const vi = 1 + 1.4 * f.vol + 1.6 * kick; SPACE.earthMat.uniforms.uVen.value.copy(vd); SPACE.earthMat.uniforms.uVenI.value = vi;
-    SPACE.ven.visible = dc.dot(vd) > 0; SPACE.ven.position.copy(vp); SPACE.ven.lookAt(c.position); SPACE.ven.scale.setScalar(dist * (.0045 + .0135 * smoothstep(4, 60, dist))); SPACE.ven.material.uniforms.uI.value = .45 * vi; }
+    SPACE.ven.visible = dc.dot(vd) > 0; SPACE.ven.position.copy(vp); SPACE.ven.lookAt(c.position); SPACE.ven.scale.setScalar(dist * (.0022 + .0135 * smoothstep(4, 60, dist))); SPACE.ven.material.uniforms.uI.value = .38 * vi; }
   SPACE.moon.position.copy(I.M);
   const mu = SPACE.moonMat.uniforms;
   mu.uSun.value.copy(I.sun); mu.uXb.value.set(...I.F.xb); mu.uYb.value.set(...I.F.yb); mu.uZb.value.set(...I.F.zb);
@@ -6093,7 +6120,7 @@ function finI() { const ms = Math.round(sim.skyMs() / 6e5) * 6e5; if (!SPACE.Ifi
 // zoom de la pédale au-delà du sol : de quelques kilomètres jusqu'à voir la Lune entière, le jardin en point de lumière
 const ZOOM_SPLIT = .72, _zp = new THREE.Vector3(), _zt = new THREE.Vector3();
 function updateZoomOrbit(u, f) {
-  const I = finI(), h = Math.exp(Math.log(.04) + (Math.log(3.6) - Math.log(.04)) * u);
+  const I = finI(), h = Math.exp(Math.log(.12) + (Math.log(3.6) - Math.log(.12)) * u);
   const toE = I.M.clone().multiplyScalar(-1).normalize(), ax = new THREE.Vector3().crossVectors(I.site, toE).normalize();
   const g = I.site.clone().applyAxisAngle(ax, -.08 * u), pos = I.M.clone().addScaledVector(g, I.R + h), Ps = I.M.clone().addScaledVector(I.site, I.R);
   const look = pos.clone().add(slerpV(Ps.clone().sub(pos).normalize(), I.M.clone().sub(pos).normalize(), smoothstep(.05, 1.2, h)));
@@ -6123,7 +6150,8 @@ function updateOrbit(t, f) {
     const dirL = slerpV(slerpV(L8, toO, ez(a / .3)), toV, smoothstep(.62, 1, a));
     k = { pos, look: pos.clone().add(dirL), up: slerpV(k.up, venueNorth(vd), b).normalize(), fov: k.fov + (42 - k.fov) * ez(a / .5) };
   }
-  updateSpace(30 + t, f, sim.kick * .5, k, I);
+  const calm = 1 - smoothstep(3, 8, t), fc = { bass: (f.bass || 0) * calm, mid: (f.mid || 0) * calm, high: (f.high || 0) * calm, vol: (f.vol || 0) * calm };
+  updateSpace(30 + t, fc, sim.kick * .5 * calm, k, I);
 }
 
 /* ---- Graines du public : elles tombent du ciel sur le jardin ---- */
@@ -6332,7 +6360,7 @@ function updateVisuals(dt, withUI) {
     camOut.focus = camera.position.distanceTo(controls.target);
   }
   updateSky(C);
-  dof.u.uFocus.value = camOut.focus; dof.u.uAperture.value = S.dof;
+  dof.u.uFocus.value = camOut.focus; dof.u.uAperture.value = S.dof * (1 - smoothstep(.02, .15, zoomZ));   // vue nette quand on zoome
   const vh = renderer.getDrawingBufferSize(_dbv).y;
   if (inIntro) { updateSpace(Tv, f, sim.kick); updateGrain(SPACE.I, Tv, sim.kick, vh); dof.u.uAperture.value = 0; renderer.toneMappingExposure = 1; }
   else if (inOrbit) { updateOrbit(finEl - 13.2, f); dof.u.uAperture.value = 0; renderer.toneMappingExposure = 1.4; }
