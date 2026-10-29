@@ -5655,9 +5655,9 @@ function pState(txt, cls) { $('pStateTxt').textContent = txt; $('pState').classN
 function drawQR() {
   const base = capteurBase();
   $('pBase').classList.toggle('hidden', !!base && /^https?:/.test(location.protocol));
-  if (!PH.id) return;
+  const pid = PH.id || PH.want; if (!pid) { $('qr').innerHTML = '<span style="font-size:11px;line-height:1.5;padding:10px">Préparation du code…</span>'; return; }
   if (!base) { $('qr').textContent = 'Adresse de capteur.html manquante'; $('pUrl').textContent = ''; return; }
-  const url = base.split('#')[0] + '#' + PH.id;
+  const url = base.split('#')[0] + '#' + pid;
   $('pUrl').textContent = url;
   if (window.qrcode) { const q = qrcode(0, 'M'); q.addData(url); q.make(); $('qr').innerHTML = q.createSvgTag({ cellSize: 6, margin: 1, scalable: true }); }
   else $('qr').textContent = 'Générateur de QR indisponible : ouvre l’adresse ci-contre sur le téléphone.';
@@ -5674,9 +5674,13 @@ function ensurePeer(onOpen) {
   if (!window.Peer) return false;
   if (PH.peer && !PH.peer.destroyed) { if (PH.id) onOpen && onOpen(); else PH.wait.push(onOpen); return true; }
   PH.wait = [onOpen];
-  const id = 'herba-' + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join('');
+  // identifiant stable pour cet ordinateur : le QR code est connu tout de suite, et les téléphones se reconnectent même après un rechargement
+  let id = null; try { id = localStorage.getItem('herba-liaison'); } catch (e) {}
+  if (!id || !/^herba-[a-z0-9]{6,}$/.test(id)) { id = 'herba-' + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join(''); try { localStorage.setItem('herba-liaison', id); } catch (e) {} }
+  PH.want = id; drawQR(); drawPublicQR();
   PH.peer = new Peer(id);
-  PH.peer.on('open', pid => { PH.id = pid; for (const f of PH.wait.splice(0)) f && f(); drawQR(); drawPublicQR(); });
+  clearTimeout(PH.retryT); PH.retryT = setTimeout(() => { if (!PH.id) { pState('Serveur de liaison lent à répondre, nouvelle tentative…', 'wait'); try { PH.peer.destroy(); } catch (e) {} PH.peer = null; ensurePeer(); } }, 12000);
+  PH.peer.on('open', pid => { clearTimeout(PH.retryT); PH.id = pid; pState(PH.stream ? 'Téléphone connecté.' : 'Prêt : en attente du téléphone…', PH.stream ? 'ok' : 'wait'); for (const f of PH.wait.splice(0)) f && f(); drawQR(); drawPublicQR(); });
   PH.peer.on('call', c => {
     if (PH.call) { try { PH.call.close(); } catch (e) {} }
     PH.call = c;
@@ -5695,7 +5699,7 @@ function ensurePeer(onOpen) {
   PH.peer.on('disconnected', () => { if (!PH.peer.destroyed) setTimeout(() => PH.peer.reconnect(), 1500); });
   PH.peer.on('error', e => {
     if (e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error') pState('Serveur de liaison injoignable, nouvelle tentative…', 'wait');
-    else if (e.type === 'unavailable-id') { PH.peer.destroy(); PH.peer = null; PH.id = null; ensurePeer(); }
+    else if (e.type === 'unavailable-id') { try { localStorage.removeItem('herba-liaison'); } catch (er) {} PH.peer.destroy(); PH.peer = null; PH.id = null; ensurePeer(); }
     else pState('Erreur de liaison (' + e.type + ').', 'err');
   });
   clearInterval(PH.tick); PH.tick = setInterval(sendStatus, 1000);
@@ -5705,8 +5709,8 @@ function ensurePeer(onOpen) {
 const PUB = { queue: [], waiting: [], lastT: -99, cool: new Map(), on: false };
 function publicBase() { const b = capteurBase(); return b ? b.replace(/capteur\.html.*$/, 'public.html') : ''; }
 function drawPublicQR() {
-  if (!PUB.on || !PH.id) return;
-  const url = publicBase().split('#')[0] + '#' + PH.id;
+  const pid = PH.id || PH.want; if (!PUB.on || !pid) return;
+  const url = publicBase().split('#')[0] + '#' + pid;
   if (window.qrcode) { const q = qrcode(0, 'M'); q.addData(url); q.make(); $('pubQR').innerHTML = q.createSvgTag({ cellSize: 5, margin: 1, scalable: true }); }
   $('pubUrl').textContent = url.replace(/^https?:\/\//, '');
 }
@@ -6197,7 +6201,7 @@ sim.lunarT = 0;
 sim.cut('ciel');
 setUI();
 updatePxs();
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});   // mise en cache : l'application se relance sans réseau
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => {});   // mise en cache : l'application se relance sans réseau
 try { renderer.compileAsync(SPACE.scene, SPACE.cam).catch(() => {}); renderer.compileAsync(scene, camera).catch(() => {}); } catch (e) {}   // préchauffage des shaders
 try { const q = localStorage.getItem('selene-qualite'); if (q && QUALITY[q]) { $('quality').value = q; applyQuality(q); } } catch (e) {}
 
