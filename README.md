@@ -79,7 +79,7 @@ Puis **Commencer la composition**.
 Scanner le QR code de la carte 3. Deux façons de le relier : **Micro + télécommande** ou **Télécommande seulement** (quand le son
 passe par le GX-1). La télécommande lance la composition, change de plan, lève l'aube, ouvre les graines du public, règle le zoom, et
 surtout **Conclure la composition** : un toucher fait décoller la conclusion (dézoom, montée en orbite), puis l'œuvre est
-conservée d'elle-même environ 40 s plus tard. Il n'y a plus de fin au silence : la composition dure tant que tu ne la conclus pas
+conservée d'elle-même environ 40 s plus tard, une fois la caméra revenue au-dessus de la salle. Il n'y a plus de fin au silence : la composition dure tant que tu ne la conclus pas
 (**E** au clavier fait de même ; *Arrêter et conserver* coupe sans conclusion).
 
 ### Fenêtre de projection et régie
@@ -132,20 +132,28 @@ la tonalité, la tension, le bend et le vibrato : la galerie et les exports les 
 
 ## Les graines du public
 
-**Graines du public** (carte 3 de l'accueil, Q, la régie ou le téléphone-capteur) affiche un QR code. Chaque spectateur compose sa graine comme une commande :
-**espèce** (12 au choix), **couleur** de sa lumière (9), **taille** (petite, moyenne, grande), **port** (élancé, rond, retombant, torsadé)
-et, s'il le veut, un **nom**. Un aperçu dessiné suit ses choix, un récapitulatif « Votre commande » s'affiche, puis **Semer ma graine**.
+**Graines du public** (carte 3 de l'accueil, Q, la régie ou le téléphone-capteur) affiche un QR code. Chaque spectateur compose sa graine
+comme une commande : **espèce** (12), **couleur** de sa lumière (9), **taille**, **port** (élancé, rond, retombant, torsadé), un **nom**
+s'il le veut, puis **l'endroit** : une carte du jardin vu de haut montre les plantes déjà là, les graines des autres et, par un triangle,
+ce que la caméra regarde à l'écran. Un toucher choisit l'endroit. Récapitulatif « Votre commande », puis **Semer ma graine**.
 
-1. La graine tombe du ciel lunaire à l'écran, de sa couleur, et se pose en dormance : un point de lumière au sol.
-2. En **inclinant le téléphone**, le spectateur la fait rouler où il veut, dans le sens de l'image projetée.
-3. Il choisit son moment, sur une note ou un silence, et touche **Faire germer**. La plante pousse avec l'espèce, la couleur,
-   la taille et le port demandés ; le téléphone affiche son nom savant et vibre.
-4. Ensuite, incliner le téléphone **penche la plante** avec lui, et **secouer** le téléphone l'illumine d'une gerbe d'étincelles.
+1. La graine tombe du ciel lunaire à l'écran, à l'endroit choisi, et se pose en dormance (on peut encore l'ajuster en inclinant le téléphone).
+2. Le spectateur choisit son moment et touche **Faire germer**.
+3. Son téléphone montre alors **sa propre plante en direct** : elle grandit, s'illumine et ondule au rythme de la musique jouée devant lui.
+4. **Lever le téléphone vers le ciel** donne de l'élan : la plante pousse plus vite, brille davantage et lance des étincelles à l'écran
+   (sans capteurs, garder le doigt sur la vue en direct). Incliner le téléphone la penche ; le secouer l'illumine.
 
-**Une seule graine par personne** : chaque téléphone garde un identifiant ; une seconde commande est refusée (« déjà semée »)
-et un rechargement de la page retrouve la graine où elle en est. Au final, les graines encore endormies germent toutes seules.
-Le semis n'est accepté qu'une fois le site révélé et le QR code ouvert. Tout est inscrit dans l'empreinte : la relecture rejoue chaque graine et chaque geste.
-La régie affiche le nombre de graines, endormies et germées.
+**Une seule graine par personne** (identifiant gardé par chaque téléphone). Au final, les graines encore endormies germent toutes seules.
+Tout est inscrit dans l'empreinte : la relecture rejoue chaque graine, chaque endroit et chaque geste. La régie compte les graines.
+
+## Le voyage astral : départ et retour à la salle
+
+L'ouverture part de **la salle de spectacle** : la caméra est au-dessus de la ville, de nuit les lumières des villes et un point de
+lumière marque la salle ; elle s'élève jusqu'à voir la Terre entière, se retourne et file vers la Lune. À la **conclusion**, elle quitte
+le jardin lunaire, traverse l'espace et redescend au-dessus de la salle, où l'œuvre se termine. Le lieu se règle dans la carte 3 de
+l'accueil (nom, latitude, longitude) ; par défaut **Bar à Pitons, 110 rue Price Ouest, Chicoutimi**.
+La Terre est rendue avec une carte 4K, le relief, les océans et leurs reflets, les nuages et leur ombre, les villes la nuit et un liseré
+ambré au terminateur. Le point de la salle pulse avec la musique.
 
 ## Zoom sur la Lune à la pédale d'expression
 
