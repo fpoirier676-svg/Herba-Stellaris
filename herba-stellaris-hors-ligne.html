@@ -5259,7 +5259,7 @@ function updZoomUI() {
 async function initMidi() {
   if (!navigator.requestMIDIAccess) { ZM.status = 'MIDI indisponible ici : ouvre Herba Stellaris dans Chrome ou Edge'; updZoomUI(); return false; }
   if (ZM.midi) return true;
-  try { ZM.midi = await navigator.requestMIDIAccess({ sysex: false }); } catch (e) { ZM.status = 'Accès MIDI refusé par le navigateur'; updZoomUI(); return false; }
+  try { ZM.midi = await navigator.requestMIDIAccess({ sysex: true }); ZM.sysex = true; } catch (e) { try { ZM.midi = await navigator.requestMIDIAccess({ sysex: false }); } catch (e2) { ZM.status = 'Accès MIDI refusé par le navigateur'; updZoomUI(); return false; } }
   const hook = () => {
     const names = []; for (const inp of ZM.midi.inputs.values()) { inp.onmidimessage = onMidi; names.push(inp.name); }
     ZM.status = names.length ? 'MIDI : ' + names.join(', ') : 'Aucune entrée MIDI : branche le GX-1 en USB (pilote Boss installé)'; updZoomUI();
@@ -5267,9 +5267,16 @@ async function initMidi() {
   ZM.midi.onstatechange = hook; hook(); return true;
 }
 function onMidi(e) {
-  const [st, d1, d2] = e.data; if ((st & 0xF0) !== 0xB0 || d2 == null) return;      // seuls les Control Change nous intéressent
+  const st = e.data[0]; if (st >= 0xF8) return;                                           // horloge et « active sensing » ignorés
+  ZM.count = (ZM.count || 0) + 1;
+  if ((st & 0xF0) !== 0xB0 || e.data[2] == null) {                                        // diagnostic : tout autre message est affiché tel quel
+    ZM.last = [...e.data.slice(0, 14)].map(b => b.toString(16).padStart(2, '0')).join(' ') + (e.data.length > 14 ? ' … (' + e.data.length + ' octets)' : '') + ' · ' + ZM.count + ' reçus';
+    try { (window.__mlog = window.__mlog || []).push([...e.data]); if (window.__mlog.length > 400) window.__mlog.shift(); } catch (er) {}
+    updZoomUI(); return;
+  }
+  const d1 = e.data[1], d2 = e.data[2];
   const ch = st & 15, name = (e.target && e.target.name) || '', now = performance.now();
-  ZM.last = `CC ${d1} = ${d2} · canal ${ch + 1}`;
+  ZM.last = `CC ${d1} = ${d2} · canal ${ch + 1} · ${ZM.count} reçus`;
   const key = ch * 128 + d1; let q = ZM.streams.get(key); if (!q || now - q.t0 > 1500) { q = { t0: now, vals: new Set() }; ZM.streams.set(key, q); } q.vals.add(d2);
   // apprentissage : le premier contrôleur qui balaie au moins 4 valeurs (une pédale, pas un interrupteur) ; sans réglage, détection automatique
   if ((ZM.learn || (!ZM.bind && /gx|boss/i.test(name))) && q.vals.size >= 4) { ZM.bind = { ch, cc: d1, name }; ZM.learn = false; saveZM(); }
