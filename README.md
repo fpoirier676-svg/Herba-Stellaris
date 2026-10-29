@@ -88,9 +88,15 @@ principale devient la **régie** : aperçu, temps, phrase, plantes, Soleil, nive
 note, accord, tonalité, tension, zoom, pédale, spectateurs. **Mire de synchronisation** (M) : un éclair à chaque attaque, pour mesurer
 la latence et la reporter dans *Latence de la chaîne*.
 
+### Instruments de scène
+Sur l'image projetée (touche **I**, ou la case dans la carte 3) : un **égaliseur à 48 bandes** tout en bas (dans la bande noire du format
+cinéma), pour voir la musique agir sur le jardin ; en haut à droite, le **nombre de végétaux**, d'espèces et de graines du public, le
+**stade évolutif** (germination, croissance, maturité, floraison, canopée, conclusion) et une **matrice 3D** qui tourne : chaque plante y
+est un point lumineux à sa place, à la hauteur de sa croissance. Les instruments s'effacent pendant les voyages dans l'espace.
+
 ### Pendant le spectacle (clavier)
 1 à 9 : plans (ensemble, ras du sol, grue, plongée, cime, canopée, ciel, Terre, contre-jour) · **A** lève le Soleil · **E** conclut ·
-**Q** graines du public · **S** mode Scène · **+ / −** zoom, **0** retour au sol · **H** commandes · **F** plein écran.
+**Q** graines du public · **S** mode Scène · **+ / −** zoom, **0** retour au sol · **I** instruments de scène · **H** commandes · **F** plein écran.
 Tout est inscrit dans l'empreinte : la galerie et les exports rejouent l'œuvre à l'identique.
 
 ### Sorties et robustesse
@@ -142,6 +148,11 @@ ce que la caméra regarde à l'écran. Un toucher choisit l'endroit. Récapitula
 3. Son téléphone montre alors **sa propre plante en direct** : elle grandit, s'illumine et ondule au rythme de la musique jouée devant lui.
 4. **Lever le téléphone vers le ciel** donne de l'élan : la plante pousse plus vite, brille davantage et lance des étincelles à l'écran
    (sans capteurs, garder le doigt sur la vue en direct). Incliner le téléphone la penche ; le secouer l'illumine.
+
+**Quand une graine tombe**, la caméra passe en plan d'ensemble et une colonne de lumière de sa couleur marque l'endroit où elle va se poser.
+À l'atterrissage, **tous les téléphones des spectateurs qui ont déjà une plante vibrent** (« une nouvelle graine vient de se poser »), et à
+l'écran chacune de leurs plantes lance **un fil de lumière vers la nouvelle venue** et s'illumine : la communauté accueille la graine.
+(La vibration dépend du téléphone : Android oui, iPhone non, il affiche seulement le message.)
 
 **Une seule graine par personne** (identifiant gardé par chaque téléphone). Au final, les graines encore endormies germent toutes seules.
 Tout est inscrit dans l'empreinte : la relecture rejoue chaque graine, chaque endroit et chaque geste. La régie compte les graines.
