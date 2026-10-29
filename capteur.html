@@ -77,7 +77,7 @@
     <div class="row2"><button class="rec" id="rFinish">Terminer et conserver</button><button id="rDiscard">Abandonner</button></div>
     <div class="lbl" style="margin-top:20px">Réalisation en direct</div>
     <div class="shots" id="shots"></div>
-    <div class="row3"><button id="rFinale">Final</button><button id="rStage">Mode Scène</button><button id="rPublic">Graines du public</button></div>
+    <div class="row3"><button id="rAube">Aube</button><button id="rFinale">Final</button><button id="rStage">Mode Scène</button></div><div class="row3" style="margin-top:8px"><button id="rPublic">Graines du public</button></div>
   </div>
 
   <p class="note" style="text-align:center">Garde cette page ouverte et l’écran allumé pendant que tu joues.</p>
@@ -190,7 +190,7 @@ function onStatus(m) {
 }
 const send = cmd => { if (conn && conn.open) conn.send({ cmd }); };
 ['Ensemble', 'Ras du sol', 'Grue', 'Plongée', 'Cime', 'Canopée', 'Ciel', 'Terre', 'Contre-jour'].forEach((n, i) => { const b = document.createElement('button'); b.textContent = n; b.onclick = () => send('shot' + (i + 1)); $('shots').appendChild(b); });
-$('rFinale').onclick = () => send('finale'); $('rStage').onclick = () => send('stage'); $('rPublic').onclick = () => send('public');
+$('rFinale').onclick = () => send('finale'); $('rAube').onclick = () => send('aube'); $('rStage').onclick = () => send('stage'); $('rPublic').onclick = () => send('public');
 $('rStart').onclick = () => send('start');
 $('rFinish').onclick = () => send('finish');
 $('rDiscard').onclick = () => { if (confirmTap($('rDiscard'))) send('discard'); };

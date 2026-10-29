@@ -18,7 +18,7 @@
   .sub { font-family:'Cormorant Garamond',serif; font-style:italic; color:var(--dim); font-size:20px; text-align:center; margin:6px 0 38px; line-height:1.35; }
   #seed { width:210px; height:210px; border-radius:50%; border:1px solid rgba(239,232,218,.5); background:radial-gradient(circle at 50% 45%, rgba(255,226,160,.22), rgba(255,226,160,.02) 60%, transparent 70%);
     color:var(--ink); font:inherit; font-size:13px; letter-spacing:.22em; text-transform:uppercase; cursor:pointer; position:relative; transition:transform .2s, opacity .3s; }
-  #seed::after { content:''; position:absolute; left:50%; top:50%; width:14px; height:14px; margin:-7px; border-radius:50%; background:#fff3d0; box-shadow:0 0 18px 6px rgba(255,226,160,.8); transform:translateY(-34px); }
+  #seed::after { content:''; position:absolute; left:50%; top:50%; width:14px; height:14px; margin:-7px; border-radius:50%; background:var(--seed,#fff3d0); box-shadow:0 0 22px 8px var(--seed,rgba(255,226,160,.8)); transform:translateY(-34px); transition:background .6s, box-shadow .6s; }
   #seed:active { transform:scale(.96); } #seed:disabled { opacity:.35; }
   #msg { min-height:70px; margin-top:30px; text-align:center; font-family:'Cormorant Garamond',serif; font-size:21px; line-height:1.4; max-width:340px; }
   #msg i { color:var(--dim); font-size:16px; }
@@ -53,9 +53,10 @@ function onMsg(d) {
   else if (d.msg === 'wait') say('La graine attend : le voyage vers la Lune n’est pas terminé.<br><i>Réessayez dans un instant.</i>');
   else if (d.msg === 'busy') say('Le ciel est plein de graines.<br><i>Réessayez dans quelques secondes.</i>');
   else if (d.msg === 'cool') startCool(d.s || 20, 'Votre dernière graine germe encore.');
-  else if (d.msg === 'queued') say('Votre graine traverse le vide…<br><i>Regardez l’écran.</i>');
-  else if (d.msg === 'planted') { say('Votre graine a germé :<br><b>' + d.nom + '</b><br><i>' + d.chem + '</i>'); if (navigator.vibrate) navigator.vibrate([30, 60, 30]); startCool(20); }
+  else if (d.msg === 'queued') { if (d.col) tint(d.col); say('Votre graine traverse le vide…<br><i>Regardez l’écran : elle est de cette couleur.</i>'); }
+  else if (d.msg === 'planted') { if (d.col) tint(d.col); say('Votre graine a germé :<br><b>' + d.nom + '</b><br><i>' + d.chem + '</i>'); if (navigator.vibrate) navigator.vibrate([30, 60, 30]); startCool(20); }
 }
+function tint(c) { document.documentElement.style.setProperty('--seed', c); }
 function startCool(s, txt) {
   cool = s; $('seed').disabled = true; clearInterval(timer);
   if (txt) say(txt);

@@ -12,6 +12,13 @@
   html,body { margin:0; height:100%; background:#000; overflow:hidden; color:var(--ink); font-family:Inter,system-ui,sans-serif; }
   canvas#c { position:fixed; inset:0; width:100%; height:100%; display:block; }
   .hidden { display:none !important; }
+  #regie { position:fixed; left:18px; top:64px; z-index:40; width:min(560px, 46vw); background:rgba(6,7,10,.86); border:1px solid rgba(255,240,220,.14); padding:14px 16px; font-size:12px; }
+  #regie .rg-head { font-size:11px; opacity:.75; margin-bottom:10px; }
+  #regie video { width:100%; aspect-ratio:16/9; background:#000; display:block; margin-bottom:10px; }
+  #regie .rg-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px 12px; font-variant-numeric:tabular-nums; margin-bottom:10px; }
+  #regie .rg-grid div span { display:block; font-size:9px; letter-spacing:.12em; text-transform:uppercase; opacity:.5; }
+  #regie .rg-btns { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; } #regie .rg-btns button { font-size:10px; padding:8px 10px; letter-spacing:.06em; }
+  #regie .rg-msg { color:#e8b98a; min-height:16px; }
   #pubBox { position:fixed; right:26px; bottom:26px; z-index:30; background:rgba(4,5,8,.72); border:1px solid rgba(255,240,220,.16); border-radius:14px; padding:14px 16px; width:190px; text-align:center; backdrop-filter:blur(6px); }
   #pubQR svg { width:150px; height:150px; background:#fff; border-radius:6px; padding:4px; }
   #pubBox .pubT { font-family:'Corinthia','Cormorant Garamond',cursive; font-size:30px; line-height:.95; color:#f3ead8; margin:8px 0 4px; }
@@ -245,6 +252,11 @@ SKYIMG.moon = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAUDBAQEAw
     <input type="file" id="fileLive" accept="audio/*">
     <button id="btnGal1">Galerie des créations</button>
   </div>
+  <div class="row" style="margin-top:10px">
+    <button id="btnCalib" title="4 s de silence de la salle, puis 4 s de jeu fort">Étalonner la salle</button>
+    <button id="btnProj" title="Ouvre l’image seule dans une fenêtre à placer sur le projecteur ; cette fenêtre devient la régie">Fenêtre de projection</button>
+  </div>
+  <div id="calibMsg" class="xnote" style="margin-top:10px;min-height:18px"></div>
   <div id="status"></div>
 </div>
 
@@ -256,6 +268,7 @@ SKYIMG.moon = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAUDBAQEAw
   <button class="small hidden" id="btnNew">Nouvelle composition</button>
   <button class="small hidden" id="btnGal2">Galerie</button>
   <button class="small" id="btnPhoto" title="Image fixe 7680×4320 de l’instant présent">Photo 8K</button>
+  <button class="small" id="btnProjT">Projection</button>
   <button class="small" id="btnFull">Plein écran</button>
   <button class="small" id="btnHide">Masquer (H)</button>
 </div>
@@ -291,6 +304,9 @@ SKYIMG.moon = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAUDBAQEAw
   <label class="chk"><input type="checkbox" id="stage"> Mode Scène (touche S) : aucun texte à l’écran</label>
   <label class="chk"><input type="checkbox" id="cycle"> Cycle jour-nuit complet (sinon : de la nuit à l’aube au climax)</label>
   <label class="chk"><input type="checkbox" id="adaptive" checked> Résolution adaptative (garder 60 i/s)</label>
+  <label class="ctl">Latence de la chaîne <output id="oLat">100 ms</output><input type="range" id="latency" min="0" max="400" step="5" value="100"></label>
+  <label class="chk"><input type="checkbox" id="mire"> Mire de synchronisation (touche M) : éclair à chaque attaque</label>
+  <button class="small" id="btnCalib2" style="margin-top:8px">Étalonner la salle</button> <span id="calibMsg2" class="xnote"></span>
   <div class="xnote" style="font-size:10px;opacity:.6;margin-top:8px;line-height:1.5">Scène : 1 ensemble · 2 ras du sol · 3 grue · 4 plongée · 5 cime · 6 canopée · 7 ciel · 8 Terre · 9 contre-jour · E final · Q graines du public · S mode Scène · F plein écran</div>
 </div>
 
@@ -300,6 +316,18 @@ SKYIMG.moon = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAUDBAQEAw
   <p class="ep-txt">Cette œuvre fait maintenant partie de votre présent passé sur&nbsp;la&nbsp;Lune</p>
   <div class="ep-site" id="epSite"></div>
   <div class="row ep-acts"><button id="epGal">Voir la galerie</button><button id="epNew">Nouvelle composition</button><button id="epClose">Fermer</button></div>
+</div>
+
+<div id="regie" class="hidden">
+  <div class="rg-head"><b>Régie</b> — l’image est dans la fenêtre de projection (touche F dans celle-ci pour le plein écran)</div>
+  <video id="rgPrev" muted playsinline autoplay></video>
+  <div class="rg-grid" id="rgStat"></div>
+  <div class="rg-btns" id="rgShots"></div>
+  <div class="rg-btns">
+    <button id="rgAube">Aube (A)</button><button id="rgFin">Final (E)</button><button id="rgPub">Graines public (Q)</button>
+    <button id="rgStage">Mode Scène (S)</button><button id="rgMire">Mire (M)</button><button id="rgClose">Fermer la projection</button>
+  </div>
+  <div class="rg-msg" id="rgMsg"></div>
 </div>
 
 <div id="pubBox" class="hidden"><div id="pubQR"></div><div class="pubT">Semez une graine<br>sur la Lune</div><div id="pubUrl"></div></div>
@@ -353,8 +381,9 @@ SKYIMG.moon = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAUDBAQEAw
       <div class="note">Chaque création est rejouée à l'identique : sa musique, son empreinte, et le ciel du jour où elle est née</div>
     </div>
     <div class="row" style="margin:0">
-      <label class="btn" for="fileImport">Importer une création</label>
+      <label class="btn" for="fileImport">Importer / restaurer</label>
       <input type="file" id="fileImport" accept=".json,application/json">
+      <button id="btnBackup">Sauvegarder toute la galerie</button>
       <button id="btnGalClose">Fermer</button>
     </div>
   </header>
@@ -399,7 +428,45 @@ const dateFR = ms => new Date(ms).toLocaleString('fr-CA', { timeZone: 'UTC', day
 /* =====================================================================
    1. AUDIO
    ===================================================================== */
+// Écoute rapide : un module audio dédié traite le son par blocs de 2,7 ms (attaques sur trois registres, niveau absolu, stéréo)
+const WORKLET_SRC = `
+class Bq { constructor(t, f, q, sr) { const w = 2 * Math.PI * f / sr, c = Math.cos(w), al = Math.sin(w) / (2 * q); let b0, b1, b2;
+    if (t === 'lp') { b0 = (1 - c) / 2; b1 = 1 - c; b2 = b0; } else { b0 = (1 + c) / 2; b1 = -(1 + c); b2 = b0; }
+    const a0 = 1 + al; this.b = [b0 / a0, b1 / a0, b2 / a0]; this.a = [-2 * c / a0, (1 - al) / a0]; this.z1 = 0; this.z2 = 0; }
+  run(x) { const y = this.b[0] * x + this.z1; this.z1 = this.b[1] * x - this.a[0] * y + this.z2; this.z2 = this.b[2] * x - this.a[1] * y; return y; } }
+class HerbaOnsets extends AudioWorkletProcessor {
+  constructor() { super(); const sr = sampleRate;
+    this.f = { lb: new Bq('lp', 150, .707, sr), hm: new Bq('hp', 160, .707, sr), lm: new Bq('lp', 2000, .707, sr), hh: new Bq('hp', 2600, .707, sr) };
+    this.fast = [0, 0, 0]; this.slow = [1e-6, 1e-6, 1e-6]; this.last = [-9, -9, -9]; this.prevF = [0, 0, 0]; this.n = 0; this.accL = 0; this.accR = 0; this.accN = 0; }
+  process(inputs) {
+    const inp = inputs[0]; if (!inp || !inp.length) { if (++this.n % 4 === 0) this.port.postMessage({ lv: 0, pan: 0, t: currentTime }); return true; }
+    const L = inp[0], Rr = inp[1] || inp[0], N = L.length, f = this.f, e = [0, 0, 0];
+    for (let i = 0; i < N; i++) { const x = (L[i] + Rr[i]) * .5, b = f.lb.run(x), m = f.lm.run(f.hm.run(x)), h = f.hh.run(x); e[0] += b * b; e[1] += m * m; e[2] += h * h; this.accL += L[i] * L[i]; this.accR += Rr[i] * Rr[i]; }
+    this.accN += N;
+    const t = currentTime, TH = [5.5, 5, 6], REF = [.12, .1, .1], ON = [], dbs = [];
+    for (let k = 0; k < 3; k++) {
+      const v = e[k] / N; this.fast[k] = v > this.fast[k] ? v : this.fast[k] * .86;
+      this.slow[k] += (this.fast[k] - this.slow[k]) * .0066;
+      dbs[k] = 10 * Math.log10((this.fast[k] + 1e-12) / (this.slow[k] + 1e-12));
+    }
+    this.pend = this.pend || [null, null, null];
+    for (let k = 0; k < 3; k++) {
+      if (dbs[k] > TH[k] && this.fast[k] > this.prevF[k] * 1.12 && this.fast[k] > 2e-7 && t - this.last[k] > REF[k]) {
+        this.last[k] = t; if (k === 0) ON.push(0); else if (!this.pend[k]) this.pend[k] = { t, db: dbs[k], pk: dbs[k] };
+      }
+      if (this.pend[k]) this.pend[k].pk = Math.max(this.pend[k].pk, dbs[k]);
+      this.prevF[k] = this.fast[k];
+    }
+    // une frappe grave déborde dans les autres registres : on attend 25 ms ; si une attaque grave tombe à côté, il faut un saut bien plus franc
+    for (let k = 1; k < 3; k++) { const q = this.pend[k]; if (q && t - q.t >= .04) { if (Math.abs(this.last[0] - q.t) > .06 || q.pk > TH[k] + 13) ON.push(k); this.pend[k] = null; } }
+    if (ON.length) this.port.postMessage({ on: ON, t });
+    if (++this.n % 4 === 0) { this.port.postMessage({ lv: Math.sqrt((this.accL + this.accR) / (2 * this.accN)), pan: (Math.sqrt(this.accR) - Math.sqrt(this.accL)) / (Math.sqrt(this.accR) + Math.sqrt(this.accL) + 1e-9), t }); this.accL = this.accR = this.accN = 0; }
+    return true;
+  }
+}
+registerProcessor('herba-onsets', HerbaOnsets);`;
 const AE = {
+  wk: null, wkReady: false, onBits: 0, lvDb: -120, pan: 0, loud: 0, flat: 0, applT: 0, applause: false,
   ctx: null, analyser: null, freq: null, prev: null, time: null, source: null, stream: null, el: null, active: false,
   peak: { bass: .15, mid: .12, high: .08, vol: .03 }, floor: { bass: .15, mid: .12, high: .08, vol: .03 },
   out: { bass: 0, mid: 0, high: 0, vol: 0, cent: 0 }, raw: {}, fluxMean: 0, lastBeat: 0, onsetPending: false,
@@ -410,6 +477,12 @@ const AE = {
       const a = this.ctx.createAnalyser();
       a.fftSize = 4096; a.smoothingTimeConstant = .55; a.minDecibels = -88; a.maxDecibels = -18;
       this.analyser = a; this.freq = new Uint8Array(a.frequencyBinCount); this.prev = new Uint8Array(a.frequencyBinCount); this.time = new Float32Array(a.fftSize);
+      this.ffl = new Float32Array(a.frequencyBinCount);
+      if (this.ctx.audioWorklet) this.ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }))).then(() => {
+        const n = new AudioWorkletNode(this.ctx, 'herba-onsets', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 2, channelCountMode: 'explicit' });
+        n.port.onmessage = ev => { const d = ev.data; if (d.on) for (const k of d.on) this.onBits |= [1, 1024, 2048][k]; else { this.lvDb = 20 * Math.log10(Math.max(d.lv, 1e-6)); this.pan += (d.pan - this.pan) * .2; } };
+        this.wk = n; this.wkReady = true; if (this.source) this.source.connect(n);
+      }).catch(e => { this.wkErr = String(e); });
     }
     if (this.ctx.state === 'suspended') this.ctx.resume();
   },
@@ -425,7 +498,7 @@ const AE = {
     this.ensure(); this.stop();
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
     this.source = this.ctx.createMediaStreamSource(this.stream);
-    this.source.connect(this.analyser);
+    this.source.connect(this.analyser); if (this.wk) this.source.connect(this.wk);
     this.startRecorder(this.stream);
     this.active = true;
   },
@@ -441,14 +514,14 @@ const AE = {
     try { this.source && this.source.disconnect(); } catch (e) {}
     this.remote = stream;
     this.source = this.ctx.createMediaStreamSource(stream);
-    this.source.connect(this.analyser); this.source.connect(this.recDest);
+    this.source.connect(this.analyser); this.source.connect(this.recDest); if (this.wk) this.source.connect(this.wk);
   },
   async useFile(file) {
     this.ensure(); this.stop();
     const el = new window.Audio(); el.src = URL.createObjectURL(file); el.loop = false;
     this.el = el;
     this.source = this.ctx.createMediaElementSource(el);
-    this.source.connect(this.analyser); this.source.connect(this.ctx.destination);
+    this.source.connect(this.analyser); this.source.connect(this.ctx.destination); if (this.wk) this.source.connect(this.wk);
     this.fileBlob = file; this.recorder = null;
     await el.play();
     this.active = true;
@@ -489,7 +562,7 @@ const AE = {
     for (let i = 1; i <= fluxTop; i++) { const d = f[i] - this.prev[i]; if (d > 0) flux += d; }
     this.prev.set(f);
     const now = performance.now() / 1000;
-    if (flux > this.fluxMean * 1.55 + 6 && now - this.lastBeat > .18 && r.bass > .1) { this.onsetPending = true; this.lastBeat = now; }
+    if (!this.wkReady && flux > this.fluxMean * 1.55 + 6 && now - this.lastBeat > .18 && r.bass > .1) { this.onBits |= 1; this.lastBeat = now; }
     this.fluxMean += (flux - this.fluxMean) * .06;
     const decay = Math.exp(-dt / 7);
     for (const k of ['bass', 'mid', 'high', 'vol']) {
@@ -498,13 +571,29 @@ const AE = {
       o[k] += (target - o[k]) * (target > o[k] ? 1 - Math.exp(-dt * 28) : 1 - Math.exp(-dt * 4.5));
     }
     o.cent += (cent - o.cent) * (1 - Math.exp(-dt * 3));
-    this.db = 20 * Math.log10(Math.max(r.vol, 1e-6));
+    this.db = this.wkReady ? this.lvDb : 20 * Math.log10(Math.max(r.vol, 1e-6));
+    // niveau absolu, étalonné sur la salle : c'est lui qui porte crescendo, decrescendo et climax (le volume normalisé, lui, s'adapte)
+    const L = clamp((this.db - S.floorDb - 4) / Math.max(10, S.topDb - S.floorDb - 4), 0, 1);
+    this.loud += (L - this.loud) * (L > this.loud ? 1 - Math.exp(-dt * 25) : 1 - Math.exp(-dt / .3));
+    // applaudissements : bruit large bande, sans hauteur, entre 1 et 8 kHz
+    //   (claquements denses : spectre plat au-dessus de 1 kHz, peu d'énergie grave ou tonale, sans interruption)
+    { a.getFloatFrequencyData(this.ffl); const i0 = Math.floor(1000 / hz), i1 = Math.floor(8000 / hz), j0 = Math.floor(60 / hz), j1 = Math.floor(1000 / hz); let lg = 0, ar = 0, lo = 0;
+      for (let i = i0; i < i1; i++) { const m = Math.pow(10, this.ffl[i] / 20) + 1e-9; lg += Math.log(m); ar += m * m; }
+      for (let i = j0; i < j1; i++) { const m = Math.pow(10, this.ffl[i] / 20); lo += m * m; }
+      const nb = i1 - i0, fl = Math.exp(lg / nb) / (Math.sqrt(ar / nb) + 1e-12), ratio = ar / (lo + 1e-12);
+      this.flat += (fl - this.flat) * (1 - Math.exp(-dt / .25)); this.hiRatio = (this.hiRatio || 0) + (ratio - (this.hiRatio || 0)) * (1 - Math.exp(-dt / .3));
+      this.hiCont = (this.hiCont || 0) + ((this.db > S.floorDb + 12 ? 1 : 0) - (this.hiCont || 0)) * (1 - Math.exp(-dt / .4));
+      const appl = this.flat > .5 && this.hiRatio > 1.6 && this.hiCont > .85 && this.loud > .1;
+      this.applT = appl ? this.applT + dt : Math.max(0, this.applT - dt * 2);
+      this.applause = this.applT > 1.5; }
     const tA = this.ctx.currentTime, gap = this.lastNow ? Math.min(tA - this.lastNow, 1) : 0; this.lastNow = tA;   // horloge audio réelle
-    if (this.db < S.silenceDb) { if (this.silStart == null) this.silStart = tA; this.silentFor = tA - this.silStart; }
+    if (this.db < S.silenceDb || this.applause) { if (this.silStart == null) this.silStart = tA; this.silentFor = tA - this.silStart; }
     else { this.silStart = null; this.silentFor = 0; this.heard += gap; }
   },
   // drapeau : 1 = attaque, 2 = silence (au-delà d'une demi-seconde) ; les deux peuvent se cumuler
-  frame() { const o = this.out, on = this.onsetPending ? 1 : 0; this.onsetPending = false; return [o.bass, o.mid, o.high, o.vol, o.cent, on + (this.silentFor > .5 ? 2 : 0)]; }
+  // empreinte : bandes normalisées, brillance, drapeaux (1 attaque grave, 2 silence, 256 applaudissements, 1024 attaque médium, 2048 attaque aiguë), niveau absolu, stéréo
+  frame() { const o = this.out, on = this.onBits; this.onBits = 0;
+    return [o.bass, o.mid, o.high, o.vol, o.cent, on + (this.silentFor > .5 && !this.applause ? 2 : 0) + (this.applause ? 256 : 0), this.loud, this.pan]; }
 };
 
 /* =====================================================================
@@ -516,7 +605,7 @@ const DPR = window.devicePixelRatio || 1;
 const QUALITY = {
   fluide: { pr: () => 1, lod: 'fluide', taps: 20, steps: 24, shadow: 2048 },
   haute: { pr: () => Math.min(DPR, 1.5), lod: 'haute', taps: 56, steps: 44, shadow: 3072 },
-  ultra: { pr: () => Math.min(DPR * 1.6, 3, 4320 / innerHeight), lod: 'haute', taps: 56, steps: 48, shadow: 4096 },   // sur-échantillonnage
+  ultra: { pr: () => Math.min(DPR * 1.6, 3, 4320 / VH()), lod: 'haute', taps: 56, steps: 48, shadow: 4096 },   // sur-échantillonnage
 };
 const PR = QUALITY.haute.pr();
 renderer.setPixelRatio(PR);
@@ -530,6 +619,8 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 
+let PROJ = null;                                                   // fenêtre de projection (le canevas y est déplacé)
+const VW = () => PROJ && !PROJ.closed ? PROJ.innerWidth : innerWidth, VH = () => PROJ && !PROJ.closed ? PROJ.innerHeight : innerHeight;
 const camera = new THREE.PerspectiveCamera(34, innerWidth / innerHeight, 0.2, 6000);
 camera.position.set(0, 4, 40);
 const controls = new OrbitControls(camera, canvas);
@@ -588,7 +679,7 @@ const cine = new ShaderPass({
     uBars: { value: 1 }, uAspect: { value: innerWidth / innerHeight }, uFade: { value: 0 }, uSat: { value: 1.22 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uTime,uAberr,uGrain,uVig,uBars,uAspect,uFade,uSat,uPanelA,uMsgA; uniform sampler2D tPanel,tMsg; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uTime,uAberr,uGrain,uVig,uBars,uAspect,uFade,uSat,uPanelA,uMsgA; uniform vec4 uFlash; uniform sampler2D tPanel,tMsg; varying vec2 vUv;
     float hash(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }
     void main(){
       vec2 uv=vUv, c=uv-.5; vec2 ca=c*vec2(uAspect,1.);
@@ -602,6 +693,7 @@ const cine = new ShaderPass({
       col*=1.-uFade;
       if(uPanelA+uMsgA>.001){ float k=uAspect/(16./9.); vec2 o=(uv-.5)*vec2(max(k,1.),max(1./k,1.))+.5;
         if(o.x>0.&&o.x<1.&&o.y>0.&&o.y<1.){ vec4 a=texture2D(tPanel,o), b=texture2D(tMsg,o); col=mix(col,a.rgb,a.a*uPanelA); col=mix(col,b.rgb,b.a*uMsgA); } }
+      col=mix(col,uFlash.rgb,uFlash.a);
       if(uBars>.5){ float vis=min(1.,uAspect/2.39); float e=(1.-vis)*.5; if(uv.y<e||uv.y>1.-e) col=vec3(0.); }
       gl_FragColor=vec4(col,1.);
     }`
@@ -646,13 +738,22 @@ composer.setSize(innerWidth, innerHeight);
 /* =====================================================================
    3. UNIFORMES PARTAGÉES & OMBRES DU RELIEF
    ===================================================================== */
-const MAXP = 96;
+const MAXP = 160;                       // plantes vivantes à la fois ; au-delà, les plus anciennes se fossilisent et cèdent leur place
+// Données par plante dans une texture (une colonne par plante) : plus de limite d'uniformes, et un seul envoi par image
+const PT_ROWS = 5, PT_DATA = new Float32Array(MAXP * PT_ROWS * 4);
+const tPlant = new THREE.DataTexture(PT_DATA, MAXP, PT_ROWS, THREE.RGBAFormat, THREE.FloatType); tPlant.magFilter = tPlant.minFilter = THREE.NearestFilter; tPlant.needsUpdate = true;
+class PSlot { constructor(r, i) { this.o = (r * MAXP + i) * 4; } set(x, y, z, w) { const d = PT_DATA, o = this.o; d[o] = x; d[o + 1] = y; d[o + 2] = z; d[o + 3] = w; return this; }
+  get x() { return PT_DATA[this.o]; } get y() { return PT_DATA[this.o + 1]; } get z() { return PT_DATA[this.o + 2]; } get w() { return PT_DATA[this.o + 3]; }
+  set x(v) { PT_DATA[this.o] = v; } set y(v) { PT_DATA[this.o + 1] = v; } set z(v) { PT_DATA[this.o + 2] = v; } set w(v) { PT_DATA[this.o + 3] = v; } }
+const slots = r => ({ value: Array.from({ length: MAXP }, (_, i) => new PSlot(r, i)) });
 const PU = {
-  uPA: { value: Array.from({ length: MAXP }, () => new THREE.Vector4()) },   // croissance, éclat, pulsation, -
-  uPB: { value: Array.from({ length: MAXP }, () => new THREE.Vector4()) },   // couleur bioluminescente, phase
-  uPC: { value: Array.from({ length: MAXP }, () => new THREE.Vector4(0, 1, 0, 0)) },   // direction du Soleil à la naissance
-  uPP: { value: Array.from({ length: MAXP }, () => new THREE.Vector4()) },   // x, z, rayon du biofilm, intensité
-  uPQ: { value: Array.from({ length: MAXP }, () => new THREE.Vector4()) },   // secousse sismique (déplacement à 5 m de haut), altitude du pied
+  tPlant: { value: tPlant }, tGlow: { value: null }, uGlowR: { value: 90 },
+  uPA: slots(0),   // croissance, éclat, pulsation, frisson
+  uPB: slots(1),   // couleur bioluminescente, phase
+  uPC: slots(2),   // direction du Soleil à la naissance
+  uPQ: slots(3),   // secousse sismique (déplacement à 5 m de haut), altitude du pied
+  uPE: slots(4),   // fossilisation
+  uPP: { value: Array.from({ length: MAXP }, () => new THREE.Vector4()) },   // x, z, rayon du biofilm, intensité (carte d'émission du sol)
   uShock: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, -1, 0)) }, uShockCol: { value: new THREE.Color(1, .8, .5) },
   uFoot: { value: Array.from({ length: 14 }, () => new THREE.Vector4()) }, uFootN: { value: 0 },
   uN: { value: 0 }, uTime: { value: 0 }, uBio: { value: 1 },
@@ -956,11 +1057,11 @@ function buildWorld(seed, startMs, dawn) {
   const groundMat = new THREE.MeshStandardMaterial({ color: 0x8c8983, roughness: 1, metalness: 0 });
   groundMat.onBeforeCompile = sh => {
     addTerrainShadow(sh);
-    Object.assign(sh.uniforms, { uPP: PU.uPP, uPB: PU.uPB, uN: PU.uN, uBio: PU.uBio, uTime: PU.uTime, uShock: PU.uShock, uShockCol: PU.uShockCol, uFoot: PU.uFoot, uFootN: PU.uFootN });
+    Object.assign(sh.uniforms, { tGlow: PU.tGlow, uGlowR: PU.uGlowR, uBio: PU.uBio, uTime: PU.uTime, uShock: PU.uShock, uShockCol: PU.uShockCol, uFoot: PU.uFoot, uFootN: PU.uFootN });
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWN;')
       .replace('#include <project_vertex>', '#include <project_vertex>\nvWN=normalize(mat3(modelMatrix)*objectNormal);');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      varying vec3 vWN; uniform vec4 uPP[${MAXP}]; uniform vec4 uPB[${MAXP}]; uniform int uN; uniform float uBio, uTime;
+      varying vec3 vWN; uniform sampler2D tGlow; uniform float uGlowR, uBio, uTime;
       uniform vec4 uShock[6]; uniform vec3 uShockCol; uniform vec4 uFoot[14]; uniform int uFootN;
       ${GNOISE2}
       float h12(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
@@ -981,6 +1082,8 @@ function buildWorld(seed, startMs, dawn) {
         float near=1.-smoothstep(25.,60.,length(vViewPosition));
         float trd=0.; float fp=uFootN>1&&near>0.?foot(vTWPos.xz,trd):0.;
         alb*=1.-fp*(.16+.14*trd);
+        vec2 guv=vec2(vTWPos.x/(2.*uGlowR)+.5,.5-vTWPos.z/(2.*uGlowR)); vec4 GL=(guv.x>0.&&guv.x<1.&&guv.y>0.&&guv.y<1.)?texture2D(tGlow,guv):vec4(0.);
+        alb*=1.-.55*clamp(GL.a,0.,1.);                       // ombre de contact au pied des plantes
         diffuseColor.rgb*=alb;`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
         { float gl=step(.9982,h12(floor(vTWPos.xz*55.)))*(1.-smoothstep(3.,22.,length(vViewPosition)));   // billes de verre d'impact qui scintillent
@@ -994,14 +1097,12 @@ function buildWorld(seed, startMs, dawn) {
           normal=normalize((viewMatrix*vec4(nw,0.)).xyz); }`)
       .replace('#include <emissivemap_fragment>', `
         vec3 bio=vec3(0.);
-        for(int i=0;i<${MAXP};i++){ if(i>=uN) break; vec4 pp=uPP[i]; float d=length(vTWPos.xz-pp.xy); if(d>pp.z||pp.w<.001) continue;
-          float fall=1.-smoothstep(pp.z*.2,pp.z,d);
-          float v1=pow(1.-abs(vn(vTWPos.xz*.85+pp.xy)*2.-1.),12.);
-          float v2=pow(1.-abs(vn(vTWPos.xz*2.6-pp.xy*1.7)*2.-1.),16.);
-          bio+=uPB[i].rgb*(v1*.9+v2*.55)*fall*pp.w; }
+        if(GL.r+GL.g+GL.b>.002){                             // biofilm : la carte d'émission porte la lueur de toutes les plantes
+          float v1=pow(1.-abs(vn(vTWPos.xz*.85)*2.-1.),12.), v2=pow(1.-abs(vn(vTWPos.xz*2.6+7.3)*2.-1.),16.);
+          vec3 g=GL.rgb/(1.+dot(GL.rgb,vec3(.333))*.9); bio+=g*(v1*.9+v2*.55); }   // saturation douce : vingt plantes voisines ne font pas un sol blanc
         for(int i=0;i<6;i++){ vec4 sk=uShock[i]; if(sk.z<0.||sk.z>4.5) continue;   // anneau de l'onde sismique
           float d=length(vTWPos.xz-sk.xy), R=22.*sk.z, w=.45+sk.z*.55;
-          bio+=uShockCol*exp(-pow((d-R)/w,2.))*sk.w*exp(-sk.z*1.2)*1.05; }
+          bio+=uShockCol*exp(-pow((d-R)/w,2.))*sk.w*exp(-sk.z*1.2)*.5; }
         totalEmissiveRadiance=bio*min(uBio,1.6)*.55;`);
   };
   const ground = new THREE.Mesh(geo, groundMat);
@@ -1288,9 +1389,12 @@ const envMat = new THREE.ShaderMaterial({
 });
 envScene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 48, 24), envMat));
 const ENV = { tex: null, sun: new THREE.Vector3(9, 9, 9), day: -1 };
-function updateEnv(C) {
+function updateEnv(C, cutKey) {
   PU.uDay.value = C.sunUp;
-  if (ENV.tex && ENV.sun.angleTo(C.sunL) < .035 && Math.abs(ENV.day - C.sunUp) < .05) return;
+  // reflets recalculés de préférence au moment d'une coupe (l'à-coup s'y cache), ou si le Soleil a beaucoup bougé
+  const da = ENV.tex ? ENV.sun.angleTo(C.sunL) : 9, dd = Math.abs(ENV.day - C.sunUp), atCut = cutKey !== ENV.cut;
+  if (ENV.tex && !(atCut && (da > .012 || dd > .02)) && da < .09 && dd < .15) return;
+  ENV.cut = cutKey;
   envMat.uniforms.uSun.value.copy(C.sunL); envMat.uniforms.uEarth.value.copy(C.earthL);
   envMat.uniforms.uDay.value = C.sunUp; envMat.uniforms.uEL.value = C.s.earthLit;
   const rt = pmrem.fromScene(envScene, 0, .1, 50);
@@ -1336,18 +1440,41 @@ function setLOD(level) {
   }
 }
 const COLS = [['iCol', 3], ['iCol2', 3], ['iMat', 3]];
-const TUBES = makeInstanced(LOD.haute.tube, 60000, [['iP0', 3], ['iP1', 3], ['iT0', 3], ['iT1', 3], ['iRad', 4], ['iTime', 4], ['iPivot', 4], ...COLS]);
-const PEARLS = makeInstanced(LOD.haute.pearl, 50000, [['iC', 3], ['iD', 4], ['iF', 4], ['iRad', 4], ['iTime', 4], ['iPivot', 4], ...COLS]);
-const CRYST = makeInstanced(LOD.haute.crystal, 3000, [['iB', 3], ['iD', 3], ['iShape', 4], ['iTime', 4], ...COLS]);
-const GEMS = makeInstanced(LOD.haute.gem, 6000, [['iC', 3], ['iD', 4], ['iS', 4], ['iTime', 4], ...COLS]);
+const TUBES = makeInstanced(LOD.haute.tube, 140000, [['iP0', 3], ['iP1', 3], ['iT0', 3], ['iT1', 3], ['iRad', 4], ['iTime', 4], ['iPivot', 4], ...COLS]);
+const PEARLS = makeInstanced(LOD.haute.pearl, 140000, [['iC', 3], ['iD', 4], ['iF', 4], ['iRad', 4], ['iTime', 4], ['iPivot', 4], ...COLS]);
+const CRYST = makeInstanced(LOD.haute.crystal, 9000, [['iB', 3], ['iD', 3], ['iShape', 4], ['iTime', 4], ...COLS]);
+const GEMS = makeInstanced(LOD.haute.gem, 14000, [['iC', 3], ['iD', 4], ['iS', 4], ['iTime', 4], ...COLS]);
 const FLORA_SETS = [TUBES, PEARLS, CRYST, GEMS];
+// Carte d'émission du sol vue du dessus : chaque plante y dépose sa lueur et son ombre de contact (une seule passe, quel que soit le nombre de plantes)
+const GLOW = { rt: new THREE.WebGLRenderTarget(512, 512, { type: THREE.HalfFloatType }), scene: new THREE.Scene(), cam: new THREE.OrthographicCamera(-90, 90, 90, -90, -10, 10) };
+GLOW.cam.position.set(0, 5, 0); GLOW.cam.up.set(0, 0, -1); GLOW.cam.lookAt(0, 0, 0); PU.tGlow.value = GLOW.rt.texture;
+{ const g = new THREE.InstancedBufferGeometry(); g.index = new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2).index; g.setAttribute('position', new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2).attributes.position);
+  GLOW.a = new THREE.InstancedBufferAttribute(new Float32Array(MAXP * 4), 4); GLOW.c = new THREE.InstancedBufferAttribute(new Float32Array(MAXP * 4), 4);
+  g.setAttribute('aP', GLOW.a); g.setAttribute('aC', GLOW.c); g.instanceCount = 0; GLOW.g = g;
+  const m = new THREE.ShaderMaterial({ blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor, depthTest: false, depthWrite: false, transparent: true,
+    vertexShader: `attribute vec4 aP, aC; varying vec2 vQ; varying vec4 vC; varying float vAo; void main(){ vQ=position.xz; vC=aC; vAo=aP.w/aP.z;
+      vec3 p=vec3(aP.x+position.x*aP.z,0.,aP.y+position.z*aP.z); gl_Position=projectionMatrix*viewMatrix*vec4(p,1.); }`,
+    fragmentShader: `varying vec2 vQ; varying vec4 vC; varying float vAo; void main(){ float d=length(vQ); if(d>1.) discard;
+      float fall=1.-smoothstep(.2,1.,d), ao=(1.-smoothstep(0.,vAo,d))*vC.a; gl_FragColor=vec4(vC.rgb*fall,ao); }` });
+  const mesh = new THREE.Mesh(g, m); mesh.frustumCulled = false; GLOW.scene.add(mesh); }
+function renderGlow(alive) {
+  let k = 0;
+  for (const p of alive) {
+    const R = Math.max(.5, PU.uPP.value[p.idx].z), ao = Math.max(.4, (p.crown || 1) * .45 + .3) * Math.min(1, p.growth * 1.5), w = PU.uPP.value[p.idx].w * (1 - (p.fossil || 0));
+    const Rq = Math.max(R, ao); GLOW.a.setXYZW(k, p.x, p.z, Rq, Math.min(ao, Rq)); GLOW.c.setXYZW(k, p.col[0] * w, p.col[1] * w, p.col[2] * w, .55 * Math.min(1, p.growth * 1.5)); k++;
+  }
+  GLOW.g.instanceCount = k; GLOW.a.needsUpdate = GLOW.c.needsUpdate = true;
+  const prev = renderer.getRenderTarget(), cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha();
+  renderer.setRenderTarget(GLOW.rt); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(GLOW.scene, GLOW.cam);
+  renderer.setRenderTarget(prev); renderer.setClearColor(cc, ca);
+}
 
 const FLORA_COMMON = `
-  uniform vec4 uPA[${MAXP}]; uniform vec4 uPB[${MAXP}]; uniform vec4 uPC[${MAXP}]; uniform vec4 uPQ[${MAXP}]; uniform float uTime; uniform float uBio; uniform float uDay; uniform vec3 uSunL;
+  uniform sampler2D tPlant; vec4 PL(int r, int i){ return texelFetch(tPlant, ivec2(i, r), 0); } uniform float uTime; uniform float uBio; uniform float uDay; uniform vec3 uSunL;
   attribute vec3 iCol, iCol2, iMat;
-  vec3 segPos; vec3 segN; float segT; float segF; float segH; int segI;
+  vec3 segPos; vec3 segN; float segT; float segF; float segH; int segI; vec3 segLeaf=vec3(0.);
   vec3 rotAB(vec3 v, vec3 a, vec3 b){ vec3 k=cross(a,b); float s=length(k), c=dot(a,b); if(s<1e-5) return v; k/=s; return v*c+cross(k,v)*s+k*dot(k,v)*(1.-c); }
-  vec3 quakeOf(vec3 p){ vec4 q=uPQ[segI]; float k=clamp((p.y-q.w)/5.,0.,1.5); return q.xyz*k*k; }   // la plante vibre depuis le sol
+  vec3 quakeOf(vec3 p){ vec4 q=PL(3,segI); float k=clamp((p.y-q.w)/5.,0.,1.5); return q.xyz*k*k; }   // la plante vibre depuis le sol
   vec3 sunTarget(){ return normalize(vec3(uSunL.x,max(uSunL.y,.1),uSunL.z)); }
   void frameOf(vec3 t, out vec3 X, out vec3 Z){ vec3 ref=abs(dot(t,vec3(.53,0.,.848)))>.97?vec3(0.,1.,0.):vec3(.53,0.,.848); X=normalize(cross(ref,t)); Z=cross(t,X); }`;
 const TUBE_GLSL = FLORA_COMMON + `
@@ -1355,10 +1482,10 @@ const TUBE_GLSL = FLORA_COMMON + `
   vec3 herm(vec3 p0,vec3 p1,vec3 m0,vec3 m1,float s){ float s2=s*s,s3=s2*s; return (2.*s3-3.*s2+1.)*p0+(s3-2.*s2+s)*m0+(-2.*s3+3.*s2)*p1+(s3-s2)*m1; }
   vec3 hermD(vec3 p0,vec3 p1,vec3 m0,vec3 m1,float s){ float s2=s*s; return (6.*s2-6.*s)*p0+(3.*s2-4.*s+1.)*m0+(-6.*s2+6.*s)*p1+(3.*s2-2.*s)*m1; }
   void floraCompute(vec3 p, vec3 n){
-    segI=int(iTime.z+.5); float G=uPA[segI].x;
+    segI=int(iTime.z+.5); float G=PL(0,segI).x;
     float f=clamp((G-iTime.x)/max(iTime.y-iTime.x,1e-4),0.,1.);
     vec3 P0=iP0,P1=iP1,T0=iT0,T1=iT1;
-    if(iPivot.w>.5){ vec3 a=uPC[segI].xyz,b=sunTarget(); P0=iPivot.xyz+rotAB(P0-iPivot.xyz,a,b); P1=iPivot.xyz+rotAB(P1-iPivot.xyz,a,b); T0=rotAB(T0,a,b); T1=rotAB(T1,a,b); }
+    if(iPivot.w>.5){ vec3 a=PL(2,segI).xyz,b=sunTarget(); P0=iPivot.xyz+rotAB(P0-iPivot.xyz,a,b); P1=iPivot.xyz+rotAB(P1-iPivot.xyz,a,b); T0=rotAB(T0,a,b); T1=rotAB(T1,a,b); }
     float L=length(P1-P0); vec3 M0=T0*L, M1=T1*L;
     float s=p.y*f;
     vec3 c=herm(P0,P1,M0,M1,s); vec3 tg=normalize(hermD(P0,P1,M0,M1,s)+vec3(1e-6));
@@ -1373,22 +1500,24 @@ const TUBE_GLSL = FLORA_COMMON + `
 const PEARL_GLSL = FLORA_COMMON + `
   attribute vec3 iC; attribute vec4 iD, iF, iRad, iTime, iPivot;
   void floraCompute(vec3 p, vec3 n){
-    segI=int(iTime.z+.5); vec4 pa=uPA[segI]; float G=pa.x;
+    segI=int(iTime.z+.5); vec4 pa=PL(0,segI); float G=pa.x;
     float f=smoothstep(iTime.x,iTime.y,G);
     vec3 C=iC, d=normalize(iD.xyz), fn=iF.xyz;
-    if(iPivot.w>.5){ vec3 a=uPC[segI].xyz,b=sunTarget(); C=iPivot.xyz+rotAB(C-iPivot.xyz,a,b); d=rotAB(d,a,b); fn=rotAB(fn,a,b); }
+    if(iPivot.w>.5){ vec3 a=PL(2,segI).xyz,b=sunTarget(); C=iPivot.xyz+rotAB(C-iPivot.xyz,a,b); d=rotAB(d,a,b); fn=rotAB(fn,a,b); }
     float e=iD.w, fl=iF.w; float r=iRad.x*f*(1.+iTime.w*pa.z*.3);
     vec3 q=p+d*dot(p,d)*(e-1.);                       // allongé selon d
     q+=fn*dot(q,fn)*(fl-1.);                          // aplati selon fn (pétales, feuilles)
     segPos=C+q*r;
+    if(pa.w>.001&&fl<.6) segPos+=fn*sin(uTime*31.+dot(C,vec3(3.1,1.7,2.3)))*pa.w*r*.55;   // frisson des feuilles sur les médiums
     vec3 nn=n-d*dot(n,d)*(1.-1./e); nn-=fn*dot(nn,fn)*(1.-1./max(fl,.05));
     segN=normalize(nn);
     segF=f; segT=iTime.y; segH=clamp(dot(p,d)*.5+.5,0.,1.);
+    if(fl<.5){ vec3 sd=normalize(cross(d,fn)+vec3(1e-5)); segLeaf=vec3(dot(p,d),dot(p,sd),1.); }   // repère de la feuille, pour ses nervures
   }`;
 const CRYSTAL_GLSL = FLORA_COMMON + `
   attribute vec3 iB, iD; attribute vec4 iShape, iTime;
   void floraCompute(vec3 p, vec3 n){
-    segI=int(iTime.z+.5); float G=uPA[segI].x;
+    segI=int(iTime.z+.5); float G=PL(0,segI).x;
     float f=clamp((G-iTime.x)/max(iTime.y-iTime.x,1e-4),0.,1.);
     vec3 d=normalize(iD); vec3 X,Z; frameOf(d,X,Z);
     float ca=cos(iShape.w), sa=sin(iShape.w); vec3 X2=X*ca+Z*sa, Z2=Z*ca-X*sa; X=X2; Z=Z2;
@@ -1400,7 +1529,7 @@ const CRYSTAL_GLSL = FLORA_COMMON + `
 const GEM_GLSL = FLORA_COMMON + `
   attribute vec3 iC; attribute vec4 iD, iS, iTime;
   void floraCompute(vec3 p, vec3 n){
-    segI=int(iTime.z+.5); vec4 pa=uPA[segI]; float G=pa.x;
+    segI=int(iTime.z+.5); vec4 pa=PL(0,segI); float G=pa.x;
     float f=smoothstep(iTime.x,iTime.y,G);
     vec3 d=normalize(iD.xyz); vec3 X,Z; frameOf(d,X,Z);
     float ca=cos(iD.w), sa=sin(iD.w); vec3 X2=X*ca+Z*sa, Z2=Z*ca-X*sa; X=X2; Z=Z2;
@@ -1421,29 +1550,35 @@ function floraMaterial(key, glsl, emisPre, phys, rim) {
   const m = new THREE.MeshPhysicalMaterial(Object.assign({ color: 0xffffff, roughness: .3, metalness: 0, envMapIntensity: 1 }, phys));
   m.customProgramCacheKey = () => 'flora-' + key;
   m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, { uPA: PU.uPA, uPB: PU.uPB, uPC: PU.uPC, uPQ: PU.uPQ, uTime: PU.uTime, uBio: PU.uBio, uDay: PU.uDay });
+    Object.assign(sh.uniforms, { tPlant: PU.tPlant, uTime: PU.uTime, uBio: PU.uBio, uDay: PU.uDay });
     addTerrainShadow(sh);
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + glsl + '\nvarying vec3 vCol; varying vec2 vMat; varying vec3 vEmis; varying vec3 vRim;')
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + glsl + '\nvarying vec3 vCol; varying vec2 vMat; varying vec3 vEmis; varying vec3 vRim; varying vec3 vLeaf;')
       .replace('#include <beginnormal_vertex>', 'floraCompute(position,normal); vec3 objectNormal=segN;')
       .replace('#include <begin_vertex>', 'vec3 transformed=segPos+quakeOf(segPos);')
       .replace('#include <fog_vertex>', `#include <fog_vertex>
         ${emisPre}
         vec3 base=mix(iCol,iCol2,clamp(cmix,0.,1.));
+        float fos=PL(4,segI).x; base=mix(base,vec3(.2,.19,.18)+vec3(dot(base,vec3(.33)))*.35,fos);   // fossilisation : la plante devient pierre
         vCol=base*mix(.5,1.,smoothstep(0.,.22,segT));                  // ombrage au pied : les parties anciennes, basses, sont plus sombres
-        vMat=iMat.xy; vec4 pa=uPA[segI]; vec4 pb=uPB[segI];
+        vMat=iMat.xy; vec4 pa=PL(0,segI); vec4 pb=PL(1,segI);
         float wave=exp(-pow((segT-pa.x*(1.-pa.z))*7.,2.))*pa.z;
         float breath=.62+.38*sin(uTime*1.25+pb.w*6.283+segT*5.);
         vec3 ecol=mix(pb.rgb,iCol2*1.25,.5);
-        vEmis=ecol*uBio*1.5*(glowAmt*(.12+.88*pa.y)*breath + wave*(.25+glowAmt)*1.3)*step(.001,segF);
+        vEmis=ecol*uBio*1.5*(glowAmt*(.12+.88*pa.y)*breath + wave*(.25+glowAmt)*1.3)*step(.001,segF)*(1.-fos);
         vEmis+=base*max(dot(-segN,uSunL),0.)*iMat.z*uDay*1.1;
         vEmis+=base*bodyGlow*(.3+.7*uDay)*step(.001,segF);           // couleur dans la masse des minéraux translucides          // lumière traversant feuilles et pétales
-        vRim=iCol2*${rim}*(.35+.65*uDay+uBio*.3)*step(.001,segF);
+        vRim=iCol2*${rim}*(.35+.65*uDay+uBio*.3)*step(.001,segF); vLeaf=segLeaf;
       `);
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vCol; varying vec2 vMat; varying vec3 vEmis; varying vec3 vRim;')
-      .replace('#include <color_fragment>', 'diffuseColor.rgb=vCol;')
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uDay; varying vec3 vCol; varying vec2 vMat; varying vec3 vEmis; varying vec3 vRim; varying vec3 vLeaf; float lfRib=0., lfVein=0., lfEdge=0.;')
+      .replace('#include <color_fragment>', `diffuseColor.rgb=vCol;
+        if(vLeaf.z>.5){ float a=vLeaf.x, b=vLeaf.y;                              // nervure centrale, nervures secondaires, bord translucide
+          lfRib=exp(-pow(b*26.,2.))*(1.-smoothstep(.75,1.,abs(a)));
+          lfVein=pow(abs(sin((a*.9-abs(b)*1.1)*14.)),22.)*(1.-abs(b))*.9;
+          lfEdge=smoothstep(.6,.98,length(vec2(a*.85,b)));
+          diffuseColor.rgb*=1.-.28*lfRib-.18*lfVein; }`)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor=vMat.x;')
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor=vMat.y;')
-      .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance=vEmis+vRim*pow(1.-abs(dot(normal,normalize(vViewPosition))),2.5);');
+      .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance=vEmis*(1.+lfRib*1.2+lfVein*.8)+vRim*pow(1.-abs(dot(normal,normalize(vViewPosition))),2.5)+vCol*lfEdge*.22*(.3+.7*uDay)+vEmis*lfEdge*.6;');
   };
   return m;
 }
@@ -1451,7 +1586,7 @@ function floraDepth(key, glsl) {
   const m = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
   m.customProgramCacheKey = () => 'flora-depth-' + key;
   m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, { uPA: PU.uPA, uPB: PU.uPB, uPC: PU.uPC, uPQ: PU.uPQ, uTime: PU.uTime, uBio: PU.uBio, uDay: PU.uDay, uSunL: PU.uSunL });
+    Object.assign(sh.uniforms, { tPlant: PU.tPlant, uTime: PU.uTime, uBio: PU.uBio, uDay: PU.uDay, uSunL: PU.uSunL });
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + glsl)
       .replace('#include <begin_vertex>', 'floraCompute(position,normal); vec3 transformed=segPos+quakeOf(segPos);');
   };
@@ -1861,7 +1996,19 @@ function writePlant(G, idx) {
   FLORA_SETS.forEach((I, j) => { const n0 = N0[j]; if (I.n > n0) for (const k in I.A) { const at = I.A[k]; at.addUpdateRange(n0 * at.itemSize, (I.n - n0) * at.itemSize); at.needsUpdate = true; } I.g.instanceCount = I.n; });
   return true;
 }
-function resetFlora() { for (const I of FLORA_SETS) { I.n = 0; I.g.instanceCount = 0; } PU.uN.value = 0; }
+function resetFlora() { for (const I of FLORA_SETS) { I.n = 0; I.g.instanceCount = 0; } PU.uN.value = 0; SLOTS.fill(0); }
+const SLOTS = new Uint8Array(MAXP);
+function allocSlot(plants) {
+  let i = SLOTS.indexOf(0);
+  if (i < 0 && plants) { compactFlora(plants); i = SLOTS.indexOf(0); }
+  if (i >= 0) SLOTS[i] = 1; return i;
+}
+// Les plantes disparues laissent leurs instances dans les tampons : on reconstruit, plante vivante par plante vivante
+function compactFlora(plants) {
+  for (const I of FLORA_SETS) { I.n = 0; I.g.instanceCount = 0; } SLOTS.fill(0);
+  for (const p of plants) { if (p.dead || !p.G) continue; const i = SLOTS.indexOf(0); SLOTS[i] = 1; p.idx = i; writePlant(p.G, i); }
+}
+const floraFill = () => Math.max(TUBES.n / TUBES.cap, PEARLS.n / PEARLS.cap, CRYST.n / CRYST.cap, GEMS.n / GEMS.cap);
 
 /* ---- Poussière balistique ---- */
 const DCAP = 7000;
@@ -1891,7 +2038,37 @@ function emitDust(rng, cx, cz, n, t, h) {
   }
   dGeo.attributes.position.needsUpdate = dGeo.attributes.aV.needsUpdate = dGeo.attributes.aT0.needsUpdate = true;
 }
-function resetDust() { dT0.fill(-1e6); dGeo.attributes.aT0.needsUpdate = true; dHead = 0; }
+function emitRing(rng, cx, cz, amp, t, h) {        // la poussière se soulève au passage du front, puis retombe sans un souffle d'air
+  for (let r = 3; r < 40; r += 2.2) { const n = Math.floor((6 + r * .6) * amp); for (let k = 0; k < n; k++) {
+    const i = dHead; dHead = (dHead + 1) % DCAP; const a = rng() * 6.283, rr = r + rng() * 2, x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr, sp = (.3 + rng() * .8) * amp, el = .9 + rng() * .5;
+    dP0.set([x, h(x, z) + .02, z], i * 3); dV.set([Math.cos(a) * Math.cos(el) * sp, Math.sin(el) * sp * 1.6, Math.sin(a) * Math.cos(el) * sp], i * 3); dT0[i] = t + rr / 22;
+  } }
+  dGeo.attributes.position.needsUpdate = dGeo.attributes.aV.needsUpdate = dGeo.attributes.aT0.needsUpdate = true;
+}
+function resetDust() { dT0.fill(-1e6); dGeo.attributes.aT0.needsUpdate = true; dHead = 0; sT0.fill(-1e6); sGeo.attributes.aT0.needsUpdate = true; sHead = 0; }
+/* ---- Étincelles des aigus : spores lumineuses lancées des cimes, en chute balistique ---- */
+const SCAP = 3000, sGeo = new THREE.BufferGeometry();
+const sP0 = new Float32Array(SCAP * 3), sV = new Float32Array(SCAP * 3), sC = new Float32Array(SCAP * 3), sT0 = new Float32Array(SCAP).fill(-1e6);
+sGeo.setAttribute('position', new THREE.BufferAttribute(sP0, 3)); sGeo.setAttribute('aV', new THREE.BufferAttribute(sV, 3)); sGeo.setAttribute('aC', new THREE.BufferAttribute(sC, 3)); sGeo.setAttribute('aT0', new THREE.BufferAttribute(sT0, 1));
+const sparkMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uTime: PU.uTime, uPR: PU.uPxs },
+  vertexShader: `attribute vec3 aV, aC; attribute float aT0; uniform float uTime,uPR; varying float vA; varying vec3 vC;
+    void main(){ float tt=uTime-aT0, tl=3.2; vec3 p=position+aV*tt+vec3(0.,-.5*${G_MOON.toFixed(2)}*tt*tt,0.);
+      vec4 mv=modelViewMatrix*vec4(p,1.); float alive=step(0.,tt)*step(tt,tl); vC=aC;
+      vA=alive*smoothstep(0.,.08,tt)*(1.-smoothstep(tl*.4,tl,tt))*(.7+.3*sin(tt*25.+aT0*91.));
+      gl_PointSize=alive*clamp(uPR*70./-mv.z,1.2,7.); gl_Position=projectionMatrix*mv; }`,
+  fragmentShader: `varying float vA; varying vec3 vC; void main(){ float d=length(gl_PointCoord-.5)*2.; if(d>1.) discard; gl_FragColor=vec4((vC*.8+.35)*vA*exp(-d*d*3.)*2.4,1.); }`
+});
+const sparks = new THREE.Points(sGeo, sparkMat); sparks.frustumCulled = false; scene.add(sparks);
+let sHead = 0;
+function emitSparks(rng, x, y, z, n, col, t) {
+  for (let k = 0; k < n; k++) {
+    const i = sHead; sHead = (sHead + 1) % SCAP;
+    const a = rng() * 6.283, sp = .4 + rng() * 1.6, up = 1.5 + rng() * 3.2;
+    sP0.set([x + (rng() - .5) * .8, y, z + (rng() - .5) * .8], i * 3); sV.set([Math.cos(a) * sp, up, Math.sin(a) * sp], i * 3); sC.set(col, i * 3); sT0[i] = t;
+  }
+  for (const k of ['position', 'aV', 'aC', 'aT0']) sGeo.attributes[k].needsUpdate = true;
+}
 
 /* =====================================================================
    7. SIMULATION — graine + empreinte musicale + instant de départ = même film
@@ -1907,7 +2084,7 @@ class Sim {
     this.mu = { vM: 0, vP: 0, dv: 0, vL: 0, vLL: 0, tilt: 0, tiltAvg: 0, ons: 0, b: .5, r: 0, p: 0, e: 0 };
     this.phrase = { id: 0, t0: 0, s: [.5, .5, 0], off: 0, fam: null, cx: 0, cz: 0 }; this.groves = [[0, 0]];
  this.lastSpawn = -99; this.shot = null; this.prevShot = null; this.full = false;
-    this.shocks = []; this.stillK = 0; this.dawn = !!W.dawn; this.D = 0; this.stage = 0; this.shotPhrase = 0; this.finaleT0 = 0; this.finaleLock = false; this.pubN = 0;
+    this.shocks = []; this.stillK = 0; this.loud = 0; this.pan = 0; this.lat = .1; this.predict = false; this.dawn = !!W.dawn; this.D = 0; this.stage = 0; this.shotPhrase = 0; this.finaleT0 = 0; this.finaleLock = false; this.pubN = 0;
     resetFlora(); resetDust();
     this.cut(this.intro ? 'arrivee' : 'large');
   }
@@ -1916,13 +2093,29 @@ class Sim {
     this.t += DT; this.tick++;
     const [bass, mid, high, vol, cent, flag] = fr, f = this.f, fl = Math.round(flag), onset = !!(fl & 1), silent = !!(fl & 2);
     const pub = !!(fl & 4), forcedShot = (fl >> 3) & 15, forcedEnd = !!(fl & 128);   // graines du public, plans et final commandés par le musicien
+    const applause = !!(fl & 256), forcedDawn = !!(fl & 512), onMid = !!(fl & 1024), onHigh = !!(fl & 2048);
+    this.loud = fr.length > 6 ? fr[6] : vol; this.pan = fr.length > 7 ? fr[7] : 0;   // anciennes empreintes : 6 valeurs
+    for (const p of this.plants) { p.g0 = p.growth; p.gl0 = p.glow; p.pu0 = p.pulse; p.fl0 = p.flut || 0; }   // pour l'interpolation à l'affichage
     const sm = (k, x) => { f[k] += (x - f[k]) * (x > f[k] ? .55 : .14); };
     sm('bass', bass); sm('mid', mid); sm('high', high); sm('vol', vol); sm('cent', cent);
     this.listen(onset);
     // le temps lunaire s'écoule : lentement au repos, à toute allure quand la musique s'emporte
     if (onset) this.beatEnv = 1; this.beatEnv *= Math.exp(-DT * 2.2);
-    const t = this.t, n = this.plants.length, m = this.mu;
+    const t = this.t, m = this.mu, live = this.plants.filter(p => !p.dead), n = live.length; this.alive = n;
+    // renouvellement : quand le jardin est plein, les plus anciennes plantes se fossilisent (8 s), puis s'effritent (3 s) et cèdent leur place
+    if ((n >= MAXP - 8 || floraFill() > .8) && t - (this.lastFossil || -99) > 2.5) {
+      let o = null; for (const p of live) if (!p.dying && !p.public && (!o || p.born < o.born)) o = p;
+      if (o) { o.dying = t; this.lastFossil = t; }
+    }
+    for (const p of live) if (p.dying) {
+      const a = t - p.dying; p.fossil = clamp(a / 8, 0, 1);
+      if (a > 8) { if (!p.crumbling) { p.crumbling = true; emitDust(this.rD, p.x, p.z, 160, t, this.W.h); } p.growth = Math.max(0, 1 - (a - 8) / 3); if (p.growth <= 0) p.dead = true; }
+    }
+    // courbe d'intensité de l'œuvre : l'énergie accumulée module densité, lumière et ampleur des mouvements
+    this.arc = (this.arc || 0) + ((this.loud || 0) * (.7 + .3 * m.p) - (this.arc || 0)) * (1 - Math.exp(-DT / 40));
     this.stillK += ((silent ? 1 : 0) - this.stillK) * (1 - Math.exp(-DT / .6));        // le silence fige le jardin
+    this.applK = applause ? Math.min(1, (this.applK || 0) + DT * 1.5) : Math.max(0, (this.applK || 0) - DT * .4);
+    if (forcedDawn) this.forceDawn = true;
     if (this.dawn) {
       // dramaturgie de la lumière : on arrive de nuit, sous la lumière cendrée ; l'aube approche avec l'énergie
       // de la musique et le Soleil se lève au moment du climax (ou, à défaut, pendant le final)
@@ -1931,7 +2124,7 @@ class Sim {
         if (this.D < 1) {
           dD = .0055 * (.3 + 1.4 * m.e) * (1 - this.stillK);
           const climax = m.r > .28 && m.vL > .42 && m.vL > m.vLL * 1.18 && t > this.introDoneAt + 35;
-          if (climax || this.finale) dD = Math.max(dD, .06);
+          if (climax || this.finale || this.forceDawn) dD = Math.max(dD, .06);
           if (this.D > .96 && dD < .01) dD = 0;                                         // l'aube attend son climax
         } else dD = this.D < 3 ? .065 : .004 * (1 - this.stillK);
       }
@@ -1951,28 +2144,59 @@ class Sim {
     // ensemencement : seulement une fois le site révélé à l'écran
     const seedOpen = !this.intro || (this.introDone && t > this.introDoneAt + 1.2);
     const cre = Math.max(this.mu.r, 0), sustained = vol > .3 && t - this.lastSpawn > 6 * (1 - .45 * cre);
-    if (seedOpen && !this.full && n < MAXP && ((onset && vol > .08 && t - this.lastSpawn > 1.6 * (1 - .4 * cre)) || sustained || (n === 0 && vol > .04))) this.spawn(bass, mid, high, cent);
+    const gap = 1.6 * (1 - .4 * cre) * (1.25 - .5 * this.arc);
+    if (seedOpen && !this.full && n < MAXP && ((onset && vol > .08 && t - this.lastSpawn > gap) || sustained || (n === 0 && vol > .04))) this.spawn(bass, mid, high, cent);
     for (const p of this.plants) {
       const bk = SPECIES[p.sp].band, band = bk === 'cent' ? (f.mid + f.cent) * .5 : f[bk];
       const young = t - p.born < 25 ? 1 : .3;
       if (p.delay && t < p.born + p.delay) continue;                                     // graine du public encore en chute
+      if (p.dead || p.dying) { p.glow *= .96; continue; }
       p.growth = Math.min(1, p.growth + DT / SPECIES[p.sp].dur * (.18 + 1.7 * band) * (1 + 1.4 * cre * young) * (1 - this.stillK));
       p.glow += (band * (1 + .5 * this.mu.r) * (1 - .8 * this.stillK) - p.glow) * .12;
       p.pulse *= Math.exp(-DT * 1.6);
     }
     if (onset) {
       const dom = bass >= mid && bass >= high ? 'bass' : mid >= high ? 'mid' : 'high';
-      for (const p of this.plants) if (SPECIES[p.sp].band === dom || this.rL() < .25) p.pulse = 1;
-      if (n && bass > .3 && vol > .1 && (t - (this.lastShock || -9) > 1.6 || bass > .75)) {          // onde sismique : la frappe part d'un point du jardin et traverse toute la flore
-        const p = this.plants[Math.max(0, n - 1 - Math.floor(this.rD() * Math.min(n, 12)))];
+      for (const p of live) if (SPECIES[p.sp].band === dom || this.rL() < .25) p.pulse = 1;
+      const predicted = this.predT != null && t - this.predT < this.lat + .12;
+      if (n && bass > .3 && vol > .1 && !predicted && (t - (this.lastShock || -9) > 1.6 || bass > .75)) {          // onde sismique : la frappe part d'un point du jardin et traverse toute la flore
+        let p = live[Math.max(0, n - 1 - Math.floor(this.rD() * Math.min(n, 12)))];
+        if (Math.abs(this.pan) > .25) { const sd = this.sideOf(); if (sd) for (let k = 0; k < 6; k++) { const q = live[Math.floor(this.rD() * n)]; if (Math.sign(sd(q.x, q.z)) === Math.sign(this.pan)) { p = q; break; } } }
         this.shocks.push({ x: p.x, z: p.z, t0: t, a: clamp(bass * (.4 + vol) * 1.3, .12, 1) }); if (this.shocks.length > 6) this.shocks.shift(); this.lastShock = t;
+        emitRing(this.rD, p.x, p.z, clamp(bass * (.4 + vol) * 1.3, .12, 1), t, this.W.h);
         emitDust(this.rD, p.x, p.z, Math.floor(40 + bass * 180), t, this.W.h);
+      }
+    }
+    if (onset || onMid || onHigh) { this.flashT = t; this.flashC = onset ? [1, .35, .2] : onMid ? [.35, 1, .45] : [.45, .65, 1]; }
+    if (onMid) for (const p of this.plants) if (SPECIES[p.sp].band === 'mid' || SPECIES[p.sp].band === 'cent' || this.rL() < .3) {   // médiums : le feuillage frissonne, les jeunes pousses bondissent
+      p.flut = 1; if (t - p.born < 20 && p.growth < 1) p.growth = Math.min(1, p.growth + .012);
+    }
+    if (onHigh && n) for (let k = 0; k < 3; k++) {                                       // aigus : étincelles qui s'envolent des cimes
+      const p = live[Math.floor(this.rD() * n)]; if (p.sp === 'mycelium' || p.dying) continue;
+      emitSparks(this.rD, p.x, p.y + p.height * p.growth * .9, p.z, 14 + Math.floor(high * 30), p.col, t);
+    }
+    for (const p of this.plants) if (p.flut) p.flut *= Math.exp(-DT / .35);
+    if (applause && n && this.tick % 8 === 0) { const p = live[Math.floor(this.rD() * n)]; emitSparks(this.rD, p.x, p.y + p.height * p.growth, p.z, 40, p.col, t); }   // le salut : la flore répond aux applaudissements
+    // tempo : sur une pulsation régulière, l'onde part à l'instant prévu (en avance de la latence d'analyse) ; l'attaque réelle confirme
+    if (onset) { const bt = this.beats || (this.beats = []); bt.push(t); if (bt.length > 9) bt.shift(); }
+    if (this.predict && this.beats && this.beats.length >= 6 && n) {
+      const bt = this.beats, iv = []; for (let i = 1; i < bt.length; i++) iv.push(bt[i] - bt[i - 1]);
+      const sv = iv.slice().sort((a, b) => a - b), per = sv[iv.length >> 1], dev = iv.reduce((a, x) => a + Math.abs(x - per), 0) / iv.length;
+      if (per > .25 && per < 1.6 && dev < per * .08 && t - bt[bt.length - 1] < per * 2.2) {
+        const next = bt[bt.length - 1] + per * Math.ceil((t + this.lat - bt[bt.length - 1]) / per - .001);
+        if (t >= next - this.lat - DT * .5 && t < next - this.lat + DT * .5 && this.lastPred !== next) {
+          this.lastPred = next; this.predT = t;
+          const p = live[Math.max(0, n - 1 - Math.floor(this.rD() * Math.min(n, 12)))];
+          this.shocks.push({ x: p.x, z: p.z, t0: t, a: clamp(f.bass * (.4 + this.loud) * 1.2, .12, .9), pred: true }); if (this.shocks.length > 6) this.shocks.shift(); this.lastShock = t;
+          emitRing(this.rD, p.x, p.z, clamp(f.bass * (.4 + this.loud) * 1.2, .12, .9), t, this.W.h);
+        }
       }
     }
     for (const p of this.plants) if (p.delay && !p.landed && t >= p.born + p.delay) { p.landed = true; emitDust(this.rD, p.x, p.z, 220, t, this.W.h); this.shocks.push({ x: p.x, z: p.z, t0: t, a: .7 }); if (this.shocks.length > 6) this.shocks.shift(); }
     if (pub && seedOpen && !this.full && n < MAXP) this.spawnPublic();
     if (this.intro) {                     // final : à 3 min 30, ou dès 3 s de silence ; annulé si la musique reprend avant 3 min 30
-      this.silentT = silent ? this.silentT + DT : 0; this.loudT = silent ? 0 : this.loudT + DT;
+      this.silentT = silent || applause ? this.silentT + DT : 0; this.loudT = silent || applause ? 0 : this.loudT + DT;
+      if (applause && !this.finale && t > this.introEnd + 30) { this.finale = true; this.finaleLock = true; this.finaleT0 = t; this.cut('finale'); }   // la salle applaudit : l'œuvre salue
       if (forcedEnd && !this.finale && t > this.introEnd) { this.finale = true; this.finaleLock = true; this.finaleT0 = t; this.cut('finale'); }
       if (!this.finale && t > this.introEnd && (t >= FINALE_T || this.silentT > 3)) { this.finale = true; this.finaleT0 = t; this.cut('finale'); }
       else if (this.finale && !this.finaleLock && t < FINALE_T && this.loudT > 2) { this.finale = false; this.cut('etab'); }
@@ -1990,9 +2214,9 @@ class Sim {
   }
   listen(onset) {
     const m = this.mu, f = this.f, k = x => 1 - Math.exp(-DT / x);
-    m.vP = m.vM; m.vM += (f.vol - m.vM) * k(1.2);
+    m.vP = m.vM; m.vM += (this.loud - m.vM) * k(1.2);
     m.dv += ((m.vM - m.vP) / DT - m.dv) * k(1.5);
-    m.vL += (f.vol - m.vL) * k(8); m.vLL += (f.vol - m.vLL) * k(25);
+    m.vL += (this.loud - m.vL) * k(8); m.vLL += (this.loud - m.vLL) * k(25);
     m.r = Math.tanh(m.dv * 6 + (m.vL - m.vLL) * 3.2);                                 // > 0 crescendo, < 0 decrescendo (gestes courts et longues montées)
     const tl = (f.bass - f.high) / (f.bass + f.high + .08);
     m.tilt += (tl - m.tilt) * k(2); m.tiltAvg += (m.tilt - m.tiltAvg) * k(30);
@@ -2029,20 +2253,27 @@ class Sim {
     const m = this.mu;
     return { H: clamp(1 + .42 * m.r + .15 * (m.e - .4), .7, 1.5), dr: Math.max(-m.r, 0) * .35, tw: (m.p - .5) * .5, S: .85 + .3 * m.b, rd: .8 + .4 * m.b, gl: .75 + .6 * this.f.cent };
   }
+  sideOf() {      // position gauche-droite d'un point dans le plan en cours (pour placer les événements du côté du son)
+    if (!this.shot) return null; const o = { pos: new THREE.Vector3(), tgt: new THREE.Vector3(), fov: 34, focus: 20 }; shotCamera(this, this.t, o);
+    const fx = o.tgt.x - o.pos.x, fz = o.tgt.z - o.pos.z; return (x, z) => (x - o.pos.x) * -fz + (z - o.pos.z) * fx;   // > 0 : à droite
+  }
   spawnPublic() { this.spawn(this.f.bass, this.f.mid, this.f.high, this.f.cent, true); }
   spawn(bass, mid, high, cent, pub) {
     const r = this.rL, W = this.W;
     const v = this.pickVariety(f => f !== 'mycelium'), sp = v.fam, P = this.phrase;
     if (!P.fam) P.fam = sp;
     let px, pz;
-    if (pub) { const a = r() * 6.283, d = 5 + r() * 16, c = this.shot && this.plants.length ? [this.shot.cx, this.shot.cz] : [0, 0]; px = c[0] + Math.cos(a) * d; pz = c[1] + Math.sin(a) * d; }
+    if (pub) { const lp = this.lastPublic && this.t - this.lastPublic.born < 5 ? this.lastPublic : null;   // graines semées ensemble : elles tombent en grappe
+      const a = r() * 6.283, d = lp ? 2 + r() * 4 : 5 + r() * 16, c = lp ? [lp.x, lp.z] : this.shot && this.plants.length ? [this.shot.cx, this.shot.cz] : [0, 0]; px = c[0] + Math.cos(a) * d; pz = c[1] + Math.sin(a) * d; }
     else if (!this.plants.length) { px = (r() - .5) * 4; pz = (r() - .5) * 4; }
-    else if (r() < .72) {                       // dans le bosquet de la phrase en cours, en gardant de l'espace
-      let bd = -1; for (let i = 0; i < 6; i++) { const a = r() * 6.283, d = 2.5 + Math.sqrt(r()) * 11, x = P.cx + Math.cos(a) * d, z = P.cz + Math.sin(a) * d; let md = 1e9; for (const q of this.plants) md = Math.min(md, Math.hypot(q.x - x, q.z - z) - SPECIES[q.sp].r * .5); if (md > bd) { bd = md; px = x; pz = z; } }
+    else if (r() < .72) {                       // dans le bosquet de la phrase en cours, en gardant de l'espace ; du côté de l'écran d'où vient le son (stéréo)
+      const side = this.sideOf(), pan = Math.abs(this.pan) > .25 ? Math.sign(this.pan) : 0;
+      let bd = -1e9; for (let i = 0; i < 6; i++) { const a = r() * 6.283, d = 2.5 + Math.sqrt(r()) * 11, x = P.cx + Math.cos(a) * d, z = P.cz + Math.sin(a) * d; let md = 1e9; for (const q of this.plants) if (!q.dead) md = Math.min(md, Math.hypot(q.x - x, q.z - z) - SPECIES[q.sp].r * .5);
+        if (pan && side) md += 3 * pan * Math.sign(side(x, z)); if (md > bd) { bd = md; px = x; pz = z; } }
     }
     else { const o = this.plants[Math.floor(r() * this.plants.length)]; const a = r() * 6.283, d = 6 + r() * 9; px = o.x + Math.cos(a) * d; pz = o.z + Math.sin(a) * d; }
     if (Math.hypot(px, pz) > 52) { px *= .7; pz *= .7; }
-    const idx = this.plants.length;
+    let idx = allocSlot(this.plants); if (idx < 0) { this.full = true; return; }
     const pal = W.palette, mixc = (u, v, k) => u.map((c, i) => c + (v[i] - c) * k);
     const baseCol = mixc(pal.a, pal.b, r());
     const col = baseCol.map(c => clamp(c * (.85 + r() * .3), 0, 1.2));
@@ -2050,9 +2281,10 @@ class Sim {
     const C = celestial(W, this.skyMs()); const sun0 = new THREE.Vector3(C.sunL.x, Math.max(C.sunL.y, .1), C.sunL.z).normalize();
     const pl = { idx, sp, var: v.id, v, mod: this.birthMod(), mus: [this.mu.b, this.mu.r, this.mu.p], phraseId: P.id, born: this.t, x: px, z: pz, y: W.h(px, pz) - .15, growth: 0, glow: 0, pulse: 1, col, phase: r(), height: 0, crown: 0, sun0 };
     const G = genPlant(pl, mulberry32(Math.floor(r() * 4294967296)), sun0, W);
-    if (!writePlant(G, idx)) { this.full = true; return; }
-    pl.height = Math.max(1, G.height); pl.crown = G.crown;
-    if (pub) { pl.delay = 1.8; pl.public = true; this.pubN++; this.lastPublic = pl; }
+    if (!writePlant(G, idx)) { compactFlora(this.plants); idx = allocSlot(this.plants); pl.idx = idx; if (idx < 0 || !writePlant(G, idx)) { SLOTS[idx] = 0; this.full = true; return; } }
+    pl.height = Math.max(1, G.height); pl.crown = G.crown; pl.G = G; this.full = false;
+    if (pub) { pl.delay = 1.8; pl.public = true; pl.col = pubColor(this.pubN); this.pubN++; this.lastPublic = pl; }
+    if (pub && !this.finale && this.t > this.introEnd && this.t - this.shot.t0 > 4 && this.t - (this.lastPubCut || -99) > 12) { this.plants.push(pl); this.cut('grue', pl); this.plants.pop(); this.lastPubCut = this.t; }
     this.plants.push(pl); if (!pub) this.lastSpawn = this.t;
     if (idx === 0 && !this.intro) this.cut('ras', pl);
     if (!pub && r() < .2 + .3 * Math.max(-this.mu.r, 0) && this.plants.length < MAXP - 12) this.spawnRhizome(pl);
@@ -2060,19 +2292,19 @@ class Sim {
   // Rhizome énergétique : un flux de gaz piégés court sous le régolithe d'une plante à sa voisine, des champignons y percent
   spawnRhizome(a) {
     const r = this.rL, W = this.W; let best = null, bd = 1e9;
-    for (const q of this.plants) { if (q === a || q.sp === 'mycelium') continue; const d = Math.hypot(q.x - a.x, q.z - a.z); if (d > 3.5 && d < 28 && d < bd) { bd = d; best = q; } }
-    if (!best || this.plants.length >= MAXP) return;
-    const idx = this.plants.length, mx = (a.x + best.x) / 2, mz = (a.z + best.z) / 2;
+    for (const q of this.plants) { if (q === a || q.sp === 'mycelium' || q.dead || q.dying) continue; const d = Math.hypot(q.x - a.x, q.z - a.z); if (d > 3.5 && d < 28 && d < bd) { bd = d; best = q; } }
+    if (!best || this.alive >= MAXP - 2) return;
+    const idx = allocSlot(this.plants), mx = (a.x + best.x) / 2, mz = (a.z + best.z) / 2; if (idx < 0) return;
     const v = this.pickVariety(f => f === 'mycelium');
     const pl = { idx, sp: 'mycelium', var: v.id, v, mod: this.birthMod(), phraseId: this.phrase.id, born: this.t, x: mx, z: mz, y: W.h(mx, mz) - .15, growth: 0, glow: 0, pulse: 1, col: a.col.slice(), phase: r(), height: 0, crown: 0, sun0: a.sun0, ax: a.x, az: a.z, bx: best.x, bz: best.z };
     const G = genPlant(pl, mulberry32(Math.floor(r() * 4294967296)), a.sun0, W);
-    if (!writePlant(G, idx)) { this.full = true; return; }
-    pl.height = Math.max(.6, G.height); this.plants.push(pl);
+    if (!writePlant(G, idx)) { SLOTS[idx] = 0; return; }
+    pl.height = Math.max(.6, G.height); pl.G = G; this.plants.push(pl);
   }
   cut(force, plant, soft, manual) {
-    const r = this.rC, n = this.plants.length, prev = this.shot && this.shot.type;
+    const r = this.rC, prev = this.shot && this.shot.type, grove = force === 'etab' && this.phrase.id > 0;
     let type = force;
-    const tall = this.plants.filter(p => p.height * p.growth > 4 && p.crown > 1.2 && p.sp !== 'mycelium' && p.sp !== 'filament');
+    const live = this.plants.filter(p => !p.dead && !p.dying), n = live.length, tall = live.filter(p => p.height * p.growth > 4 && p.crown > 1.2 && p.sp !== 'mycelium' && p.sp !== 'filament');
     if (type === 'etab') { this.stage = 0; type = null; }
     if (!type) {   // grammaire : plan d'ensemble → détail → révélation → détail → révélation…
       const T3 = !n ? [['large', 'ciel', 'terre']] : [
@@ -2086,22 +2318,46 @@ class Sim {
     if (!n && !['large', 'ciel', 'terre', 'finale', 'arrivee'].includes(type)) type = 'large';
     this.shotPhrase = this.phrase.id;
     if (this.shot && !manual && soft && type !== 'finale') { this.prevShot = this.shot; } else this.prevShot = null;
-    let cx = 0, cz = 0; if (n) { for (const p of this.plants) { cx += p.x; cz += p.z; } cx /= n; cz /= n; }
-    const pl = plant || ((type === 'cime' || type === 'canopee') && tall.length ? tall[Math.floor(r() * tall.length)] : n ? this.plants[Math.floor(r() * n)] : null);
-    let ext = 12; for (const p of this.plants) ext = Math.max(ext, Math.hypot(p.x - cx, p.z - cz) + p.height * .5);   // étendue de l'œuvre
-    this.shot = { type, t0: this.t, a: r(), b: r(), c: r(), pl: pl ? pl.idx : -1, cx, cz, ext, blend: this.prevShot ? 2.6 : 0 };
+    let cx = 0, cz = 0; if (n) { for (const p of live) { cx += p.x; cz += p.z; } cx /= n; cz /= n; }
+    if (grove) { cx += (this.phrase.cx - cx) * .75; cz += (this.phrase.cz - cz) * .75; }          // nouvelle phrase : on montre le bosquet qui commence
+    // sujet : de préférence ce qui vient d'arriver (naissance récente, graine du public)
+    const recent = live.filter(p => this.t - p.born < 8 && p.sp !== 'mycelium');
+    const pl = plant || ((type === 'cime' || type === 'canopee') && tall.length ? tall[Math.floor(r() * tall.length)]
+      : recent.length && r() < .65 ? recent[Math.floor(r() * recent.length)] : n ? live[Math.floor(r() * n)] : null);
+    let ext = 12; for (const p of live) ext = Math.max(ext, Math.hypot(p.x - cx, p.z - cz) + p.height * .5);   // étendue de l'œuvre
+    const fixed = type === 'finale' || type === 'arrivee';
+    this.shot = { type, t0: this.t, a: r(), b: r(), c: r(), pl: pl ? this.plants.indexOf(pl) : -1, cx, cz, ext, blend: this.prevShot ? 2.6 : 0, spd: fixed ? 1 : .75 + .6 * (this.arc || 0) };
+    // visibilité : on cherche un angle où aucune autre plante ne masque le sujet
+    if (pl && ['ras', 'grue', 'terre', 'cime', 'contre'].includes(type)) {
+      const tmp = { pos: new THREE.Vector3(), tgt: new THREE.Vector3(), fov: 34, focus: 20 };
+      const blocked = () => { for (const T of [this.t + .5, this.t + 6]) { shotCamera(this, T, tmp, this.shot); if (occluded(tmp.pos, tmp.tgt, live, pl)) return true; } return false; };
+      for (let k = 0; k < 7 && blocked(); k++) { this.shot.b = (this.shot.b + .143) % 1; if (k === 3) this.shot.a = (this.shot.a + .5) % 1; }
+    }
   }
 }
 
+// couleur propre à chaque graine du public (suite d'or : jamais deux teintes voisines à la suite)
+const pubColor = k => hsv2rgb([(.13 + k * .618034) % 1, .72, 1]);
+const hexCol = c => '#' + c.map(v => Math.round(clamp(v, 0, 1) * 255).toString(16).padStart(2, '0')).join('');
 /* ---- Le réalisateur ---- */
-const _v = new THREE.Vector3(), _t = new THREE.Vector3();
+function occluded(a, b, plants, subj) {
+  const dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz + 1e-6;
+  for (const q of plants) {
+    if (q === subj || q.sp === 'mycelium' || q.sp === 'herbe') continue;
+    const rq = Math.max((q.crown || 1) * q.growth, SPECIES[q.sp].r * .35), hq = q.height * q.growth;
+    const u = clamp(((q.x - a.x) * dx + (q.z - a.z) * dz) / L2, 0, .92), px = a.x + dx * u, pz = a.z + dz * u, py = a.y + (b.y - a.y) * u;
+    if (Math.hypot(q.x - px, q.z - pz) < rq && py < q.y + hq && py > q.y - .5) return true;
+  }
+  return false;
+}
+const _v = new THREE.Vector3(), _t = new THREE.Vector3(), _gc = new THREE.Vector3(), _sp = new THREE.Vector3(), _st = new THREE.Vector3();
 function shotCamera(sim, T, out, shot) {
-  const W = sim.W, s = shot || sim.shot, h = W.h, el = T - s.t0;
+  const W = sim.W, s = shot || sim.shot, h = W.h, el = (T - s.t0) * (s.spd || 1);
   const P = s.pl >= 0 ? sim.plants[s.pl] : null;
   const H = P ? Math.max(1.5, P.height * Math.max(P.growth, .25)) : 3;
   const C = P ? _t.set(P.x, P.y, P.z) : _t.set(s.cx, h(s.cx, s.cz), s.cz);
-  const gc = new THREE.Vector3(s.cx, h(s.cx, s.cz), s.cz);
-  let pos = new THREE.Vector3(), tgt = new THREE.Vector3(), fov = 34;
+  const gc = _gc.set(s.cx, h(s.cx, s.cz), s.cz);
+  let pos = _sp.set(0, 0, 0), tgt = _st.set(0, 0, 0), fov = 34;
   if (s.type === 'large') {
     const R = 36 + s.a * 30, az = s.b * 6.283 + el * .022 * (s.c > .5 ? 1 : -1);
     pos.set(gc.x + Math.cos(az) * R, 0, gc.z + Math.sin(az) * R); pos.y = h(pos.x, pos.z) + 4 + s.c * 9;
@@ -2169,30 +2425,30 @@ function shotCamera(sim, T, out, shot) {
 /* =====================================================================
    8. SESSIONS
    ===================================================================== */
-let mode = 'intro', sim = null, frames = [], recFrames = null, replayEl = null, liveT0 = 0, idleAcc = 0, current = null, videoRec = null, videoChunks = [];
-const ZERO = [0, 0, 0, 0, 0, 0], SILENT = [0, 0, 0, 0, 0, 2];
+let recStride = 6, mode = 'intro', sim = null, frames = [], recFrames = null, replayEl = null, liveT0 = 0, idleAcc = 0, current = null, videoRec = null, videoChunks = [];
+const ZERO = [0, 0, 0, 0, 0, 0, 0, 0], SILENT = [0, 0, 0, 0, 0, 2, 0, 0];
 function startWorld(seed, startMs, intro, dawn) { world = buildWorld(seed, startMs, dawn); sim = new Sim(seed, world, intro); sim.tscale = S.tscale; CEL = celestial(world, sim.skyMs()); }
 
 async function startLive(kind, file) {
   const seed = (crypto.getRandomValues(new Uint32Array(1))[0]) >>> 0;
-  startWorld(seed, Date.now(), true, !S.cycle); frames = [];
+  startWorld(seed, Date.now(), true, !S.cycle); frames = []; sim.lat = S.latency / 1000; sim.predict = true;
   if (kind === 'mic') await AE.useMic(); else if (kind === 'phone') await AE.useRemote(PH.stream); else await AE.useFile(file);
   liveT0 = AE.ctx.currentTime; AE.silentFor = 0; AE.heard = 0; AE.silStart = null; AE.lastNow = 0;
   if (AE.el) AE.el.onended = () => { if (mode === 'live') finishLive(true); };
-  mode = 'live'; setUI();
+  mode = 'live'; setUI(); keepAwake(true);
 }
 function liveTime() { return AE.el ? AE.el.currentTime : AE.ctx.currentTime - liveT0; }
 
 let wantThumb = null;
 async function finishLive(save) {
   if (mode !== 'live') return;
-  mode = 'idle'; setUI();
+  mode = 'idle'; setUI(); keepAwake(false);
   const audio = await AE.finishRecording(); AE.stop();
   if (!save) return;
   const thumb = await new Promise(res => wantThumb = res);
   const rec = {
     id: Date.now().toString(36) + '-' + sim.W.seed.toString(36), name: sim.W.name, date: new Date().toISOString(), seed: sim.W.seed, startUTC: sim.W.startMs,
-    tscale: sim.tscale, dawn: sim.dawn, publicSeeds: sim.pubN, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), varieties: new Set(sim.plants.map(p => p.var)).size, frames: new Float32Array(frames), audio, thumb,
+    stride: 8, lat: S.latency / 1000, tscale: sim.tscale, dawn: sim.dawn, publicSeeds: sim.pubN, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), varieties: new Set(sim.plants.map(p => p.var)).size, frames: new Float32Array(frames), audio, thumb,
   };
   try { await DB.put(rec); } catch (e) { memStore.set(rec.id, rec); }
   showEpilogue(rec);
@@ -2202,8 +2458,8 @@ const speciesLine = c => Object.keys(SPECIES).filter(k => c[k]).map(k => c[k] + 
 
 async function startReplay(rec, exportVideo) {
   closeGallery(); AE.ensure(); AE.stop();
-  startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1;
-  recFrames = rec.frames; current = rec; replayEl = null;
+  startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0;
+  recFrames = rec.frames; recStride = rec.stride || 6; current = rec; replayEl = null;
   if (rec.audio) {
     const el = new window.Audio(URL.createObjectURL(rec.audio)); replayEl = el;
     const src = AE.ctx.createMediaElementSource(el); src.connect(AE.ctx.destination);
@@ -2255,8 +2511,20 @@ async function exportJSON(rec) {
   const out = { format: 'selene-1', ...rec, frames: b64(new Uint8Array(rec.frames.buffer)), audio, audioType: rec.audio ? rec.audio.type : null };
   download(new Blob([JSON.stringify(out)], { type: 'application/json' }), slug(rec.name) + '.selene.json');
 }
+async function backupGallery() {
+  const list = await allCreations(), items = [];
+  for (const rec of list) items.push({ ...rec, frames: b64(new Uint8Array(rec.frames.buffer, rec.frames.byteOffset, rec.frames.byteLength)), audio: rec.audio ? b64(new Uint8Array(await rec.audio.arrayBuffer())) : null, audioType: rec.audio ? rec.audio.type : null });
+  download(new Blob([JSON.stringify({ format: 'herba-galerie-1', date: new Date().toISOString(), items })], { type: 'application/json' }), 'herba-stellaris-galerie-' + new Date().toISOString().slice(0, 10) + '.json');
+}
+async function putImported(o) {
+  const u = unb64(o.frames);
+  const rec = { ...o, frames: new Float32Array(u.buffer, 0, u.byteLength / 4), audio: o.audio ? new Blob([unb64(o.audio)], { type: o.audioType || 'audio/webm' }) : null };
+  delete rec.format; delete rec.audioType;
+  try { await DB.put(rec); } catch (e) { memStore.set(rec.id, rec); }
+}
 async function importJSON(file) {
   const o = JSON.parse(await file.text());
+  if (o.format === 'herba-galerie-1') { for (const it of o.items) await putImported(it); return; }
   if (o.format !== 'selene-1') throw new Error('format inconnu');
   const u = unb64(o.frames);
   const rec = { ...o, frames: new Float32Array(u.buffer, 0, u.byteLength / 4), audio: o.audio ? new Blob([unb64(o.audio)], { type: o.audioType || 'audio/webm' }) : null };
@@ -2268,18 +2536,19 @@ async function importJSON(file) {
    9. INTERFACE
    ===================================================================== */
 const $ = id => document.getElementById(id);
-const S = { sens: 1.2, tscale: 1, bio: 1, dof: .4, grain: .05, scope: true, autocam: true, annot: false, quality: 'haute', silenceDb: -50, autostop: true, cycle: false, stage: false, output: 'cinema', adaptive: true };
+const S = { sens: 1.2, tscale: 1, bio: 1, dof: .4, grain: .05, scope: true, autocam: true, annot: false, quality: 'haute', silenceDb: -50, autostop: true, cycle: false, stage: false, output: 'cinema', adaptive: true, floorDb: -62, topDb: -14, latency: 100, mire: false };
+try { const c = JSON.parse(localStorage.getItem('herba-salle') || 'null'); if (c) Object.assign(S, c); } catch (e) {}
 const step01 = x => x >= 0 ? 1 : 0;
 const bind = (id, key, out, f = v => v.toFixed(2)) => $(id).addEventListener('input', e => { S[key] = parseFloat(e.target.value); $(out).textContent = f(S[key]); });
 bind('sens', 'sens', 'oSens'); bind('bio', 'bio', 'oBio'); bind('dof', 'dof', 'oDof'); bind('grain', 'grain', 'oGrain', v => v.toFixed(3)); bind('tscale', 'tscale', 'oTime');
 $('tscale').addEventListener('input', () => { if (sim && mode !== 'replay' && mode !== 'export') sim.tscale = S.tscale; });
 $('scope').addEventListener('change', e => S.scope = e.target.checked);
-$('silence').addEventListener('input', e => { S.silenceDb = +e.target.value; $('oSil').textContent = '−' + Math.abs(S.silenceDb) + ' dB'; });
+$('silence').addEventListener('input', e => { S.silenceDb = +e.target.value; $('oSil').textContent = '−' + Math.abs(S.silenceDb) + ' dB'; saveSalle(); });
 $('autostop').addEventListener('change', e => S.autostop = e.target.checked);
 $('annot').addEventListener('change', e => { S.annot = e.target.checked; SKY.lines.visible = S.annot; if (!S.annot) $('labels').innerHTML = ''; });
 function applyQuality(qk) {
   S.quality = qk; const q = QUALITY[qk], pr = q.pr();
-  renderer.setPixelRatio(pr); composer.setPixelRatio(pr); composer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(pr); composer.setPixelRatio(pr); composer.setSize(VW(), VH());
   setLOD(q.lod); dof.u.uTaps.value = q.taps; PU.uTSteps.value = q.steps; updatePxs();
   if (world) { const sh = world.sun.shadow; sh.mapSize.set(q.shadow, q.shadow); if (sh.map) { sh.map.dispose(); sh.map = null; } }
   try { localStorage.setItem('selene-qualite', qk); } catch (e) {}
@@ -2289,6 +2558,30 @@ $('output').addEventListener('change', e => setOutput(e.target.value));
 $('stage').addEventListener('change', e => setStage(e.target.checked));
 $('cycle').addEventListener('change', e => S.cycle = e.target.checked);
 $('adaptive').addEventListener('change', e => { S.adaptive = e.target.checked; if (!S.adaptive) setResScale(1); });
+$('latency').value = S.latency; $('oLat').textContent = S.latency + ' ms';
+$('latency').addEventListener('input', e => { S.latency = +e.target.value; $('oLat').textContent = S.latency + ' ms'; saveSalle(); });
+$('mire').addEventListener('change', e => S.mire = e.target.checked);
+$('silence').value = S.silenceDb; $('oSil').textContent = '−' + Math.abs(S.silenceDb) + ' dB';
+function saveSalle() { try { localStorage.setItem('herba-salle', JSON.stringify({ floorDb: S.floorDb, topDb: S.topDb, silenceDb: S.silenceDb, latency: S.latency })); } catch (e) {} }
+// Étalonnage : le bruit de la salle fixe le seuil de silence, le jeu fort fixe le haut de la dynamique
+async function calibrate() {
+  const say = t => { $('calibMsg').textContent = t; $('calibMsg2').textContent = t; };
+  if (mode === 'live') return say('Impossible pendant une composition.');
+  try {
+    const wasActive = AE.active; AE.ensure();
+    if (!wasActive) { if (PH.stream) await AE.useRemote(PH.stream); else await AE.useMic(); }
+    const take = async (sec, msg) => { const v = []; const t0 = performance.now(); while (performance.now() - t0 < sec * 1000) { AE.update(.05, S.sens); v.push(AE.db); say(msg + ' ' + Math.ceil(sec - (performance.now() - t0) / 1000) + ' s'); await new Promise(r => setTimeout(r, 50)); } return v.sort((a, b) => a - b); };
+    await new Promise(r => setTimeout(r, 400));
+    const q = await take(4, 'Silence dans la salle…');
+    const l = await take(4, 'Jouez fort maintenant…');
+    const floor = q[Math.floor(q.length * .5)], top = l[Math.floor(l.length * .95)];
+    S.floorDb = Math.max(-90, floor); S.topDb = Math.max(top, S.floorDb + 25);
+    S.silenceDb = clamp(Math.round(S.floorDb + 7), -75, -25); $('silence').value = S.silenceDb; $('oSil').textContent = '−' + Math.abs(S.silenceDb) + ' dB';
+    saveSalle(); if (!wasActive) AE.stop();
+    say(`Salle : bruit ${S.floorDb.toFixed(0)} dB, jeu fort ${S.topDb.toFixed(0)} dB, seuil de silence ${S.silenceDb} dB.`);
+  } catch (e) { say('Étalonnage impossible : ' + e.message); }
+}
+$('btnCalib').addEventListener('click', calibrate); $('btnCalib2').addEventListener('click', calibrate);
 try { const o = localStorage.getItem('herba-sortie'); if (o) { $('output').value = o; setOutput(o); } } catch (e) {}
 function setStage(on) {
   S.stage = on; $('stage').checked = on;
@@ -2297,7 +2590,7 @@ function setStage(on) {
 }
 // Résolution adaptative : on descend la définition quand la machine peine, on la remonte quand elle respire
 let resScale = 1, ftAvg = 1 / 60, ftAcc = 0, ftGood = 0;
-function setResScale(k) { resScale = k; const pr = QUALITY[S.quality].pr() * k; renderer.setPixelRatio(pr); composer.setPixelRatio(pr); composer.setSize(innerWidth, innerHeight); updatePxs(); }
+function setResScale(k) { resScale = k; const pr = QUALITY[S.quality].pr() * k; renderer.setPixelRatio(pr); composer.setPixelRatio(pr); composer.setSize(VW(), VH()); updatePxs(); }
 function adaptRes(dt) {
   if (!S.adaptive || offline || mode === 'export') return;
   ftAvg += (dt - ftAvg) * .05; ftAcc += dt; if (ftAcc < 2) return; ftAcc = 0;
@@ -2306,19 +2599,22 @@ function adaptRes(dt) {
   else ftGood = 0;
 }
 // Commandes du musicien pendant la composition : elles sont inscrites dans l'empreinte, donc rejouées à l'identique
-const PEND = { shot: 0, end: false };
+const PEND = { shot: 0, end: false, dawn: false };
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   const k = e.key.toLowerCase();
   if (k === 's') setStage(!S.stage);
   else if (k === 'q') togglePublic();
   else if (k === 'e' && mode === 'live') PEND.end = true;
+  else if (k === 'a' && mode === 'live') PEND.dawn = true;
+  else if (k === 'm') { S.mire = !S.mire; $('mire').checked = S.mire; }
   else if (/^[1-9]$/.test(k) && mode === 'live') PEND.shot = +k;
 });
 function applyPending(fr) {
   if (PEND.shot) { fr[5] += 8 * PEND.shot; PEND.shot = 0; }
   if (PEND.end) { fr[5] += 128; PEND.end = false; }
-  if (PUB.queue.length && sim.introDone && sim.t - PUB.lastT > 2.5) { fr[5] += 4; PUB.lastT = sim.t; PUB.waiting.push(PUB.queue.shift()); }
+  if (PEND.dawn) { fr[5] += 512; PEND.dawn = false; }
+  if (PUB.queue.length && sim.introDone && sim.t - PUB.lastT > .7) { fr[5] += 4; PUB.lastT = sim.t; PUB.waiting.push(PUB.queue.shift()); }
 }
 $('autocam').addEventListener('change', e => { S.autocam = e.target.checked; controls.enabled = !S.autocam; if (!S.autocam && sim) controls.target.copy(camTarget); });
 
@@ -2346,6 +2642,7 @@ $('btnStop').addEventListener('click', () => stopReplay());
 $('btnNew').addEventListener('click', () => { mode = 'intro'; setUI(); });
 $('btnGal1').addEventListener('click', openGallery); $('btnGal2').addEventListener('click', openGallery);
 $('btnGalClose').addEventListener('click', closeGallery);
+$('btnBackup').addEventListener('click', () => backupGallery().catch(e => alertBox('Sauvegarde impossible : ' + e.message)));
 $('fileImport').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { await importJSON(f); renderGallery(); } catch (err) { alertBox('Import impossible : ' + err.message); } });
 function alertBox(m) { const c = $('cards'); const d = document.createElement('div'); d.className = 'empty'; d.textContent = m; c.prepend(d); }
 
@@ -2414,11 +2711,60 @@ function updateLabels(C) {
   box.innerHTML = html;
 }
 
-addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
-  cine.uniforms.uAspect.value = innerWidth / innerHeight;
-});
+/* ---- Fenêtre de projection et régie ---- */
+async function openProjection() {
+  if (PROJ && !PROJ.closed) { PROJ.focus(); return; }
+  const w = window.open('', 'herba-projection', 'popup,width=1280,height=720');
+  if (!w) { $('calibMsg').textContent = 'La fenêtre de projection a été bloquée : autorise les fenêtres surgissantes pour ce site.'; return; }
+  PROJ = w;
+  w.document.open(); w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Herba Stellaris — Projection</title><style>html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:none}canvas{display:block;width:100%;height:100%}</style></head><body></body></html>'); w.document.close();
+  w.document.body.appendChild(canvas);
+  w.addEventListener('resize', onResize);
+  w.addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') { if (w.document.fullscreenElement) w.document.exitFullscreen(); else w.document.documentElement.requestFullscreen().catch(() => {}); } else window.dispatchEvent(new KeyboardEvent('keydown', { key: e.key })); });
+  w.addEventListener('dblclick', () => w.document.documentElement.requestFullscreen().catch(() => {}));
+  w.addEventListener('pagehide', closeProjection);
+  try { if ('getScreenDetails' in window) { const sd = await window.getScreenDetails(); const o = sd.screens.find(x => x !== sd.currentScreen); if (o) { w.moveTo(o.availLeft, o.availTop); w.resizeTo(o.availWidth, o.availHeight); } } } catch (e) {}
+  S.annot = false; $('annot').checked = false; SKY.lines.visible = false; $('labels').innerHTML = '';
+  $('regie').classList.remove('hidden'); document.body.classList.add('regie-on');
+  try { $('rgPrev').srcObject = canvas.captureStream(12); } catch (e) {}
+  setTimeout(onResize, 300); onResize(); schedule();
+}
+function closeProjection() {
+  if (!PROJ) return; const w = PROJ; PROJ = null;
+  document.body.insertBefore(canvas, document.body.firstChild); canvas.style.width = canvas.style.height = '';
+  try { if (!w.closed) w.close(); } catch (e) {}
+  $('regie').classList.add('hidden'); document.body.classList.remove('regie-on'); $('rgPrev').srcObject = null; onResize(); schedule();
+}
+['Ensemble', 'Ras du sol', 'Grue', 'Plongée', 'Cime', 'Canopée', 'Ciel', 'Terre', 'Contre-jour'].forEach((n, i) => { const b = document.createElement('button'); b.textContent = (i + 1) + ' · ' + n; b.onclick = () => { if (mode === 'live') PEND.shot = i + 1; }; $('rgShots').appendChild(b); });
+$('rgAube').onclick = () => { if (mode === 'live') PEND.dawn = true; }; $('rgFin').onclick = () => { if (mode === 'live') PEND.end = true; };
+$('rgPub').onclick = () => togglePublic(); $('rgStage').onclick = () => setStage(!S.stage); $('rgMire').onclick = () => { S.mire = !S.mire; $('mire').checked = S.mire; };
+$('rgClose').onclick = closeProjection; $('btnProj').onclick = openProjection; $('btnProjT').onclick = openProjection;
+function updateRegie() {
+  if (!PROJ) return;
+  const C = CEL, el = C ? (C.el / D2R).toFixed(1) + '°' : '—', ph = sim.phrase ? sim.phrase.id + 1 : 1, fps = Math.round(1 / Math.max(ftAvg, 1e-3));
+  const lien = PH.stream ? 'téléphone ✓' : AE.active ? 'micro local' : '—';
+  const items = [['Temps', mode === 'live' ? mmss(liveTime()) : mmss(sim.t)], ['Phrase', ph], ['Plantes', sim.plants.length + (sim.full ? ' (plein)' : '')], ['Soleil', el + (sim.dawn ? (sim.D < 1 ? ' · avant l’' + (world.term === 'crepuscule' ? 'ombre' : 'aube') : '') : '')],
+    ['Niveau', Math.round((sim.loud || 0) * 100) + ' %'], ['Dynamique', (sim.mu.r > .15 ? 'crescendo' : sim.mu.r < -.15 ? 'decrescendo' : 'stable')], ['Plan', sim.shot.type], ['Image', fps + ' i/s · ' + Math.round(resScale * 100) + ' %'],
+    ['Source', lien], ['Public', PUB.on ? PUB.queue.length + ' en attente · ' + sim.pubN + ' semées' : 'fermé'], ['Silence', AE.silentFor > 1 ? AE.silentFor.toFixed(0) + ' s' : '—'], ['Applaudis.', AE.applause ? 'oui' : '—']];
+  $('rgStat').innerHTML = items.map(([k, v]) => `<div><span>${k}</span>${v}</div>`).join('');
+}
+/* ---- Perte du contexte graphique : on continue d'écouter et d'enregistrer, l'image revient dès que possible ---- */
+let ctxLost = false;
+canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); ctxLost = true; $('rgMsg').textContent = 'Carte graphique perdue : l’enregistrement continue, reprise automatique…'; }, false);
+canvas.addEventListener('webglcontextrestored', () => { ctxLost = false; ENV.tex = null; $('rgMsg').textContent = 'Image rétablie.'; setTimeout(() => { $('rgMsg').textContent = ''; }, 4000); onResize(); }, false);
+/* ---- Écran toujours allumé pendant une composition ---- */
+let wakeLock = null;
+async function keepAwake(on) {
+  try { if (on && 'wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); }
+    else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; } } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && mode === 'live') keepAwake(true); });
+function onResize() {
+  camera.aspect = VW() / VH(); camera.updateProjectionMatrix();
+  renderer.setSize(VW(), VH()); composer.setSize(VW(), VH());
+  cine.uniforms.uAspect.value = VW() / VH(); updatePxs();
+}
+addEventListener('resize', onResize);
 
 
 /* =====================================================================
@@ -2502,11 +2848,11 @@ function publicConn(c) {
     const now = performance.now(), last = PUB.cool.get(c.peer) || -1e9, say = o => { try { c.send(o); } catch (e) {} };
     if (mode !== 'live' || !sim.introDone) return say({ msg: 'wait' });
     if (now - last < 20000) return say({ msg: 'cool', s: Math.ceil((20000 - (now - last)) / 1000) });
-    if (PUB.queue.length >= 6 || sim.full) return say({ msg: 'busy' });
-    PUB.cool.set(c.peer, now); PUB.queue.push(c); say({ msg: 'queued', n: PUB.queue.length });
+    if (PUB.queue.length >= 12 || sim.full) return say({ msg: 'busy' });
+    PUB.cool.set(c.peer, now); PUB.queue.push(c); say({ msg: 'queued', n: PUB.queue.length, col: hexCol(pubColor(sim.pubN + PUB.waiting.length + PUB.queue.length - 1)) });
   });
 }
-function notifyPublic(pl) { const c = PUB.waiting.shift(); if (c && c.open) try { c.send({ msg: 'planted', nom: pl.v.nom, chem: pl.v.chem, site: world.name }); } catch (e) {} }
+function notifyPublic(pl) { const c = PUB.waiting.shift(); if (c && c.open) try { c.send({ msg: 'planted', nom: pl.v.nom, chem: pl.v.chem, site: world.name, col: hexCol(pl.col) }); } catch (e) {} }
 function phoneStream(st) {
   PH.stream = st;
   // Chrome ne livre l'audio d'un flux WebRTC à Web Audio que s'il est aussi attaché à un élément média
@@ -2546,6 +2892,7 @@ async function phoneCommand(cmd) {
   if (cmd === 'start' && PH.stream && (mode === 'intro' || mode === 'idle')) { $('phoneBox').classList.add('hidden'); closeGallery(); await startLive('phone'); }
   else if (cmd === 'finish' && mode === 'live') finishLive(true);
   else if (cmd === 'finale' && mode === 'live') PEND.end = true;
+  else if (cmd === 'aube' && mode === 'live') PEND.dawn = true;
   else if (cmd === 'stage') setStage(!S.stage);
   else if (cmd === 'public') togglePublic();
   else if (typeof cmd === 'string' && /^shot[1-9]$/.test(cmd) && mode === 'live') PEND.shot = +cmd[4];
@@ -2780,7 +3127,7 @@ function drawMsg() {
 drawMsg(); drawPanel(-1);
 if (document.fonts) document.fonts.ready.then(() => { drawMsg(); if (ovZone >= 0) drawPanel(ovZone); });
 cine.uniforms.tPanel = { value: texPanel }; cine.uniforms.tMsg = { value: texMsg };
-cine.uniforms.uPanelA = { value: 0 }; cine.uniforms.uMsgA = { value: 0 };
+cine.uniforms.uPanelA = { value: 0 }; cine.uniforms.uMsgA = { value: 0 }; cine.uniforms.uFlash = { value: new THREE.Vector4() };
 function updateOverlay(Tv, sinceArr, on) {
   let zi = -1, a = 0;
   if (on) for (let i = 0; i < GAS_ZONES.length; i++) { const Z = GAS_ZONES[i]; if (Tv >= Z.t0 && Tv < Z.t1) { zi = i; a = smoothstep(Z.t0, Z.t0 + .6, Tv) * (1 - smoothstep(Z.t1 - .6, Z.t1, Tv)); } }
@@ -2859,6 +3206,7 @@ sim.lunarT = 0;
 sim.cut('ciel');
 setUI();
 updatePxs();
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});   // mise en cache : l'application se relance sans réseau
 try { renderer.compileAsync(SPACE.scene, SPACE.cam).catch(() => {}); renderer.compileAsync(scene, camera).catch(() => {}); } catch (e) {}   // préchauffage des shaders
 try { const q = localStorage.getItem('selene-qualite'); if (q && QUALITY[q]) { $('quality').value = q; applyQuality(q); } } catch (e) {}
 
@@ -2879,7 +3227,7 @@ function advance(dt) {
     const T = replayTime();
     stepRecorded(T);
     renderT = Math.max(sim.t, T);
-    if (!replayEl && sim.tick >= recFrames.length / 6) stopReplay();
+    if (!replayEl && sim.tick >= recFrames.length / recStride) stopReplay();
     $('rec').innerHTML = (mode === 'export' ? '<span class="dot"></span>Export vidéo ' : '▶ ' + current.name + ' ') + mmss(T) + ' / ' + mmss(current.duration);
   } else {
     idleAcc += dt;
@@ -2888,8 +3236,8 @@ function advance(dt) {
   }
 }
 function stepRecorded(T) {
-  const total = recFrames.length / 6;
-  while (sim.tick < Math.floor(T * TICK)) { const i = sim.tick * 6; sim.step(sim.tick < total ? recFrames.subarray(i, i + 6) : ZERO); }
+  const total = recFrames.length / recStride, Tl = T + (current && current.lat ? current.lat : 0);   // en relecture, l'image rattrape la latence d'analyse
+  while (sim.tick < Math.floor(Tl * TICK)) { const i = sim.tick * recStride; sim.step(sim.tick < total ? recFrames.subarray(i, i + recStride) : ZERO); }
 }
 
 function updateVisuals(dt, withUI) {
@@ -2904,12 +3252,15 @@ function updateVisuals(dt, withUI) {
   W.lhgMat.uniforms.uAmt.value = (.03 + f.high * .22) * (.35 + 1.8 * Math.exp(-(((elDeg + 1) / 4) ** 2)));
   renderer.toneMappingExposure = 1 + .7 * C.night;
   dustMat.uniforms.uLit.value = .15 + .85 * C.sunUp;
-  updateEnv(C);
+  updateEnv(C, sim.shot ? sim.shot.t0 : 0);
 
   const k = S.bio * (1 + 1.4 * C.night);
   PU.uTime.value = renderT; PU.uBio.value = k; PU.uN.value = sim.plants.length;
-  for (const p of sim.plants) {
-    PU.uPA.value[p.idx].set(p.growth, p.glow, p.pulse, 1);
+  const ia = clamp((renderT - (sim.t - DT)) / DT, 0, 1), lerpP = (a, b) => a == null ? b : a + (b - a) * ia;   // interpolation entre deux pas de simulation
+  const salut = sim.applK || 0, alive = sim.plants.filter(p => !p.dead);
+  for (const p of alive) {
+    PU.uPE.value[p.idx].set(p.fossil || 0, 0, 0, 0);
+    PU.uPA.value[p.idx].set(lerpP(p.g0, p.growth), lerpP(p.gl0, p.glow) + salut * .8, lerpP(p.pu0, p.pulse), lerpP(p.fl0, p.flut || 0));
     PU.uPB.value[p.idx].set(p.col[0], p.col[1], p.col[2], p.phase);
     PU.uPC.value[p.idx].set(p.sun0.x, p.sun0.y, p.sun0.z, 0);
     PU.uPP.value[p.idx].set(p.x, p.z, (2.5 + p.height * .55) * p.growth, (.25 + p.glow * .9) * Math.min(1, p.growth * 2));
@@ -2918,7 +3269,7 @@ function updateVisuals(dt, withUI) {
     const SH = sim.shocks;
     for (let i = 0; i < 6; i++) { const sk = SH[SH.length - 1 - i]; if (sk) PU.uShock.value[i].set(sk.x, sk.z, renderT - sk.t0, sk.a); else PU.uShock.value[i].set(0, 0, -1, 0); }
     PU.uShockCol.value.setRGB(...mixC(W.palette.b, [1, .9, .7], .4));
-    for (const p of sim.plants) {
+    for (const p of alive) {
       let qx = 0, qy = 0, qz = 0, pw = 0;
       for (const sk of SH) {
         const age = renderT - sk.t0; if (age < 0 || age > 4.5) continue;
@@ -2930,7 +3281,8 @@ function updateVisuals(dt, withUI) {
     }
     const FT = W.foot || []; PU.uFootN.value = FT.length; FT.forEach((v, i) => PU.uFoot.value[i].copy(v));
   }
-  const ranked = sim.plants.slice().sort((a, b) => (b.glow + .2) * b.growth * b.height - (a.glow + .2) * a.growth * a.height);
+  tPlant.needsUpdate = true; renderGlow(alive);
+  const ranked = alive.slice().sort((a, b) => (b.glow + .2) * b.growth * b.height - (a.glow + .2) * a.growth * a.height);
   plantLights.forEach((l, i) => {
     const p = ranked[i];
     if (!p) { l.intensity = 0; return; }
@@ -2971,13 +3323,14 @@ function updateVisuals(dt, withUI) {
   SPACE.grain.visible = inIntro;
   updateOverlay(Tv, sim.introDone ? renderT - sim.introDoneAt : 0, sim.intro);
   updatePublicFalls(vh);
+  { const a = S.mire && sim.flashT != null ? Math.exp(-Math.max(0, renderT - sim.flashT) / .05) : 0; cine.uniforms.uFlash.value.set(...(sim.flashC || [1, 1, 1]), a); }
   {  // la graine posée au cœur du site, jusqu'à ce que la première plante en sorte
     const p0 = sim.plants[0], on = sim.intro && sim.introDone ? (p0 ? 1 - smoothstep(0, .35, p0.growth) : 1) : 0;
     landedGrain.visible = on > .001;
     if (on > .001) { const gx = p0 ? p0.x : 0, gz = p0 ? p0.z : 0; landedGrain.geometry.attributes.position.setXYZ(0, gx, world.h(gx, gz) + .12, gz); landedGrain.geometry.attributes.position.needsUpdate = true;
       const u = landedGrain.material.uniforms; u.uPx.value = vh / 1080; u.uSize.value = 26 + 12 * f.bass + 6 * Math.sin(renderT * 3); u.uI.value = 3.2; u.uOn.value = on; u.uCol.value.setRGB(...mixC([1, .86, .55], world.palette.a, .35)); }
   }
-  bloom.strength = .32 + f.bass * .18 + f.vol * .1;
+  bloom.strength = .32 + f.bass * .18 + f.vol * .1 + .12 * (sim.arc || 0);
   cine.uniforms.uTime.value = renderT; cine.uniforms.uGrain.value = S.grain; cine.uniforms.uBars.value = S.scope && S.output === 'cinema' ? 1 : 0;
 
   if (withUI) {
@@ -2993,13 +3346,17 @@ function updateVisuals(dt, withUI) {
   }
 }
 
+let frameN = 0, lastFrameT = 0, frameDur = 16;
 function frame() {
+  const fs0 = performance.now();
   if (!offline) {
     const dt = Math.min(clock.getDelta(), .1);
     adaptRes(dt);
     advance(dt);
-    updateVisuals(dt, true);
-    composer.render(dt);
+    updateVisuals(dt, !uiHidden || !!PROJ);
+    frameN++; renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = frameN % 2 === 0 || mode === 'export';   // ombres à 30 Hz : invisibles à l'œil, mais un gros gain
+    if (frameN % 10 === 0) updateRegie();
+    if (!ctxLost) composer.render(dt);
     if (wantThumb) {
       const tw = 720, th = Math.round(tw / 2.39), cv = document.createElement('canvas'); cv.width = tw; cv.height = th;
       const sw = canvas.width, sh = Math.min(canvas.height, sw / 2.39);
@@ -3007,8 +3364,13 @@ function frame() {
       const r = wantThumb; wantThumb = null; r(cv.toDataURL('image/jpeg', .85));
     }
   } else clock.getDelta();
-  requestAnimationFrame(frame);
+  lastFrameT = performance.now(); frameDur += (lastFrameT - fs0 - frameDur) * .1;
+  schedule();
 }
+// la fenêtre de projection, toujours visible, cadence la boucle ; un jeton évite deux boucles en parallèle
+let loopTok = 0;
+setInterval(() => { if (!offline && lastFrameT && performance.now() - lastFrameT > 250 + 4 * frameDur) frame(); }, 16);   // boucle de secours si le navigateur suspend l'animation d'une fenêtre
+function schedule() { const id = ++loopTok; (PROJ && !PROJ.closed ? PROJ : window).requestAnimationFrame(() => { if (id === loopTok) frame(); }); }
 
 /* =====================================================================
    11. HAUTE DÉFINITION — photo 8K, vidéo 8K calculée image par image
@@ -3021,8 +3383,8 @@ function setRenderSize(w, h) {
 }
 function restoreRenderSize() {
   const q = QUALITY[S.quality];
-  renderer.setPixelRatio(q.pr()); renderer.setSize(innerWidth, innerHeight, false); composer.setPixelRatio(q.pr()); composer.setSize(innerWidth, innerHeight);
-  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); cine.uniforms.uAspect.value = innerWidth / innerHeight; updatePxs();
+  renderer.setPixelRatio(q.pr()); renderer.setSize(VW(), VH(), false); composer.setPixelRatio(q.pr()); composer.setSize(VW(), VH());
+  camera.aspect = VW() / VH(); camera.updateProjectionMatrix(); cine.uniforms.uAspect.value = VW() / VH(); updatePxs();
 }
 function hdQuality(on) {                         // pendant un rendu HD : détail maximal, quelle que soit la qualité d'affichage
   setLOD(on ? 'haute' : QUALITY[S.quality].lod);
@@ -3118,7 +3480,7 @@ async function runExport() {
   const duration = abuf ? abuf.duration : rec.duration, total = Math.ceil(duration * fps);
   $('xForm').classList.add('hidden'); $('xRun').classList.remove('hidden');
   hdJob.cancel = false; mode = 'hd'; setUI(); closeGallery();
-  AE.stop(); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; recFrames = rec.frames; current = rec;
+  AE.stop(); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; recFrames = rec.frames; recStride = rec.stride || 6; current = rec;
   offline = true; hdQuality(true); setRenderSize(w, h);
   const t0 = performance.now();
   try {

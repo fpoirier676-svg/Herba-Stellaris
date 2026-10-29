@@ -63,16 +63,42 @@ Repères d'échelle : un vieil étage de descente d'alunisseur se trouve à 65�
 
 Pensé pour une projection derrière le musicien.
 
-- **Mode Scène** (touche **S**, ou case dans le panneau) : plus aucun texte ni interface, curseur caché. Seul le message poétique de l'ouverture reste.
-- **Sortie de projection** (panneau) : *Cinéma 2.39*, *Plein cadre* pour les écrans ultra‑larges ou plusieurs projecteurs, *Dôme 180°* (image fisheye domemaster, centre relevé de 20°).
-- **Réalisation en direct** : touches **1** à **9** pour imposer un plan (1 ensemble, 2 ras du sol, 3 grue, 4 plongée, 5 cime, 6 canopée, 7 ciel, 8 Terre, 9 contre‑jour), **E** pour lancer le final, **F** plein écran.
-  Les mêmes commandes sont sur le téléphone‑capteur. Elles sont inscrites dans l'empreinte de la composition : la galerie et les exports les rejouent à l'identique.
-- **Graines du public** (touche **Q**) : un QR code s'affiche dans un coin. Les spectateurs ouvrent `public.html` sur leur téléphone et touchent « Semer ».
-  Leur graine tombe du ciel lunaire, se pose avec une onde de choc et germe selon la musique du moment. Le téléphone reçoit le nom et la chimie de la plante née.
-  Une graine par spectateur toutes les 20 s, une graine toutes les 2,5 s au plus.
-- **Fluidité** : résolution adaptative (vise 60 i/s), envoi partiel des nouvelles plantes à la carte graphique, shaders préchauffés au chargement,
-  tampon audio minimal et paquets Opus de 10 ms pour le téléphone.
-- **Cycle complet** : la case « Cycle jour‑nuit complet » rétablit l'ancien comportement (le temps lunaire s'accélère avec le volume) à la place de la dramaturgie nuit → aube.
+### Avant le spectacle
+1. **Étalonner la salle** (bouton d'accueil ou panneau) : 4 s de silence de la salle, puis 4 s de jeu fort. Le seuil de silence
+   et la plage de dynamique sont réglés sur la salle, et gardés pour les fois suivantes.
+2. **Fenêtre de projection** : l'image seule s'ouvre dans une fenêtre à placer sur le projecteur (placée automatiquement sur le
+   second écran si le navigateur le permet ; touche F ou double-clic dedans pour le plein écran). La fenêtre principale devient la
+   **régie** : aperçu, temps, phrase, plantes, Soleil, niveau, dynamique, plan en cours, images par seconde, source, public, silence, applaudissements.
+3. **Mire de synchronisation** (touche M) : un éclair coloré à chaque attaque (rouge grave, vert médium, bleu aigu). Filmer l'écran
+   au ralenti avec un téléphone pendant que tu joues, mesurer l'écart, et le reporter dans **Latence de la chaîne** : les pulsations
+   régulières sont alors anticipées de ce délai et tombent avec le son.
+
+### Pendant le spectacle
+- **Mode Scène** (S) : plus aucun texte ni interface. Seul le message poétique de l'ouverture reste.
+- **Plans** : 1 ensemble, 2 ras du sol, 3 grue, 4 plongée, 5 cime, 6 canopée, 7 ciel, 8 Terre, 9 contre-jour. **A** lève le Soleil (force le climax), **E** lance le final.
+  Mêmes commandes dans la régie et sur le téléphone-capteur. Elles sont inscrites dans l'empreinte : la galerie et les exports les rejouent à l'identique.
+- **Graines du public** (Q) : QR code dans un coin ; les spectateurs ouvrent `public.html` et touchent « Semer ». Chaque graine a sa propre couleur,
+  visible sur le téléphone et dans la traînée à l'écran ; les graines semées ensemble tombent en grappe et la caméra va voir l'atterrissage.
+- **Applaudissements** : reconnus (bruit large bande sans hauteur). Ils déclenchent le final et un salut lumineux de toute la flore, sans bloquer l'arrêt.
+
+### Sorties et robustesse
+- **Sortie de projection** : *Cinéma 2.39*, *Plein cadre* (écrans ultra-larges), *Dôme 180°* (fisheye domemaster, centre relevé de 20°).
+- **Sans réseau** : après une première visite, la page se relance depuis le cache. La **version hors ligne** (`herba-stellaris-hors-ligne.html`)
+  embarque tout dans un seul fichier, à ouvrir avec le micro de l'ordinateur ou une interface audio USB (le téléphone et les graines du public demandent le réseau).
+- Si la carte graphique décroche, l'écoute et l'enregistrement continuent et l'image revient seule. L'écran reste allumé pendant une composition.
+- **Sauvegarder toute la galerie** (dans la galerie) : un seul fichier, à restaurer par « Importer / restaurer ».
+
+## Comment le son agit sur l'image
+
+| Échelle | Ce que le public voit |
+|---|---|
+| Réflexe (≈ 10 à 50 ms) | Frappe grave : onde dans le sol, poussière soulevée, flore qui vibre, lumière dans les rhizomes. Attaque médium : le feuillage frissonne, les jeunes pousses bondissent. Attaque aiguë : étincelles lancées des cimes. Silence : tout se fige. |
+| Geste (1 à 5 s) | Naissances choisies par le registre, la dynamique et le rythme ; la caméra va voir ce qui vient d'arriver. |
+| Phrase (10 à 60 s) | Un bosquet par phrase musicale, montré par un plan d'ensemble quand il commence. |
+| Forme (minutes) | Courbe d'intensité de l'œuvre (densité, lumière, ampleur des mouvements) ; aube au climax ; renouvellement : au-delà de 160 plantes, les plus anciennes se fossilisent en pierre puis s'effritent, et la création continue. |
+
+Les attaques sont détectées par un module audio dédié, par blocs de 2,7 ms, sur trois registres. La dynamique (crescendo, decrescendo,
+climax) suit le niveau sonore absolu étalonné sur la salle, et non plus le volume normalisé qui s'adaptait à la musique.
 
 Sources des valeurs de l'exosphère lunaire et du vent solaire : NASA (mission LADEE).
 
@@ -83,6 +109,8 @@ Sources des valeurs de l'exosphère lunaire et du vent solaire : NASA (mission L
 | `index.html` | L'application (scène 3D, galerie, exports photo et vidéo jusqu'en 8K) |
 | `capteur.html` | Page à ouvrir sur le téléphone (via le QR code) pour en faire le micro de l'application et la télécommande de réalisation |
 | `public.html` | Page des spectateurs pour semer une graine pendant la composition |
+| `herba-stellaris-hors-ligne.html` | Version autonome en un seul fichier, sans réseau |
+| `sw.js` | Mise en cache pour relancer sans réseau |
 | `.nojekyll` | Indique à GitHub Pages de servir les fichiers tels quels |
 
 ## Utilisation
