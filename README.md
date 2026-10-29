@@ -88,6 +88,36 @@ Pensé pour une projection derrière le musicien.
 - Si la carte graphique décroche, l'écoute et l'enregistrement continuent et l'image revient seule. L'écran reste allumé pendant une composition.
 - **Sauvegarder toute la galerie** (dans la galerie) : un seul fichier, à restaurer par « Importer / restaurer ».
 
+## Jouer à la guitare
+
+Réglé pour une guitare électro-acoustique à cordes nylon (Ibanez TOD10N) passant par un Boss GX-1.
+
+**Branchement à faible latence** : guitare → GX-1 → câble **USB-C** → ordinateur. Le GX-1 sert d'interface audio
+(installer d'abord le pilote USB Boss). À l'accueil, choisir l'entrée « GX-1 » (bouton *Rechercher les entrées* la première fois)
+et l'instrument **Guitare**. Le téléphone reste possible, mais il ajoute 60 à 150 ms.
+
+Conseils de jeu : un réglage du GX-1 sans écho ni grande réverbération pour l'analyse (les effets brouillent les attaques et les notes) ;
+le mode jeu du projecteur ; la mire (touche M) pour mesurer le décalage restant.
+
+| Geste | Réponse |
+|---|---|
+| Note pincée | Une fleur de lumière s'ouvre à l'instant de l'attaque, haute pour une note aiguë, basse pour une note grave ; sa couleur suit le cycle des quintes |
+| Note tenue | La fleur reste ouverte et sa plante pousse tant que la corde résonne |
+| Mélodie, arpège | Une ligne de lumière court d'une fleur à la suivante |
+| Accord | Majeur : fleurs et arbres ; mineur : saules, fougères, rhizomes ; septièmes : gemmes et géodes ; suspendus : filaments ; diminué / augmenté : cristaux |
+| Tonalité | Les nouvelles plantes prennent les couleurs de la tonalité et de ses voisines (dominante, sous-dominante) |
+| Tension harmonique | Les cristaux se hérissent ; à la résolution, toute la flore s'illumine d'un coup |
+| Bend | La tige de la plante qui chante se courbe, de l'amplitude du bend |
+| Vibrato | Les feuilles voisines ondulent à la vitesse exacte du vibrato |
+| Glissé | Une traînée lumineuse court au sol vers la nouvelle note |
+| Harmonique naturelle | Tintement de cristal : éclats blancs, les cristaux répondent |
+| Note étouffée | Frappe sèche de poussière, la fleur se referme |
+| Percussion sur la caisse | Le sol répond : onde sismique (coup grave) ou éclats (tape aiguë) |
+| Rasgueado, accord gratté | Onde et éventail d'étincelles |
+
+Les nouvelles œuvres sont calculées 60 fois par seconde (au lieu de 30) et enregistrent, en plus du son, la hauteur, l'accord,
+la tonalité, la tension, le bend et le vibrato : la galerie et les exports les rejouent à l'identique.
+
 ## Comment le son agit sur l'image
 
 | Échelle | Ce que le public voit |

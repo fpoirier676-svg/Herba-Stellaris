@@ -2543,6 +2543,11 @@ var qrcode = function() {
     <input type="file" id="fileLive" accept="audio/*">
     <button id="btnGal1">Galerie des créations</button>
   </div>
+  <div class="row" style="margin-top:10px;align-items:center">
+    <label class="xnote">Entrée <select id="inDev"><option value="">Micro par défaut</option></select></label>
+    <label class="xnote">Instrument <select id="instr"><option value="guitare">Guitare</option><option value="tout">Toute source</option></select></label>
+    <button id="btnDevs" title="Afficher les noms des entrées (autorise le micro une fois)">Rechercher les entrées</button>
+  </div>
   <div class="row" style="margin-top:10px">
     <button id="btnCalib" title="4 s de silence de la salle, puis 4 s de jeu fort">Étalonner la salle</button>
     <button id="btnProj" title="Ouvre l’image seule dans une fenêtre à placer sur le projecteur ; cette fenêtre devient la régie">Fenêtre de projection</button>
@@ -2596,6 +2601,7 @@ var qrcode = function() {
   <label class="chk"><input type="checkbox" id="cycle"> Cycle jour-nuit complet (sinon : de la nuit à l’aube au climax)</label>
   <label class="chk"><input type="checkbox" id="adaptive" checked> Résolution adaptative (garder 60 i/s)</label>
   <label class="ctl">Latence de la chaîne <output id="oLat">100 ms</output><input type="range" id="latency" min="0" max="400" step="5" value="100"></label>
+  <label class="chk"><input type="checkbox" id="lowlat"> Affichage faible latence (au prochain chargement ; peut déchirer l’image)</label>
   <label class="chk"><input type="checkbox" id="mire"> Mire de synchronisation (touche M) : éclair à chaque attaque</label>
   <button class="small" id="btnCalib2" style="margin-top:8px">Étalonner la salle</button> <span id="calibMsg2" class="xnote"></span>
   <div class="xnote" style="font-size:10px;opacity:.6;margin-top:8px;line-height:1.5">Scène : 1 ensemble · 2 ras du sol · 3 grue · 4 plongée · 5 cime · 6 canopée · 7 ciel · 8 Terre · 9 contre-jour · E final · Q graines du public · S mode Scène · F plein écran</div>
@@ -2694,7 +2700,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 /* =====================================================================
    0. OUTILS
    ===================================================================== */
-const TICK = 30, DT = 1 / TICK, G_MOON = 1.62, D2R = Math.PI / 180;
+let TICK = 30, DT = 1 / TICK; const G_MOON = 1.62, D2R = Math.PI / 180;
+const LIVE_TICK = 60;                 // les nouvelles œuvres sont calculées 60 fois par seconde (les anciennes restent à 30)
+function setTick(n) { TICK = n; DT = 1 / n; }
 const TIME_BASE = 600;            // secondes lunaires par seconde réelle, au repos (1 s = 10 min)
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function hash2(i, j, s) { let h = (Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(s, 1442695041)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; }
@@ -2726,13 +2734,22 @@ class Bq { constructor(t, f, q, sr) { const w = 2 * Math.PI * f / sr, c = Math.c
     const a0 = 1 + al; this.b = [b0 / a0, b1 / a0, b2 / a0]; this.a = [-2 * c / a0, (1 - al) / a0]; this.z1 = 0; this.z2 = 0; }
   run(x) { const y = this.b[0] * x + this.z1; this.z1 = this.b[1] * x - this.a[0] * y + this.z2; this.z2 = this.b[2] * x - this.a[1] * y; return y; } }
 class HerbaOnsets extends AudioWorkletProcessor {
-  constructor() { super(); const sr = sampleRate;
-    this.f = { lb: new Bq('lp', 150, .707, sr), hm: new Bq('hp', 160, .707, sr), lm: new Bq('lp', 2000, .707, sr), hh: new Bq('hp', 2600, .707, sr) };
+  constructor(o) { super(); const sr = sampleRate, g = o && o.processorOptions && o.processorOptions.guitar;
+    // registres : pour la guitare, cordes graves (Mi-La-Ré) / médium (Sol-Si) / aigu (Mi aigu, haut du manche)
+    this.f = g ? { lb: new Bq('lp', 170, .707, sr), hm: new Bq('hp', 170, .707, sr), lm: new Bq('lp', 650, .707, sr), hh: new Bq('hp', 650, .707, sr) }
+      : { lb: new Bq('lp', 150, .707, sr), hm: new Bq('hp', 160, .707, sr), lm: new Bq('lp', 2000, .707, sr), hh: new Bq('hp', 2600, .707, sr) };
+    // hauteur (YIN) sur un signal décimé par 4 : 12 kHz suffisent pour les fondamentales de la guitare (82 Hz – 1,2 kHz)
+    this.dsr = sr / 4; this.d1 = new Bq('lp', 2600, .707, sr); this.d2 = new Bq('lp', 2600, .707, sr); this.dc = 0;
+    this.ring = new Float32Array(4096); this.rw = 0; this.sinceY = 0;
+    this.W = Math.round(this.dsr * .027); this.tmin = Math.floor(this.dsr / 1150); this.tmax = Math.ceil(this.dsr / 72);
+    this.buf = new Float32Array(this.W + this.tmax + 2); this.dd = new Float32Array(this.tmax + 2);
     this.fast = [0, 0, 0]; this.slow = [1e-6, 1e-6, 1e-6]; this.last = [-9, -9, -9]; this.prevF = [0, 0, 0]; this.n = 0; this.accL = 0; this.accR = 0; this.accN = 0; }
   process(inputs) {
     const inp = inputs[0]; if (!inp || !inp.length) { if (++this.n % 4 === 0) this.port.postMessage({ lv: 0, pan: 0, t: currentTime }); return true; }
     const L = inp[0], Rr = inp[1] || inp[0], N = L.length, f = this.f, e = [0, 0, 0];
-    for (let i = 0; i < N; i++) { const x = (L[i] + Rr[i]) * .5, b = f.lb.run(x), m = f.lm.run(f.hm.run(x)), h = f.hh.run(x); e[0] += b * b; e[1] += m * m; e[2] += h * h; this.accL += L[i] * L[i]; this.accR += Rr[i] * Rr[i]; }
+    for (let i = 0; i < N; i++) { const x = (L[i] + Rr[i]) * .5, b = f.lb.run(x), m = f.lm.run(f.hm.run(x)), h = f.hh.run(x); e[0] += b * b; e[1] += m * m; e[2] += h * h; this.accL += L[i] * L[i]; this.accR += Rr[i] * Rr[i];
+      const y = this.d2.run(this.d1.run(x)); if (++this.dc === 4) { this.dc = 0; this.ring[this.rw] = y; this.rw = (this.rw + 1) & 4095; this.sinceY++; } }
+    if (this.sinceY >= 64) { this.sinceY = 0; this.yin(); }
     this.accN += N;
     const t = currentTime, TH = [5.5, 5, 6], REF = [.12, .1, .1], ON = [], dbs = [];
     for (let k = 0; k < 3; k++) {
@@ -2755,6 +2772,20 @@ class HerbaOnsets extends AudioWorkletProcessor {
     return true;
   }
 }
+HerbaOnsets.prototype.yin = function () {
+  const W = this.W, T = this.tmax, n = W + T, b = this.buf, d = this.dd; let e = 0;
+  for (let i = 0; i < n; i++) { b[i] = this.ring[(this.rw - n + i + 8192) & 4095]; }
+  for (let i = T; i < n; i++) e += b[i] * b[i];
+  e = Math.sqrt(e / W); if (e < 1e-4) { this.port.postMessage({ p: 0, c: 0, e, t: currentTime }); return; }
+  let run = 0; d[0] = 1;
+  for (let tau = 1; tau <= T; tau++) { let s = 0; for (let j = 0; j < W; j++) { const q = b[j] - b[j + tau]; s += q * q; } run += s; d[tau] = run > 0 ? s * tau / run : 1; }
+  let best = -1;
+  for (let tau = this.tmin; tau < T; tau++) if (d[tau] < .13) { while (tau + 1 < T && d[tau + 1] < d[tau]) tau++; best = tau; break; }
+  if (best < 0) { let m = 1; for (let tau = this.tmin; tau < T; tau++) if (d[tau] < m) { m = d[tau]; best = tau; } if (m > .35) best = -1; }
+  if (best < 0) { this.port.postMessage({ p: 0, c: 0, e, t: currentTime }); return; }
+  const a = d[best - 1], c0 = d[best], z = d[best + 1] || c0, den = a - 2 * c0 + z, sh = den ? .5 * (a - z) / den : 0;
+  this.port.postMessage({ p: this.dsr / (best + sh), c: 1 - c0, e, t: currentTime });
+};
 registerProcessor('herba-onsets', HerbaOnsets);`;
 const AE = {
   wk: null, wkReady: false, onBits: 0, lvDb: -120, pan: 0, loud: 0, flat: 0, applT: 0, applause: false,
@@ -2764,18 +2795,22 @@ const AE = {
   recorder: null, chunks: [], recMime: '', db: -120, silentFor: 0, heard: 0,
   ensure() {
     if (!this.ctx) {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      try { this.ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive', sampleRate: 48000 }); } catch (e) { this.ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' }); }
       const a = this.ctx.createAnalyser();
       a.fftSize = 4096; a.smoothingTimeConstant = .55; a.minDecibels = -88; a.maxDecibels = -18;
       this.analyser = a; this.freq = new Uint8Array(a.frequencyBinCount); this.prev = new Uint8Array(a.frequencyBinCount); this.time = new Float32Array(a.fftSize);
       this.ffl = new Float32Array(a.frequencyBinCount);
       const wl = this.ctx.audioWorklet, blobU = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
-      if (wl) wl.addModule(blobU).catch(() => wl.addModule('data:application/javascript;base64,' + btoa(unescape(encodeURIComponent(WORKLET_SRC))))).then(() => {   // fichier ouvert depuis le disque : repli en data:
-        const n = new AudioWorkletNode(this.ctx, 'herba-onsets', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 2, channelCountMode: 'explicit' });
-        n.port.onmessage = ev => { const d = ev.data; if (d.on) for (const k of d.on) this.onBits |= [1, 1024, 2048][k]; else { this.lvDb = 20 * Math.log10(Math.max(d.lv, 1e-6)); this.pan += (d.pan - this.pan) * .2; } };
-        this.wk = n; this.wkReady = true; if (this.source) this.source.connect(n);
-      }).catch(e => { this.wkErr = String(e); });
+      if (wl) this.wkMod = wl.addModule(blobU).catch(() => wl.addModule('data:application/javascript;base64,' + btoa(unescape(encodeURIComponent(WORKLET_SRC)))));   // fichier ouvert depuis le disque : repli en data:
     }
+    if (this.wkMod && !this.wk && !this.wkMade) { this.wkMade = true; this.wkMod.then(() => {
+      const n = new AudioWorkletNode(this.ctx, 'herba-onsets', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 2, channelCountMode: 'explicit', processorOptions: { guitar: S.instr === 'guitare' } });
+      n.port.onmessage = ev => { const d = ev.data;
+        if (d.on) { for (const k of d.on) this.onBits |= [1, 1024, 2048][k]; GT.onset(d.t, d.on); }
+        else if (d.p !== undefined) GT.pitch(d);
+        else { this.lvDb = 20 * Math.log10(Math.max(d.lv, 1e-6)); this.pan += (d.pan - this.pan) * .2; } };
+      this.wk = n; this.wkReady = true; if (this.source) this.source.connect(n);
+    }).catch(e => { this.wkErr = String(e); this.wkMade = false; }); }
     if (this.ctx.state === 'suspended') this.ctx.resume();
   },
   stop() {
@@ -2788,7 +2823,10 @@ const AE = {
   },
   async useMic() {
     this.ensure(); this.stop();
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const a = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 }, sampleRate: { ideal: 48000 }, latency: { ideal: 0 } };
+    if (S.inDev) a.deviceId = { exact: S.inDev };
+    try { this.stream = await navigator.mediaDevices.getUserMedia({ audio: a }); } catch (e) { delete a.deviceId; this.stream = await navigator.mediaDevices.getUserMedia({ audio: a }); }
+    try { const st = this.stream.getAudioTracks()[0].getSettings(); this.inLat = st.latency || 0; this.inLabel = this.stream.getAudioTracks()[0].label; } catch (e) {}
     this.source = this.ctx.createMediaStreamSource(this.stream);
     this.source.connect(this.analyser); if (this.wk) this.source.connect(this.wk);
     this.startRecorder(this.stream);
@@ -2844,8 +2882,8 @@ const AE = {
     a.getByteFrequencyData(f); a.getFloatTimeDomainData(this.time);
     const hz = this.ctx.sampleRate / a.fftSize;
     const avg = (lo, hi) => { const i0 = Math.max(1, Math.floor(lo / hz)), i1 = Math.min(f.length - 1, Math.ceil(hi / hz)); let s = 0; for (let i = i0; i <= i1; i++) s += f[i]; return s / ((i1 - i0 + 1) * 255); };
-    const r = this.raw;
-    r.bass = avg(25, 160); r.mid = avg(160, 2500); r.high = avg(2500, 14000);
+    const r = this.raw, gtr = S.instr === 'guitare';
+    r.bass = gtr ? avg(60, 170) : avg(25, 160); r.mid = gtr ? avg(170, 650) : avg(160, 2500); r.high = gtr ? avg(650, 6000) : avg(2500, 14000);
     let sq = 0; for (let i = 0; i < this.time.length; i++) sq += this.time[i] * this.time[i];
     r.vol = Math.sqrt(sq / this.time.length);
     let num = 0, den = 0; for (let i = 2; i < f.length; i++) { num += i * f[i]; den += f[i]; }
@@ -2878,21 +2916,129 @@ const AE = {
       const appl = this.flat > .5 && this.hiRatio > 1.6 && this.hiCont > .85 && this.loud > .1;
       this.applT = appl ? this.applT + dt : Math.max(0, this.applT - dt * 2);
       this.applause = this.applT > 1.5; }
+    GT.update(dt);
     const tA = this.ctx.currentTime, gap = this.lastNow ? Math.min(tA - this.lastNow, 1) : 0; this.lastNow = tA;   // horloge audio réelle
     if (this.db < S.silenceDb || this.applause) { if (this.silStart == null) this.silStart = tA; this.silentFor = tA - this.silStart; }
     else { this.silStart = null; this.silentFor = 0; this.heard += gap; }
   },
   // drapeau : 1 = attaque, 2 = silence (au-delà d'une demi-seconde) ; les deux peuvent se cumuler
   // empreinte : bandes normalisées, brillance, drapeaux (1 attaque grave, 2 silence, 256 applaudissements, 1024 attaque médium, 2048 attaque aiguë), niveau absolu, stéréo
-  frame() { const o = this.out, on = this.onBits; this.onBits = 0;
-    return [o.bass, o.mid, o.high, o.vol, o.cent, on + (this.silentFor > .5 && !this.applause ? 2 : 0) + (this.applause ? 256 : 0), this.loud, this.pan]; }
+  //   puis l'oreille de guitariste : hauteur, clarté, accord, tonalité, tension, bend, vibrato (profondeur, vitesse) — drapeaux 4096 note, 8192 harmonique,
+  //   16384 étouffé, 32768 / 65536 percussion grave / aiguë, 131072 glissé, 262144 rasgueado
+  frame() { const o = this.out, on = this.onBits | GT.take(); this.onBits = 0;
+    return [o.bass, o.mid, o.high, o.vol, o.cent, on + (this.silentFor > .5 && !this.applause ? 2 : 0) + (this.applause ? 256 : 0), this.loud, this.pan, ...GT.vals()]; }
+};
+
+/* ---- L'oreille de guitariste : notes, accords, tonalité, tension, et façons de jouer ---- */
+const CHORDS = [[0, 4, 7], [0, 3, 7], [0, 4, 7, 10], [0, 4, 7, 11], [0, 3, 7, 10], [0, 2, 7], [0, 5, 7], [0, 3, 6], [0, 4, 8], [0, 7]];
+const CHORD_NAMES = ['majeur', 'mineur', '7', 'maj7', 'm7', 'sus2', 'sus4', 'diminué', 'augmenté', 'quinte'];
+const NOTE_NAMES = ['Do', 'Do♯', 'Ré', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
+const KK_MAJ = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88], KK_MIN = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+const GT = {
+  bits: 0, note: null, pend: null, hist: [], onT: [], vPitch: 0, vClar: 0, bend: 0, vibD: 0, vibR: 0, lastNoteM: 0, lastNoteT: -9,
+  chroma: new Float32Array(12), keyC: new Float32Array(12), chord: 0, key: 0, tension: 0, chordName: '', keyName: '',
+  gate() { return Math.pow(10, (S.floorDb + 10) / 20); },
+  onset(t, regs) {
+    this.onT.push(t); while (this.onT.length && t - this.onT[0] > .15) this.onT.shift();
+    if (this.onT.length >= 3 && t - (this.strumT || -9) > .2) { this.bits |= 262144; this.strumT = t; }      // rasgueado / accord gratté
+    if (t - this.lastNoteT > .1) this.pend = { t, low: regs.includes(0), reads: [] };   // les registres d'une même attaque arrivent décalés de quelques ms
+  },
+  pitch(d) {
+    const t = d.t, voiced = d.p > 60 && d.p < 1400 && d.c > .8 && d.e > this.gate() * .25;
+    const m = voiced ? 69 + 12 * Math.log2(d.p / 440) : 0;
+    this.vPitch = m; this.vClar = voiced ? d.c : 0;
+    if (voiced) { this.hist.push([t, m]); } while (this.hist.length && t - this.hist[0][0] > .5) this.hist.shift();
+    const P = this.pend;
+    if (P) {
+      if (voiced && t > P.t + .018) P.reads.push(m);                                           // on laisse passer le claquement de l'attaque
+      const r = P.reads, n = r.length;
+      if (n >= 3 && Math.abs(r[n - 1] - r[n - 2]) < .3 && Math.abs(r[n - 2] - r[n - 3]) < .3) { this.noteOn(r[n - 1], t, d.e, d.c); this.pend = null; }
+      else if (t - P.t > .075) {                                                                   // pas de hauteur unique : accord gratté, ou percussion sur la caisse
+        if (this.tonal()) { if (t - (this.strumT || -9) > .2) { this.bits |= 262144; this.strumT = t; } } else this.bits |= P.low ? 32768 : 65536; this.pend = null; }
+    } else if (this.note) {
+      const N = this.note;
+      if (!voiced || d.e < N.peak * .06) { if (t - N.t > .05) { if (t - N.t < .24) this.bits |= 16384; this.note = null; } }   // une note qui s'éteint aussitôt : étouffée
+      else {
+        N.peak = Math.max(N.peak, d.e);
+        if (!N.mutedChecked && t - N.t > .16) { N.mutedChecked = true; if (d.e < N.peak * .18) this.bits |= 16384; }   // étouffé : la corde s'éteint aussitôt
+        if (N.sliding) {                                                                          // pendant un glissé, on suit la hauteur sans parler de bend
+          if (Math.abs(m - N.slideM) > .25) { N.slideM = m; N.slideT = t; } else if (t - N.slideT > .08) { N.sliding = false; N.m0 = Math.round(m); }
+          this.bend = 0;
+        }
+        const dev = m - N.m0;
+        if (!N.sliding && Math.abs(dev) >= 1.5) {
+          // glissé seulement si la hauteur a vraiment voyagé (valeurs intermédiaires) et sans nouvelle attaque
+          const mid = this.hist.filter(x => x[0] > t - .35 && (x[1] - N.m0) * (m - x[1]) > 0 && Math.abs(x[1] - N.m0) > .4 && Math.abs(m - x[1]) > .4).length;
+          if (mid >= 2 && t - (this.onT[this.onT.length - 1] || -9) > .15) { this.bits |= 131072; N.sliding = true; N.slideM = m; N.slideT = t; }
+          N.m0 = Math.round(m); N.slid = true; }
+        if (!N.sliding) this.bend = Math.abs(dev) > .3 && Math.abs(dev) < 1.5 ? dev : 0;
+      }
+    } else if (voiced && this.hist.length > 6) {                                                 // liaison (hammer-on, pull-off) : nouvelle note sans attaque
+      const h = this.hist, a = h[h.length - 1][1], b = h[h.length - 5][1];
+      if (Math.abs(a - b) < .3 && Math.abs(a - this.lastNoteM) > .8 && t - this.lastNoteT > .08) this.noteOn(a, t, d.e, d.c, true);
+    }
+    // vibrato : oscillation régulière autour du centre de la note
+    if (this.note && this.hist.length > 20) {
+      const h = this.hist.filter(x => x[0] > t - .42), mean = h.reduce((s, x) => s + x[1], 0) / h.length; let zc = 0, mn = 9, mx = -9;
+      for (let i = 0; i < h.length; i++) { const v = h[i][1] - mean; mn = Math.min(mn, v); mx = Math.max(mx, v); if (i && (v > 0) !== (h[i - 1][1] - mean > 0)) zc++; }
+      const dur = h[h.length - 1][0] - h[0][0], rate = dur > .2 ? zc / (2 * dur) : 0, depth = (mx - mn) / 2;
+      const ok = depth > .07 && depth < .8 && rate > 3.5 && rate < 9.5;
+      this.vibD += ((ok ? depth : 0) - this.vibD) * .3; this.vibR = ok ? rate : this.vibR;
+    } else this.vibD *= .8;
+  },
+  noteOn(m, t, e, c, legato) {
+    const m0 = Math.round(m);
+    if (t - this.lastNoteT < .15 && m0 === this.lastNoteM) return;
+    this.note = { m0, t, peak: e, mutedChecked: false }; this.lastNoteM = m0; this.lastNoteT = t; this.bend = 0;
+    this.bits |= 4096; if (legato) this.legato = true;
+    // harmonique naturelle : son presque pur, l'énergie se concentre sur la fondamentale
+    if (AE.ffl && c > .95) { const hz = AE.ctx.sampleRate / AE.analyser.fftSize, f0 = 440 * Math.pow(2, (m - 69) / 12); let e1 = 0, eh = 0;
+      this.e2 = this.e3 = 1;
+      for (let k = 1; k <= 3; k++) { const i = Math.round(k * f0 / hz); if (i >= AE.ffl.length - 1) break; const p = Math.pow(10, Math.max(AE.ffl[i - 1], AE.ffl[i], AE.ffl[i + 1]) / 10); if (k === 1) e1 = p; else if (k === 2) this.e2 = p; else this.e3 = p; }
+      if (e1 > 0 && this.e2 / e1 < .04 && this.e3 / e1 < .04) this.bits |= 8192; }
+  },
+  tonal() {     // spectre très creusé (des partiels nets) : c'est un accord ; spectre plat : un coup sur le bois
+    const f = AE.ffl, hz = AE.ctx.sampleRate / AE.analyser.fftSize; let lg = 0, ar = 0, n = 0;
+    for (let i = Math.floor(80 / hz); i < 1500 / hz; i++) { const p = Math.pow(10, f[i] / 10) + 1e-14; lg += Math.log(p); ar += p; n++; }
+    return Math.exp(lg / n) / (ar / n) < .12;
+  },
+  update(dt) {
+    const a = AE.analyser, f = AE.ffl; if (!a || !f) return;
+    const hz = AE.ctx.sampleRate / a.fftSize, ch = new Float32Array(12); let tot = 0;
+    for (let i = Math.floor(70 / hz); i < Math.min(f.length, 2100 / hz); i++) {
+      const fr = i * hz, mi = 69 + 12 * Math.log2(fr / 440), r = Math.round(mi), w = Math.exp(-((mi - r) ** 2) / .045), p = Math.pow(10, f[i] / 10) * w;
+      ch[((r % 12) + 12) % 12] += p; tot += p;
+    }
+    const k1 = 1 - Math.exp(-dt / .2), k2 = 1 - Math.exp(-dt / 12), mx = Math.max(...ch) || 1, on = AE.loud > .06 && tot > 0;
+    for (let i = 0; i < 12; i++) { const v = on ? ch[i] / mx : 0; this.chroma[i] += (v - this.chroma[i]) * k1; this.keyC[i] += (v - this.keyC[i]) * k2; }
+    // accord : gabarit le plus proche (similarité cosinus)
+    const mean = this.chroma.reduce((s, v) => s + v, 0) / 12, cc = Array.from(this.chroma, v => Math.max(0, v - mean)), n2 = Math.sqrt(cc.reduce((s, v) => s + v * v, 0)) + 1e-9;
+    let best = 0, bs = .55;
+    if (on) for (let r = 0; r < 12; r++) CHORDS.forEach((tp, q) => { let s = 0; for (const iv of tp) s += cc[(r + iv) % 12]; s /= Math.sqrt(tp.length) * n2; s -= q === 9 ? .06 : q > 1 ? .015 : 0; if (s > bs) { bs = s; best = r * 16 + q + 1; } });
+    this.chord = best; this.chordName = best ? NOTE_NAMES[(best - 1) >> 4] + ' ' + CHORD_NAMES[(best - 1) & 15] : '';
+    // tonalité (profils de Krumhansl) sur une dizaine de secondes
+    let kb = 0, kv = .5;
+    for (let r = 0; r < 12; r++) for (const [prof, mode] of [[KK_MAJ, 0], [KK_MIN, 1]]) { let sx = 0, sy = 0, sxy = 0, sxx = 0, syy = 0; for (let i = 0; i < 12; i++) { const x = this.keyC[(r + i) % 12], y = prof[i]; sx += x; sy += y; sxy += x * y; sxx += x * x; syy += y * y; }
+      const cor = (12 * sxy - sx * sy) / Math.sqrt(Math.max(1e-9, (12 * sxx - sx * sx) * (12 * syy - sy * sy))); if (cor > kv) { kv = cor; kb = r * 2 + mode + 1; } }
+    this.key = kb; this.keyName = kb ? NOTE_NAMES[(kb - 1) >> 1] + ((kb - 1) & 1 ? ' mineur' : ' majeur') : '';
+    // tension : rugosité des intervalles présents (secondes mineures, tritons…)
+    const W = [0, 1, .3, .06, .04, 0, .7]; let num = 0, den = 1e-9;
+    const sc = Array.from(this.chroma, v => v > .35 ? v * v : 0);   // seules les notes bien présentes comptent (les harmoniques et les fuites sont ignorées)
+    for (let i = 0; i < 12; i++) for (let j = i + 1; j < 12; j++) { const p = sc[i] * sc[j], ic = Math.min(j - i, 12 - j + i); num += p * W[ic]; den += p; }
+    const tn = on ? clamp(num / den * 2.2, 0, 1) : 0; this.tension += (tn - this.tension) * (1 - Math.exp(-dt / .3));
+  },
+  take() { const b = this.bits; this.bits = 0; return b; },
+  vals() { return [this.note ? this.note.m0 : this.vPitch, this.vClar, this.chord, this.key, this.tension, this.bend, this.vibD, this.vibR]; }
 };
 
 /* =====================================================================
    2. RENDU & POST-PRODUCTION
    ===================================================================== */
 const canvas = document.getElementById('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+let LOWLAT = false; try { LOWLAT = localStorage.getItem('herba-lowlat') === '1'; } catch (e) {}
+// affichage à faible latence (option) : l'image part vers l'écran sans attendre la composition du navigateur
+const glctx = canvas.getContext('webgl2', { antialias: false, powerPreference: 'high-performance', desynchronized: LOWLAT, alpha: true, depth: true, stencil: false, preserveDrawingBuffer: false });
+const renderer = new THREE.WebGLRenderer({ canvas, context: glctx, antialias: false, powerPreference: 'high-performance' });
 const DPR = window.devicePixelRatio || 1;
 const QUALITY = {
   fluide: { pr: () => 1, lod: 'fluide', taps: 20, steps: 24, shadow: 2048 },
@@ -3039,7 +3185,7 @@ class PSlot { constructor(r, i) { this.o = (r * MAXP + i) * 4; } set(x, y, z, w)
   set x(v) { PT_DATA[this.o] = v; } set y(v) { PT_DATA[this.o + 1] = v; } set z(v) { PT_DATA[this.o + 2] = v; } set w(v) { PT_DATA[this.o + 3] = v; } }
 const slots = r => ({ value: Array.from({ length: MAXP }, (_, i) => new PSlot(r, i)) });
 const PU = {
-  tPlant: { value: tPlant }, tGlow: { value: null }, uGlowR: { value: 90 },
+  tPlant: { value: tPlant }, uTension: { value: 0 }, tGlow: { value: null }, uGlowR: { value: 90 },
   uPA: slots(0),   // croissance, éclat, pulsation, frisson
   uPB: slots(1),   // couleur bioluminescente, phase
   uPC: slots(2),   // direction du Soleil à la naissance
@@ -3762,7 +3908,7 @@ function renderGlow(alive) {
 }
 
 const FLORA_COMMON = `
-  uniform sampler2D tPlant; vec4 PL(int r, int i){ return texelFetch(tPlant, ivec2(i, r), 0); } uniform float uTime; uniform float uBio; uniform float uDay; uniform vec3 uSunL;
+  uniform sampler2D tPlant; vec4 PL(int r, int i){ return texelFetch(tPlant, ivec2(i, r), 0); } uniform float uTime, uTension; uniform float uBio; uniform float uDay; uniform vec3 uSunL;
   attribute vec3 iCol, iCol2, iMat;
   vec3 segPos; vec3 segN; float segT; float segF; float segH; int segI; vec3 segLeaf=vec3(0.);
   vec3 rotAB(vec3 v, vec3 a, vec3 b){ vec3 k=cross(a,b); float s=length(k), c=dot(a,b); if(s<1e-5) return v; k/=s; return v*c+cross(k,v)*s+k*dot(k,v)*(1.-c); }
@@ -3800,7 +3946,7 @@ const PEARL_GLSL = FLORA_COMMON + `
     vec3 q=p+d*dot(p,d)*(e-1.);                       // allongé selon d
     q+=fn*dot(q,fn)*(fl-1.);                          // aplati selon fn (pétales, feuilles)
     segPos=C+q*r;
-    if(pa.w>.001&&fl<.6) segPos+=fn*sin(uTime*31.+dot(C,vec3(3.1,1.7,2.3)))*pa.w*r*.55;   // frisson des feuilles sur les médiums
+    if(pa.w>.001&&fl<.6){ float vr=PL(4,segI).y; segPos+=fn*sin(uTime*(vr>.5?6.2832*vr:31.)+dot(C,vec3(3.1,1.7,2.3)))*pa.w*r*.55; }   // frisson des feuilles sur les médiums
     vec3 nn=n-d*dot(n,d)*(1.-1./e); nn-=fn*dot(nn,fn)*(1.-1./max(fl,.05));
     segN=normalize(nn);
     segF=f; segT=iTime.y; segH=clamp(dot(p,d)*.5+.5,0.,1.);
@@ -3813,7 +3959,7 @@ const CRYSTAL_GLSL = FLORA_COMMON + `
     float f=clamp((G-iTime.x)/max(iTime.y-iTime.x,1e-4),0.,1.);
     vec3 d=normalize(iD); vec3 X,Z; frameOf(d,X,Z);
     float ca=cos(iShape.w), sa=sin(iShape.w); vec3 X2=X*ca+Z*sa, Z2=Z*ca-X*sa; X=X2; Z=Z2;
-    float L=max(iShape.x*f,1e-4), r=iShape.y*smoothstep(0.,.25,f)*(.55+.45*f);
+    float L=max(iShape.x*f*(1.+uTension*.3),1e-4), r=iShape.y*smoothstep(0.,.25,f)*(.55+.45*f);   // la tension harmonique hérisse les cristaux
     segPos=iB+X*(p.x*r)+d*(p.y*L)+Z*(p.z*r);
     segN=normalize(X*(n.x/max(r,1e-4))+d*(n.y/L)+Z*(n.z/max(r,1e-4)));
     segF=f; segT=mix(iTime.x,iTime.y,p.y); segH=p.y;
@@ -3842,7 +3988,7 @@ function floraMaterial(key, glsl, emisPre, phys, rim) {
   const m = new THREE.MeshPhysicalMaterial(Object.assign({ color: 0xffffff, roughness: .3, metalness: 0, envMapIntensity: 1 }, phys));
   m.customProgramCacheKey = () => 'flora-' + key;
   m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, { tPlant: PU.tPlant, uTime: PU.uTime, uBio: PU.uBio, uDay: PU.uDay });
+    Object.assign(sh.uniforms, { tPlant: PU.tPlant, uTension: PU.uTension, uTime: PU.uTime, uBio: PU.uBio, uDay: PU.uDay });
     addTerrainShadow(sh);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + glsl + '\nvarying vec3 vCol; varying vec2 vMat; varying vec3 vEmis; varying vec3 vRim; varying vec3 vLeaf;')
       .replace('#include <beginnormal_vertex>', 'floraCompute(position,normal); vec3 objectNormal=segN;')
@@ -3878,7 +4024,7 @@ function floraDepth(key, glsl) {
   const m = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
   m.customProgramCacheKey = () => 'flora-depth-' + key;
   m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, { tPlant: PU.tPlant, uTime: PU.uTime, uBio: PU.uBio, uDay: PU.uDay, uSunL: PU.uSunL });
+    Object.assign(sh.uniforms, { tPlant: PU.tPlant, uTension: PU.uTension, uTime: PU.uTime, uBio: PU.uBio, uDay: PU.uDay, uSunL: PU.uSunL });
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + glsl)
       .replace('#include <begin_vertex>', 'floraCompute(position,normal); vec3 transformed=segPos+quakeOf(segPos);');
   };
@@ -4243,7 +4389,7 @@ function genPlant(pl, rng, sunDir, W) {
     for (const s of J) { const c = V(s[0], s[1], s[2]), e = dirT(c, V(s[3], s[4], s[5]), .2); s[0] = e.a.x; s[1] = e.a.y; s[2] = e.a.z; e.d.normalize(); s[3] = e.d.x; s[4] = e.d.y; s[5] = e.d.z; s[7] *= D.S; s[8] *= D.S * Math.sqrt(D.H); s[9] *= D.S; }
   }
   // teinte et lueur propres à la variété
-  const HK = .42, tint = (c, metal) => metal > .5 ? c : harmonize(hueRot(c, D.hue), W.harm, HK);
+  const HK = .42, tint = (c, metal) => metal > .5 ? c : harmonize(hueRot(c, D.hue), pl.harm || W.harm, HK);
   const mm = new Map(), remat = m => { if (!mm.has(m)) mm.set(m, { col: tint(m.col, m.metal), col2: tint(m.col2, m.metal), rough: m.rough, metal: m.metal, trans: m.trans }); return mm.get(m); };
   for (const s of T) { s[14] *= D.gl; s[18] = tint(s[18], s[20][1]); s[19] = tint(s[19], s[20][1]); }
   for (const s of P) { s[12] *= D.gl; s[16] = remat(s[16]); }
@@ -4337,7 +4483,7 @@ function emitRing(rng, cx, cz, amp, t, h) {        // la poussière se soulève 
   } }
   dGeo.attributes.position.needsUpdate = dGeo.attributes.aV.needsUpdate = dGeo.attributes.aT0.needsUpdate = true;
 }
-function resetDust() { dT0.fill(-1e6); dGeo.attributes.aT0.needsUpdate = true; dHead = 0; sT0.fill(-1e6); sGeo.attributes.aT0.needsUpdate = true; sHead = 0; }
+function resetDust() { bT.fill(-1e6); bGeo.attributes.aT.needsUpdate = true; bHead = 0; tT.fill(-1e6); tGeo.attributes.aT0.needsUpdate = true; tHead = 0; dT0.fill(-1e6); dGeo.attributes.aT0.needsUpdate = true; dHead = 0; sT0.fill(-1e6); sGeo.attributes.aT0.needsUpdate = true; sHead = 0; }
 /* ---- Étincelles des aigus : spores lumineuses lancées des cimes, en chute balistique ---- */
 const SCAP = 3000, sGeo = new THREE.BufferGeometry();
 const sP0 = new Float32Array(SCAP * 3), sV = new Float32Array(SCAP * 3), sC = new Float32Array(SCAP * 3), sT0 = new Float32Array(SCAP).fill(-1e6);
@@ -4353,6 +4499,53 @@ const sparkMat = new THREE.ShaderMaterial({
 });
 const sparks = new THREE.Points(sGeo, sparkMat); sparks.frustumCulled = false; scene.add(sparks);
 let sHead = 0;
+/* ---- Fleurs de notes : une corolle de lumière s'ouvre à chaque note, et dure tant qu'elle résonne ---- */
+const BCAP = 400, bGeo = new THREE.BufferGeometry();
+const bP = new Float32Array(BCAP * 3), bC = new Float32Array(BCAP * 3), bT = new Float32Array(BCAP * 3).fill(-1e6);   // t0, fin, taille
+bGeo.setAttribute('position', new THREE.BufferAttribute(bP, 3)); bGeo.setAttribute('aC', new THREE.BufferAttribute(bC, 3)); bGeo.setAttribute('aT', new THREE.BufferAttribute(bT, 3));
+const bloomMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uTime: PU.uTime, uPR: PU.uPxs },
+  vertexShader: `attribute vec3 aC, aT; uniform float uTime,uPR; varying vec3 vC; varying float vA, vRot, vOpen;
+    void main(){ float tt=uTime-aT.x, te=uTime-aT.y; float grow=smoothstep(0.,.09,tt), fade=1.-smoothstep(0.,1.4,te);
+      vA=step(0.,tt)*grow*fade; vOpen=grow*(1.-.35*smoothstep(0.,1.4,te)); vRot=aT.x*13.7+tt*.4; vC=aC;
+      vec4 mv=modelViewMatrix*vec4(position+vec3(0.,max(te,0.)*.25,0.),1.);
+      gl_PointSize=vA>0.?clamp(uPR*aT.z*1150./-mv.z*(1.+.08*sin(tt*7.)),3.,260.):0.; gl_Position=projectionMatrix*mv; }`,
+  fragmentShader: `varying vec3 vC; varying float vA, vRot, vOpen;
+    void main(){ vec2 q=gl_PointCoord-.5; float r=length(q)*2.; if(r>1.) discard; float a=atan(q.y,q.x)+vRot;
+      float petal=.45+.55*pow(abs(cos(a*2.5)),.8); float shape=smoothstep(petal*vOpen+.02,petal*vOpen-.08,r);
+      float core=exp(-r*r*40.)*1.6, vein=pow(abs(cos(a*2.5)),40.)*(1.-r)*.6;
+      gl_FragColor=vec4((vC*(shape*1.3+vein)+vec3(1.,.97,.9)*core*.55)*vA*1.5,1.); }`
+});
+const blossoms = new THREE.Points(bGeo, bloomMat); blossoms.frustumCulled = false; scene.add(blossoms);
+let bHead = 0;
+function emitBlossom(rng, pos, col, size, t) {
+  const i = bHead; bHead = (bHead + 1) % BCAP;
+  bP.set(pos, i * 3); bC.set(col, i * 3); bT.set([t, 1e6, size], i * 3);
+  for (const k of ['position', 'aC', 'aT']) bGeo.attributes[k].needsUpdate = true; return i;
+}
+function endBlossom(i, t) { if (bT[i * 3 + 1] > t) { bT[i * 3 + 1] = t; bGeo.attributes.aT.needsUpdate = true; } }
+/* ---- Lignes mélodiques et glissés : une lumière qui court d'une note à l'autre ---- */
+const TCAP = 6000, tGeo = new THREE.BufferGeometry();
+const tP = new Float32Array(TCAP * 3), tC = new Float32Array(TCAP * 3), tT = new Float32Array(TCAP).fill(-1e6);
+tGeo.setAttribute('position', new THREE.BufferAttribute(tP, 3)); tGeo.setAttribute('aC', new THREE.BufferAttribute(tC, 3)); tGeo.setAttribute('aT0', new THREE.BufferAttribute(tT, 1));
+const trailMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uTime: PU.uTime, uPR: PU.uPxs },
+  vertexShader: `attribute vec3 aC; attribute float aT0; uniform float uTime,uPR; varying vec3 vC; varying float vA;
+    void main(){ float tt=uTime-aT0; vA=step(0.,tt)*(exp(-tt*9.)*1.6+.5*(1.-smoothstep(.1,2.2,tt))); vC=aC;
+      vec4 mv=modelViewMatrix*vec4(position,1.); gl_PointSize=vA>.003?clamp(uPR*38./-mv.z*(1.+exp(-tt*9.)),1.,9.):0.; gl_Position=projectionMatrix*mv; }`,
+  fragmentShader: `varying vec3 vC; varying float vA; void main(){ float d=length(gl_PointCoord-.5)*2.; if(d>1.) discard; gl_FragColor=vec4((vC*.8+.25)*vA*exp(-d*d*3.),1.); }`
+});
+const trails = new THREE.Points(tGeo, trailMat); trails.frustumCulled = false; scene.add(trails);
+let tHead = 0;
+function emitTrail(rng, a, b, ca, cb, t, ground) {
+  const d = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), N = Math.min(140, 10 + Math.floor(d * 9)), lift = ground ? 0 : Math.min(2.5, d * .18);
+  for (let k = 0; k <= N; k++) {
+    const u = k / N, i = tHead; tHead = (tHead + 1) % TCAP;
+    tP.set([a[0] + (b[0] - a[0]) * u + (rng() - .5) * .04, a[1] + (b[1] - a[1]) * u + Math.sin(Math.PI * u) * lift, a[2] + (b[2] - a[2]) * u + (rng() - .5) * .04], i * 3);
+    tC.set([ca[0] + (cb[0] - ca[0]) * u, ca[1] + (cb[1] - ca[1]) * u, ca[2] + (cb[2] - ca[2]) * u], i * 3); tT[i] = t + u * (ground ? .35 : .14);
+  }
+  for (const k of ['position', 'aC', 'aT0']) tGeo.attributes[k].needsUpdate = true;
+}
 function emitSparks(rng, x, y, z, n, col, t) {
   for (let k = 0; k < n; k++) {
     const i = sHead; sHead = (sHead + 1) % SCAP;
@@ -4387,8 +4580,11 @@ class Sim {
     const pub = !!(fl & 4), forcedShot = (fl >> 3) & 15, forcedEnd = !!(fl & 128);   // graines du public, plans et final commandés par le musicien
     const applause = !!(fl & 256), forcedDawn = !!(fl & 512), onMid = !!(fl & 1024), onHigh = !!(fl & 2048);
     this.loud = fr.length > 6 ? fr[6] : vol; this.pan = fr.length > 7 ? fr[7] : 0;   // anciennes empreintes : 6 valeurs
+    const G = this.g || (this.g = { tMax: [], lastRes: -99, key: 0, chord: 0, chordQ: -1, note: null, bend: 0, vibD: 0, vibR: 0, tens: 0 });
+    if (fr.length > 8) { G.pitch = fr[8]; G.clar = fr[9]; G.chord = fr[10]; G.key = fr[11]; G.tens = fr[12]; G.bend = fr[13]; G.vibD = fr[14]; G.vibR = fr[15]; G.chordQ = G.chord ? (G.chord - 1) & 15 : -1; }
+    const noteOn = !!(fl & 4096), harm = !!(fl & 8192), muted = !!(fl & 16384), percLo = !!(fl & 32768), percHi = !!(fl & 65536), slide = !!(fl & 131072), strum = !!(fl & 262144);
     for (const p of this.plants) { p.g0 = p.growth; p.gl0 = p.glow; p.pu0 = p.pulse; p.fl0 = p.flut || 0; }   // pour l'interpolation à l'affichage
-    const sm = (k, x) => { f[k] += (x - f[k]) * (x > f[k] ? .55 : .14); };
+    const aUp = 1 - Math.pow(.45, DT * 30), aDn = 1 - Math.pow(.86, DT * 30), sm = (k, x) => { f[k] += (x - f[k]) * (x > f[k] ? aUp : aDn); };
     sm('bass', bass); sm('mid', mid); sm('high', high); sm('vol', vol); sm('cent', cent);
     this.listen(onset);
     // le temps lunaire s'écoule : lentement au repos, à toute allure quand la musique s'emporte
@@ -4442,9 +4638,9 @@ class Sim {
       const bk = SPECIES[p.sp].band, band = bk === 'cent' ? (f.mid + f.cent) * .5 : f[bk];
       const young = t - p.born < 25 ? 1 : .3;
       if (p.delay && t < p.born + p.delay) continue;                                     // graine du public encore en chute
-      if (p.dead || p.dying) { p.glow *= .96; continue; }
+      if (p.dead || p.dying) { p.glow *= Math.pow(.96, DT * 30); continue; }
       p.growth = Math.min(1, p.growth + DT / SPECIES[p.sp].dur * (.18 + 1.7 * band) * (1 + 1.4 * cre * young) * (1 - this.stillK));
-      p.glow += (band * (1 + .5 * this.mu.r) * (1 - .8 * this.stillK) - p.glow) * .12;
+      p.glow += (band * (1 + .5 * this.mu.r) * (1 - .8 * this.stillK) - p.glow) * (1 - Math.pow(.88, DT * 30));
       p.pulse *= Math.exp(-DT * 1.6);
     }
     if (onset) {
@@ -4468,7 +4664,7 @@ class Sim {
       emitSparks(this.rD, p.x, p.y + p.height * p.growth * .9, p.z, 14 + Math.floor(high * 30), p.col, t);
     }
     for (const p of this.plants) if (p.flut) p.flut *= Math.exp(-DT / .35);
-    if (applause && n && this.tick % 8 === 0) { const p = live[Math.floor(this.rD() * n)]; emitSparks(this.rD, p.x, p.y + p.height * p.growth, p.z, 40, p.col, t); }   // le salut : la flore répond aux applaudissements
+    if (applause && n && this.tick % Math.round(8 * TICK / 30) === 0) { const p = live[Math.floor(this.rD() * n)]; emitSparks(this.rD, p.x, p.y + p.height * p.growth, p.z, 40, p.col, t); }   // le salut : la flore répond aux applaudissements
     // tempo : sur une pulsation régulière, l'onde part à l'instant prévu (en avance de la latence d'analyse) ; l'attaque réelle confirme
     if (onset) { const bt = this.beats || (this.beats = []); bt.push(t); if (bt.length > 9) bt.shift(); }
     if (this.predict && this.beats && this.beats.length >= 6 && n) {
@@ -4484,6 +4680,7 @@ class Sim {
         }
       }
     }
+    if (n && this.introDone) this.guitar(t, live, { noteOn, harm, muted, percLo, percHi, slide, strum });
     for (const p of this.plants) if (p.delay && !p.landed && t >= p.born + p.delay) { p.landed = true; emitDust(this.rD, p.x, p.z, 220, t, this.W.h); this.shocks.push({ x: p.x, z: p.z, t0: t, a: .7 }); if (this.shocks.length > 6) this.shocks.shift(); }
     if (pub && seedOpen && !this.full && n < MAXP) this.spawnPublic();
     if (this.intro) {                     // final : à 3 min 30, ou dès 3 s de silence ; annulé si la musique reprend avant 3 min 30
@@ -4503,6 +4700,59 @@ class Sim {
       else if (L > Lmin && onset && (bass > .45 || f.vol > .55)) this.cut();
       else if (L > Lmax) this.cut(null, null, true);
     }
+  }
+  // Vocabulaire de la guitare : chaque geste de jeu a sa réponse dans le jardin
+  guitar(t, live, e) {
+    const G = this.g, r = this.rD, n = live.length, loud = this.loud || 0;
+    const hue = pc => ((pc * 7) % 12) / 12;                                                         // cycle des quintes : notes consonantes, teintes voisines
+    if (G.key) { const pc = (G.key - 1) >> 1, h = hue(pc); G.harm = [h, (h + 1 / 12) % 1, (h + 11 / 12) % 1]; }   // la tonalité colore les nouvelles plantes
+    // tension et résolution
+    G.tMax.push(G.tens); if (G.tMax.length > 2 * TICK) G.tMax.shift();
+    if (Math.max(...G.tMax) > .42 && G.tens < .17 && t - G.lastRes > 6) {
+      G.lastRes = t;
+      for (const p of live) { p.pulse = 1; p.glow = Math.min(1.4, p.glow + .5); }
+      for (let k = 0; k < Math.min(10, n); k++) { const p = live[Math.floor(r() * n)]; emitSparks(r, p.x, p.y + p.height * p.growth, p.z, 30, p.col, t); }
+      this.shocks.push({ x: this.phrase.cx, z: this.phrase.cz, t0: t, a: .8, res: true }); if (this.shocks.length > 6) this.shocks.shift();
+      this.flashT = t; this.flashC = [1, .95, .8];
+    }
+    const pickHost = (lo, hi) => {
+      const c = this.shot ? [this.shot.cx, this.shot.cz] : [0, 0];
+      let best = null, bs = -1e9;
+      for (let k = 0; k < 8; k++) { const p = live[Math.floor(r() * n)]; if (p.sp === 'mycelium' || p.dying) continue; const hh = p.height * p.growth;
+        const sc = -Math.hypot(p.x - c[0], p.z - c[1]) * .06 - (hh < lo ? lo - hh : hh > hi ? (hh - hi) * .4 : 0) + r() * .5; if (sc > bs) { bs = sc; best = p; } }
+      return best || live[0];
+    };
+    if (e.noteOn && G.pitch > 0 && this.stillK < .5) {
+      const m = G.pitch, pc = ((Math.round(m) % 12) + 12) % 12, reg = clamp((m - 40) / 45, 0, 1);
+      const host = pickHost(reg * 6, 1.5 + reg * 14), k = .12 + reg * .88, cr = (host.crown || .6) * .6 * host.growth;
+      const a = r() * 6.283, pos = [host.x + Math.cos(a) * cr * r(), host.y + Math.max(.3, host.height * host.growth * k), host.z + Math.sin(a) * cr * r()];
+      const col = hsv2rgb([hue(pc), .72, 1]), size = .35 + loud * .9 + (e.harm ? .3 : 0);
+      if (G.note && G.note.bl != null) endBlossom(G.note.bl, t);
+      const bl = emitBlossom(r, pos, e.harm ? [1, 1, 1] : col, size, t);
+      if (G.note && t - G.note.t < .7) emitTrail(r, G.note.pos, pos, G.note.col, col, t, false);          // la mélodie trace sa ligne d'une fleur à l'autre
+      G.note = { t, m, pos, col, bl, host, bendDir: [Math.cos(a), Math.sin(a)] }; this.bendHost = host;
+    }
+    if (G.note) {
+      const N = G.note;
+      if (G.pitch <= 0 || loud < .03) { if (N.bl != null) { endBlossom(N.bl, t); N.bl = null; } }
+      else if (N.host && !N.host.dead && N.host.growth < 1) N.host.growth = Math.min(1, N.host.growth + DT * .03);   // la tige pousse tant que la corde résonne
+      if (e.slide && N.pos) {                                                                       // glissé : une traînée court au sol vers la nouvelle note
+        const h = pickHost(0, 99), np = [h.x, h.y + Math.max(.3, h.height * h.growth * (.12 + clamp((G.pitch - 40) / 45, 0, 1) * .88)), h.z];
+        emitTrail(r, [N.pos[0], this.W.h(N.pos[0], N.pos[2]) + .06, N.pos[2]], [np[0], this.W.h(np[0], np[2]) + .06, np[2]], N.col, N.col, t, true);
+        if (N.bl != null) endBlossom(N.bl, t); N.bl = emitBlossom(r, np, N.col, .4 + loud * .7, t); N.pos = np; N.host = h;
+      }
+      if (e.muted && N.bl != null) { endBlossom(N.bl, t); N.bl = null; emitDust(r, N.host.x, N.host.z, 40, t, this.W.h); }   // étouffé : une frappe sèche, sans floraison
+      if (e.harm && N.host) { emitSparks(r, N.pos[0], N.pos[1], N.pos[2], 6, [1, 1, 1], t); for (const p of live) if (p.sp === 'cristal' || p.sp === 'amethyste' || p.sp === 'gemme') p.pulse = 1; }   // harmonique : tintement de cristal
+      // vibrato : les feuilles ondulent à la vitesse exacte du vibrato, autour de la plante qui chante
+      if (G.vibD > .06 && N.host) for (const p of live) if (Math.hypot(p.x - N.host.x, p.z - N.host.z) < 7) { p.flut = Math.max(p.flut || 0, Math.min(1, G.vibD * 2.2)); p.vibR = G.vibR; }
+    }
+    // percussion sur la caisse : la terre répond ; tape aiguë : un petit choc et des éclats
+    if ((e.percLo || e.percHi) && t - (this.lastPerc || -9) > .1) {
+      this.lastPerc = t; const p = live[Math.max(0, n - 1 - Math.floor(r() * Math.min(n, 10)))], a = e.percLo ? clamp(.35 + loud * .7, .3, 1) : .28;
+      this.shocks.push({ x: p.x, z: p.z, t0: t, a }); if (this.shocks.length > 6) this.shocks.shift(); emitRing(r, p.x, p.z, a, t, this.W.h);
+      if (e.percHi) emitSparks(r, p.x, p.y + p.height * p.growth * .5, p.z, 12, [1, .85, .6], t);
+    }
+    if (e.strum) for (let k = 0; k < 3; k++) { const p = live[Math.floor(r() * n)]; emitSparks(r, p.x, p.y + p.height * p.growth * .8, p.z, 16, p.col, t); }   // rasgueado : un éventail d'étincelles
   }
   listen(onset) {
     const m = this.mu, f = this.f, k = x => 1 - Math.exp(-DT / x);
@@ -4535,6 +4785,7 @@ class Sim {
       let x = Math.exp(-d2 / 2) + .004;
       x /= 1 + .7 * (cv[v.id] || 0); x /= 1 + .12 * (cf[v.fam] || 0);                 // diversité
       if (P.fam === v.fam) x *= 2.2;                                                       // cohérence de la phrase
+      if (this.g && this.g.chordQ >= 0) { const fav = CHORD_FAM[this.g.chordQ]; if (fav && fav.includes(v.fam)) x *= 1.9; }   // l'accord joué oriente la famille
       if ((v.fam === 'arbre' || v.fam === 'arborescente' || v.fam === 'saule') && m.e < .25) x *= .3;
       w.push(x); tot += x;
     }
@@ -4571,7 +4822,7 @@ class Sim {
     const col = baseCol.map(c => clamp(c * (.85 + r() * .3), 0, 1.2));
     // direction du Soleil à l'instant (déterministe) de la naissance, relevée au-dessus de l'horizon
     const C = celestial(W, this.skyMs()); const sun0 = new THREE.Vector3(C.sunL.x, Math.max(C.sunL.y, .1), C.sunL.z).normalize();
-    const pl = { idx, sp, var: v.id, v, mod: this.birthMod(), mus: [this.mu.b, this.mu.r, this.mu.p], phraseId: P.id, born: this.t, x: px, z: pz, y: W.h(px, pz) - .15, growth: 0, glow: 0, pulse: 1, col, phase: r(), height: 0, crown: 0, sun0 };
+    const pl = { idx, sp, var: v.id, v, harm: this.g && this.g.harm, mod: this.birthMod(), mus: [this.mu.b, this.mu.r, this.mu.p], phraseId: P.id, born: this.t, x: px, z: pz, y: W.h(px, pz) - .15, growth: 0, glow: 0, pulse: 1, col, phase: r(), height: 0, crown: 0, sun0 };
     const G = genPlant(pl, mulberry32(Math.floor(r() * 4294967296)), sun0, W);
     if (!writePlant(G, idx)) { compactFlora(this.plants); idx = allocSlot(this.plants); pl.idx = idx; if (idx < 0 || !writePlant(G, idx)) { SLOTS[idx] = 0; this.full = true; return; } }
     pl.height = Math.max(1, G.height); pl.crown = G.crown; pl.G = G; this.full = false;
@@ -4631,6 +4882,9 @@ class Sim {
 // couleur propre à chaque graine du public (suite d'or : jamais deux teintes voisines à la suite)
 const pubColor = k => hsv2rgb([(.13 + k * .618034) % 1, .72, 1]);
 const hexCol = c => '#' + c.map(v => Math.round(clamp(v, 0, 1) * 255).toString(16).padStart(2, '0')).join('');
+// accords → familles : majeur lumineux, mineur pleureur, septièmes irisées, suspendus en suspens, diminué et augmenté hérissés
+const CHORD_FAM = [['fleur', 'corolle', 'arbre', 'arbuste'], ['saule', 'fougere', 'eventail', 'mycelium'], ['gemme', 'amethyste', 'cristal'], ['amethyste', 'gemme', 'fleur'], ['fougere', 'arborescente', 'saule'],
+  ['filament', 'herbe'], ['filament', 'arborescente'], ['cristal', 'amethyste'], ['cristal', 'gemme'], ['arbre', 'succulente']];
 /* ---- Le réalisateur ---- */
 function occluded(a, b, plants, subj) {
   const dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz + 1e-6;
@@ -4718,12 +4972,12 @@ function shotCamera(sim, T, out, shot) {
    8. SESSIONS
    ===================================================================== */
 let recStride = 6, mode = 'intro', sim = null, frames = [], recFrames = null, replayEl = null, liveT0 = 0, idleAcc = 0, current = null, videoRec = null, videoChunks = [];
-const ZERO = [0, 0, 0, 0, 0, 0, 0, 0], SILENT = [0, 0, 0, 0, 0, 2, 0, 0];
+const FSTRIDE = 16, ZERO = new Array(FSTRIDE).fill(0), SILENT = ZERO.slice(); SILENT[5] = 2;
 function startWorld(seed, startMs, intro, dawn) { world = buildWorld(seed, startMs, dawn); sim = new Sim(seed, world, intro); sim.tscale = S.tscale; CEL = celestial(world, sim.skyMs()); }
 
 async function startLive(kind, file) {
   const seed = (crypto.getRandomValues(new Uint32Array(1))[0]) >>> 0;
-  startWorld(seed, Date.now(), true, !S.cycle); frames = []; sim.lat = S.latency / 1000; sim.predict = true;
+  setTick(LIVE_TICK); startWorld(seed, Date.now(), true, !S.cycle); frames = []; sim.lat = S.latency / 1000; sim.predict = true;
   if (kind === 'mic') await AE.useMic(); else if (kind === 'phone') await AE.useRemote(PH.stream); else await AE.useFile(file);
   liveT0 = AE.ctx.currentTime; AE.silentFor = 0; AE.heard = 0; AE.silStart = null; AE.lastNow = 0;
   if (AE.el) AE.el.onended = () => { if (mode === 'live') finishLive(true); };
@@ -4740,7 +4994,7 @@ async function finishLive(save) {
   const thumb = await new Promise(res => wantThumb = res);
   const rec = {
     id: Date.now().toString(36) + '-' + sim.W.seed.toString(36), name: sim.W.name, date: new Date().toISOString(), seed: sim.W.seed, startUTC: sim.W.startMs,
-    stride: 8, lat: S.latency / 1000, tscale: sim.tscale, dawn: sim.dawn, publicSeeds: sim.pubN, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), varieties: new Set(sim.plants.map(p => p.var)).size, frames: new Float32Array(frames), audio, thumb,
+    stride: FSTRIDE, tick: TICK, lat: S.latency / 1000, tscale: sim.tscale, dawn: sim.dawn, publicSeeds: sim.pubN, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), varieties: new Set(sim.plants.map(p => p.var)).size, frames: new Float32Array(frames), audio, thumb,
   };
   try { await DB.put(rec); } catch (e) { memStore.set(rec.id, rec); }
   showEpilogue(rec);
@@ -4750,7 +5004,7 @@ const speciesLine = c => Object.keys(SPECIES).filter(k => c[k]).map(k => c[k] + 
 
 async function startReplay(rec, exportVideo) {
   closeGallery(); AE.ensure(); AE.stop();
-  startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0;
+  setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0;
   recFrames = rec.frames; recStride = rec.stride || 6; current = rec; replayEl = null;
   if (rec.audio) {
     const el = new window.Audio(URL.createObjectURL(rec.audio)); replayEl = el;
@@ -4828,7 +5082,8 @@ async function importJSON(file) {
    9. INTERFACE
    ===================================================================== */
 const $ = id => document.getElementById(id);
-const S = { sens: 1.2, tscale: 1, bio: 1, dof: .4, grain: .05, scope: true, autocam: true, annot: false, quality: 'haute', silenceDb: -50, autostop: true, cycle: false, stage: false, output: 'cinema', adaptive: true, floorDb: -62, topDb: -14, latency: 100, mire: false };
+const S = { sens: 1.2, tscale: 1, bio: 1, dof: .4, grain: .05, scope: true, autocam: true, annot: false, quality: 'haute', silenceDb: -50, autostop: true, cycle: false, stage: false, output: 'cinema', adaptive: true, floorDb: -62, topDb: -14, latency: 100, mire: false, instr: 'guitare', inDev: '' };
+try { const v = JSON.parse(localStorage.getItem('herba-entree') || 'null'); if (v) Object.assign(S, v); } catch (e) {}
 try { const c = JSON.parse(localStorage.getItem('herba-salle') || 'null'); if (c) Object.assign(S, c); } catch (e) {}
 const step01 = x => x >= 0 ? 1 : 0;
 const bind = (id, key, out, f = v => v.toFixed(2)) => $(id).addEventListener('input', e => { S[key] = parseFloat(e.target.value); $(out).textContent = f(S[key]); });
@@ -4853,6 +5108,22 @@ $('adaptive').addEventListener('change', e => { S.adaptive = e.target.checked; i
 $('latency').value = S.latency; $('oLat').textContent = S.latency + ' ms';
 $('latency').addEventListener('input', e => { S.latency = +e.target.value; $('oLat').textContent = S.latency + ' ms'; saveSalle(); });
 $('mire').addEventListener('change', e => S.mire = e.target.checked);
+$('lowlat').checked = LOWLAT; $('lowlat').addEventListener('change', e => { try { localStorage.setItem('herba-lowlat', e.target.checked ? '1' : '0'); } catch (er) {} });
+// Entrée audio : l'interface USB (le GX-1, par exemple) passe avant le téléphone, bien plus lent
+const saveEntree = () => { try { localStorage.setItem('herba-entree', JSON.stringify({ instr: S.instr, inDev: S.inDev })); } catch (e) {} };
+async function listDevs(ask) {
+  try {
+    if (ask) { const st = await navigator.mediaDevices.getUserMedia({ audio: true }); st.getTracks().forEach(t => t.stop()); }
+    const ds = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput' && d.deviceId !== 'default' && d.deviceId !== 'communications');
+    const sel = $('inDev'); sel.innerHTML = '<option value="">Micro par défaut</option>' + ds.map(d => `<option value="${d.deviceId}">${(d.label || 'Entrée audio').replace(/</g, '')}</option>`).join('');
+    if (!S.inDev) { const g = ds.find(d => /gx-?1|boss|roland|usb|interface|scarlett|audient|motu|presonus|steinberg/i.test(d.label)); if (g) S.inDev = g.deviceId; }
+    sel.value = ds.some(d => d.deviceId === S.inDev) ? S.inDev : ''; S.inDev = sel.value; saveEntree();
+  } catch (e) { $('calibMsg').textContent = 'Entrées audio inaccessibles : ' + e.message; }
+}
+$('inDev').addEventListener('change', e => { S.inDev = e.target.value; saveEntree(); });
+$('instr').value = S.instr; $('instr').addEventListener('change', e => { S.instr = e.target.value; saveEntree(); if (AE.wk) { try { AE.wk.disconnect(); } catch (er) {} AE.wk = null; AE.wkReady = false; AE.wkMade = false; } });
+$('btnDevs').addEventListener('click', () => listDevs(true));
+if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) { listDevs(false); navigator.mediaDevices.addEventListener && navigator.mediaDevices.addEventListener('devicechange', () => listDevs(false)); }
 $('silence').value = S.silenceDb; $('oSil').textContent = '−' + Math.abs(S.silenceDb) + ' dB';
 function saveSalle() { try { localStorage.setItem('herba-salle', JSON.stringify({ floorDb: S.floorDb, topDb: S.topDb, silenceDb: S.silenceDb, latency: S.latency })); } catch (e) {} }
 // Étalonnage : le bruit de la salle fixe le seuil de silence, le jeu fort fixe le haut de la dynamique
@@ -5034,9 +5305,10 @@ $('rgClose').onclick = closeProjection; $('btnProj').onclick = openProjection; $
 function updateRegie() {
   if (!PROJ) return;
   const C = CEL, el = C ? (C.el / D2R).toFixed(1) + '°' : '—', ph = sim.phrase ? sim.phrase.id + 1 : 1, fps = Math.round(1 / Math.max(ftAvg, 1e-3));
-  const lien = PH.stream ? 'téléphone ✓' : AE.active ? 'micro local' : '—';
+  const lien = PH.stream ? 'téléphone (lent)' : AE.active ? (AE.inLabel || 'entrée locale').slice(0, 22) : '—';
   const items = [['Temps', mode === 'live' ? mmss(liveTime()) : mmss(sim.t)], ['Phrase', ph], ['Plantes', sim.plants.length + (sim.full ? ' (plein)' : '')], ['Soleil', el + (sim.dawn ? (sim.D < 1 ? ' · avant l’' + (world.term === 'crepuscule' ? 'ombre' : 'aube') : '') : '')],
     ['Niveau', Math.round((sim.loud || 0) * 100) + ' %'], ['Dynamique', (sim.mu.r > .15 ? 'crescendo' : sim.mu.r < -.15 ? 'decrescendo' : 'stable')], ['Plan', sim.shot.type], ['Image', fps + ' i/s · ' + Math.round(resScale * 100) + ' %'],
+    ['Note', GT.note ? NOTE_NAMES[((GT.note.m0 % 12) + 12) % 12] + (Math.floor(GT.note.m0 / 12) - 1) : '—'], ['Accord', GT.chordName || '—'], ['Tonalité', GT.keyName || '—'], ['Tension', Math.round(GT.tension * 100) + ' %'],
     ['Source', lien], ['Public', PUB.on ? PUB.queue.length + ' en attente · ' + sim.pubN + ' semées' : 'fermé'], ['Silence', AE.silentFor > 1 ? AE.silentFor.toFixed(0) + ' s' : '—'], ['Applaudis.', AE.applause ? 'oui' : '—']];
   $('rgStat').innerHTML = items.map(([k, v]) => `<div><span>${k}</span>${v}</div>`).join('');
 }
@@ -5489,7 +5761,7 @@ const meters = ['mBass', 'mMid', 'mHigh', 'mVol', 'mCent'].map($);
 let renderT = 0, hudTick = 0, offline = false;
 
 // Accueil : jardin de démonstration sous le ciel de maintenant
-startWorld(20261028, Date.now());
+setTick(30); startWorld(20261028, Date.now());
 for (let i = 0; i < 1000; i++) {
   const t = i / TICK, beat = i % 16 === 0 ? 1 : 0;
   sim.step([.45 + .35 * Math.sin(t * .7), .5 + .3 * Math.sin(t * .31 + 1), .35 + .3 * Math.sin(t * 1.3), .25, .3 + .25 * Math.sin(t * .2), beat]);
@@ -5551,7 +5823,7 @@ function updateVisuals(dt, withUI) {
   const ia = clamp((renderT - (sim.t - DT)) / DT, 0, 1), lerpP = (a, b) => a == null ? b : a + (b - a) * ia;   // interpolation entre deux pas de simulation
   const salut = sim.applK || 0, alive = sim.plants.filter(p => !p.dead);
   for (const p of alive) {
-    PU.uPE.value[p.idx].set(p.fossil || 0, 0, 0, 0);
+    PU.uPE.value[p.idx].set(p.fossil || 0, p.flut > .02 ? (p.vibR || 0) : 0, 0, 0);
     PU.uPA.value[p.idx].set(lerpP(p.g0, p.growth), lerpP(p.gl0, p.glow) + salut * .8, lerpP(p.pu0, p.pulse), lerpP(p.fl0, p.flut || 0));
     PU.uPB.value[p.idx].set(p.col[0], p.col[1], p.col[2], p.phase);
     PU.uPC.value[p.idx].set(p.sun0.x, p.sun0.y, p.sun0.z, 0);
@@ -5559,7 +5831,7 @@ function updateVisuals(dt, withUI) {
   }
   {   // ondes sismiques : anneau au sol, secousse des plantes au passage du front, lumière qui court dans les rhizomes
     const SH = sim.shocks;
-    for (let i = 0; i < 6; i++) { const sk = SH[SH.length - 1 - i]; if (sk) PU.uShock.value[i].set(sk.x, sk.z, renderT - sk.t0, sk.a); else PU.uShock.value[i].set(0, 0, -1, 0); }
+    for (let i = 0; i < 6; i++) { const sk = SH[SH.length - 1 - i]; if (sk) PU.uShock.value[i].set(sk.x, sk.z, renderT - sk.t0, sk.a * (sk.res ? 1.6 : 1)); else PU.uShock.value[i].set(0, 0, -1, 0); }
     PU.uShockCol.value.setRGB(...mixC(W.palette.b, [1, .9, .7], .4));
     for (const p of alive) {
       let qx = 0, qy = 0, qz = 0, pw = 0;
@@ -5568,12 +5840,14 @@ function updateVisuals(dt, withUI) {
         const dx = p.x - sk.x, dz = p.z - sk.z, d = Math.hypot(dx, dz) + 1e-3, ph = d - 22 * age, w = sk.a * Math.exp(-ph * ph / 18) * Math.exp(-age * .9), osc = Math.sin(ph * .8);
         qx += dx / d * w * .32 * osc; qz += dz / d * w * .32 * osc; qy += w * .1; pw = Math.max(pw, w);
       }
+      if (p === sim.bendHost && sim.g && sim.g.bend && sim.g.note) { const bd = sim.g.note.bendDir, k = clamp(sim.g.bend, -1.5, 1.5) * .9; qx += bd[0] * k; qz += bd[1] * k; }   // le bend courbe la tige
       PU.uPQ.value[p.idx].set(qx, qy, qz, p.y + .15);
       PU.uPA.value[p.idx].z = Math.max(p.pulse, pw * (p.sp === 'mycelium' ? 1.7 : .7));
     }
     const FT = W.foot || []; PU.uFootN.value = FT.length; FT.forEach((v, i) => PU.uFoot.value[i].copy(v));
   }
   tPlant.needsUpdate = true; renderGlow(alive);
+  PU.uTension.value += (((sim.g && sim.g.tens) || 0) - PU.uTension.value) * .15;
   const ranked = alive.slice().sort((a, b) => (b.glow + .2) * b.growth * b.height - (a.glow + .2) * a.growth * a.height);
   plantLights.forEach((l, i) => {
     const p = ranked[i];
@@ -5772,7 +6046,7 @@ async function runExport() {
   const duration = abuf ? abuf.duration : rec.duration, total = Math.ceil(duration * fps);
   $('xForm').classList.add('hidden'); $('xRun').classList.remove('hidden');
   hdJob.cancel = false; mode = 'hd'; setUI(); closeGallery();
-  AE.stop(); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; recFrames = rec.frames; recStride = rec.stride || 6; current = rec;
+  AE.stop(); setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; recFrames = rec.frames; recStride = rec.stride || 6; current = rec;
   offline = true; hdQuality(true); setRenderSize(w, h);
   const t0 = performance.now();
   try {
