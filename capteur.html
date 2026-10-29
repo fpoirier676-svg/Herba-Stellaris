@@ -42,6 +42,8 @@
   .note { color:var(--faint); font-size:12px; line-height:1.65; }
   .hidden { display:none !important; }
   .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; } .row3 button { font-size:10px; letter-spacing:.1em; padding:14px 4px; }
+  .shots { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; } .shots button { margin-top:0; padding:12px 4px; font-size:10px; letter-spacing:.08em; }
 </style>
 </head>
 <body>
@@ -73,6 +75,9 @@
     <p class="epi hidden" id="epi">Cette œuvre fait maintenant partie de votre présent passé sur&nbsp;la&nbsp;Lune</p>
     <button class="big" id="rStart">Lancer la composition</button>
     <div class="row2"><button class="rec" id="rFinish">Terminer et conserver</button><button id="rDiscard">Abandonner</button></div>
+    <div class="lbl" style="margin-top:20px">Réalisation en direct</div>
+    <div class="shots" id="shots"></div>
+    <div class="row3"><button id="rFinale">Final</button><button id="rStage">Mode Scène</button><button id="rPublic">Graines du public</button></div>
   </div>
 
   <p class="note" style="text-align:center">Garde cette page ouverte et l’écran allumé pendant que tu joues.</p>
@@ -88,7 +93,7 @@ if (!window.isSecureContext) state('Cette page doit être ouverte en https pour 
 
 // Opus réglé pour la musique : stéréo, haut débit, sans DTX
 const sdpMusic = sdp => sdp.replace(/a=fmtp:(\d+) ([^\r\n]*useinbandfec=1[^\r\n]*)/g,
-  (m, pt, p) => `a=fmtp:${pt} ${p};stereo=1;sprop-stereo=1;maxaveragebitrate=256000;maxplaybackrate=48000;usedtx=0`);
+  (m, pt, p) => `a=fmtp:${pt} ${p};stereo=1;sprop-stereo=1;maxaveragebitrate=256000;maxplaybackrate=48000;usedtx=0;minptime=10\r\na=ptime:10`);
 
 async function listDevices() {
   try {
@@ -184,6 +189,8 @@ function onStatus(m) {
   $('rFinish').disabled = $('rDiscard').disabled = !live;
 }
 const send = cmd => { if (conn && conn.open) conn.send({ cmd }); };
+['Ensemble', 'Ras du sol', 'Grue', 'Plongée', 'Cime', 'Canopée', 'Ciel', 'Terre', 'Contre-jour'].forEach((n, i) => { const b = document.createElement('button'); b.textContent = n; b.onclick = () => send('shot' + (i + 1)); $('shots').appendChild(b); });
+$('rFinale').onclick = () => send('finale'); $('rStage').onclick = () => send('stage'); $('rPublic').onclick = () => send('public');
 $('rStart').onclick = () => send('start');
 $('rFinish').onclick = () => send('finish');
 $('rDiscard').onclick = () => { if (confirmTap($('rDiscard'))) send('discard'); };

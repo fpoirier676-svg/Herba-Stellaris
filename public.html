@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Herba Stellaris — Semer une graine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Corinthia:wght@400;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root { --ink:#efe8da; --dim:rgba(239,232,218,.62); --faint:rgba(239,232,218,.34); }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:#000; color:var(--ink); font-family:Inter,system-ui,sans-serif; overflow:hidden; }
+  body { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:calc(env(safe-area-inset-top) + 24px) 26px calc(env(safe-area-inset-bottom) + 24px);
+    background:radial-gradient(ellipse at 50% 110%, rgba(70,60,40,.35), transparent 60%), radial-gradient(ellipse at 50% -10%, rgba(40,52,80,.35), transparent 60%), #000; }
+  h1 { font-family:'Corinthia','Cormorant Garamond',cursive; font-weight:400; font-size:64px; line-height:1; margin:0; text-align:center; }
+  .sub { font-family:'Cormorant Garamond',serif; font-style:italic; color:var(--dim); font-size:20px; text-align:center; margin:6px 0 38px; line-height:1.35; }
+  #seed { width:210px; height:210px; border-radius:50%; border:1px solid rgba(239,232,218,.5); background:radial-gradient(circle at 50% 45%, rgba(255,226,160,.22), rgba(255,226,160,.02) 60%, transparent 70%);
+    color:var(--ink); font:inherit; font-size:13px; letter-spacing:.22em; text-transform:uppercase; cursor:pointer; position:relative; transition:transform .2s, opacity .3s; }
+  #seed::after { content:''; position:absolute; left:50%; top:50%; width:14px; height:14px; margin:-7px; border-radius:50%; background:#fff3d0; box-shadow:0 0 18px 6px rgba(255,226,160,.8); transform:translateY(-34px); }
+  #seed:active { transform:scale(.96); } #seed:disabled { opacity:.35; }
+  #msg { min-height:70px; margin-top:30px; text-align:center; font-family:'Cormorant Garamond',serif; font-size:21px; line-height:1.4; max-width:340px; }
+  #msg i { color:var(--dim); font-size:16px; }
+  .note { position:fixed; bottom:calc(env(safe-area-inset-bottom) + 14px); left:0; right:0; text-align:center; color:var(--faint); font-size:11px; letter-spacing:.06em; }
+</style>
+</head>
+<body>
+  <h1>Herba Stellaris</h1>
+  <div class="sub" id="sub">Une flore naît sur la Lune, en musique.<br>Semez-y votre graine.</div>
+  <button id="seed" disabled>Semer</button>
+  <div id="msg">Connexion…</div>
+  <div class="note">Regardez l’écran : votre graine tombera du ciel lunaire.</div>
+<script>
+const $ = id => document.getElementById(id);
+const target = decodeURIComponent((location.hash || '').slice(1));
+let conn = null, peer = null, cool = 0, timer = null;
+const say = h => $('msg').innerHTML = h;
+function connect() {
+  if (!target) { say('Scannez le QR code affiché sur l’écran.'); return; }
+  if (!window.Peer) { say('Connexion impossible : vérifiez votre accès à internet.'); return; }
+  peer = new Peer();
+  peer.on('open', () => {
+    conn = peer.connect(target, { metadata: { role: 'public' }, reliable: true });
+    conn.on('open', () => { $('seed').disabled = false; say('Touchez la graine quand vous le souhaitez.'); });
+    conn.on('data', d => onMsg(d || {}));
+    conn.on('close', () => { $('seed').disabled = true; say('La liaison s’est interrompue. Rechargez la page pour revenir.'); });
+  });
+  peer.on('error', () => say('La composition n’est pas joignable pour l’instant. Rechargez la page dans un moment.'));
+}
+function onMsg(d) {
+  if (d.msg === 'hello' && d.site) $('sub').innerHTML = 'Une flore naît en ce moment sur la Lune,<br>au site <b>' + d.site + '</b>.';
+  else if (d.msg === 'wait') say('La graine attend : le voyage vers la Lune n’est pas terminé.<br><i>Réessayez dans un instant.</i>');
+  else if (d.msg === 'busy') say('Le ciel est plein de graines.<br><i>Réessayez dans quelques secondes.</i>');
+  else if (d.msg === 'cool') startCool(d.s || 20, 'Votre dernière graine germe encore.');
+  else if (d.msg === 'queued') say('Votre graine traverse le vide…<br><i>Regardez l’écran.</i>');
+  else if (d.msg === 'planted') { say('Votre graine a germé :<br><b>' + d.nom + '</b><br><i>' + d.chem + '</i>'); if (navigator.vibrate) navigator.vibrate([30, 60, 30]); startCool(20); }
+}
+function startCool(s, txt) {
+  cool = s; $('seed').disabled = true; clearInterval(timer);
+  if (txt) say(txt);
+  timer = setInterval(() => { if (--cool <= 0) { clearInterval(timer); $('seed').disabled = false; $('seed').textContent = 'Semer'; } else $('seed').textContent = cool + ' s'; }, 1000);
+  $('seed').textContent = cool + ' s';
+}
+$('seed').onclick = () => { if (conn && conn.open) { conn.send({ seed: true }); $('seed').disabled = true; setTimeout(() => { if (!cool) $('seed').disabled = false; }, 2500); } };
+connect();
+</script>
+</body>
+</html>

@@ -46,11 +46,33 @@ Chaque variété a une signature musicale : **registre** (graves ↔ aigus), **d
 ## Déroulé d'une composition
 
 1. **Ouverture** — une graine lumineuse quitte la Terre réelle du jour et traverse l'espace jusqu'au site choisi, au rythme de la musique.
-   À l'écran : les formules des gaz traversés (atmosphère terrestre, géocouronne, vent solaire, exosphère lunaire) et le message
-   « Le temps d'une musique, la Lune apprend à fleurir ».
-2. **Ensemencement** — la graine posée luit au cœur du site ; la première plante en sort.
-3. **Création** — plans variés : vues plongeantes sur l'ensemble de l'œuvre, travellings au‑dessus de la canopée, rotations autour des cimes.
-4. **Final** — à 3 min 30, dézoom lent sur l'œuvre entière ; après 10 s de silence, la création s'arrête d'elle‑même.
+   À l'écran : le message « Le temps d'une musique, la Lune apprend à fleurir » et, hors mode Scène, les formules des gaz traversés.
+2. **Arrivée de nuit** — le site est choisi juste avant l'aube lunaire, sous la lumière cendrée de la Terre. La graine posée luit au cœur du site ; la première plante en sort.
+3. **Création** — chaque frappe grave lance une onde sismique : un anneau de lumière court sur le sol, la flore vibre au passage du front
+   et la lumière file dans les rhizomes. Le silence fige tout. Les plans sont longs, coupés sur les débuts de phrase et sur les frappes,
+   enchaînés en fondu quand la musique est liée : plan d'ensemble → détail → révélation.
+4. **Climax** — le Soleil se lève au moment où la musique atteint son sommet (crescendo fort et soutenu), avec des ombres de plusieurs
+   dizaines de mètres et la lueur de poussière à l'horizon. En Lune décroissante, l'aube est sur la face cachée : c'est alors le
+   **coucher** du Soleil qui marque le climax et la bioluminescence prend le relais.
+5. **Final** — à 3 min 30 (ou touche E) : dézoom sur l'œuvre entière, puis montée en orbite. Le jardin devient un point de lumière
+   sur la Lune, avec la Terre dans le ciel. Après 10 s de silence, la composition s'arrête une fois la montée achevée (environ 30 s).
+
+Repères d'échelle : un vieil étage de descente d'alunisseur se trouve à 65‑75 m du jardin, avec les traces de pas de ceux qui en sont descendus.
+
+## Guide de scène
+
+Pensé pour une projection derrière le musicien.
+
+- **Mode Scène** (touche **S**, ou case dans le panneau) : plus aucun texte ni interface, curseur caché. Seul le message poétique de l'ouverture reste.
+- **Sortie de projection** (panneau) : *Cinéma 2.39*, *Plein cadre* pour les écrans ultra‑larges ou plusieurs projecteurs, *Dôme 180°* (image fisheye domemaster, centre relevé de 20°).
+- **Réalisation en direct** : touches **1** à **9** pour imposer un plan (1 ensemble, 2 ras du sol, 3 grue, 4 plongée, 5 cime, 6 canopée, 7 ciel, 8 Terre, 9 contre‑jour), **E** pour lancer le final, **F** plein écran.
+  Les mêmes commandes sont sur le téléphone‑capteur. Elles sont inscrites dans l'empreinte de la composition : la galerie et les exports les rejouent à l'identique.
+- **Graines du public** (touche **Q**) : un QR code s'affiche dans un coin. Les spectateurs ouvrent `public.html` sur leur téléphone et touchent « Semer ».
+  Leur graine tombe du ciel lunaire, se pose avec une onde de choc et germe selon la musique du moment. Le téléphone reçoit le nom et la chimie de la plante née.
+  Une graine par spectateur toutes les 20 s, une graine toutes les 2,5 s au plus.
+- **Fluidité** : résolution adaptative (vise 60 i/s), envoi partiel des nouvelles plantes à la carte graphique, shaders préchauffés au chargement,
+  tampon audio minimal et paquets Opus de 10 ms pour le téléphone.
+- **Cycle complet** : la case « Cycle jour‑nuit complet » rétablit l'ancien comportement (le temps lunaire s'accélère avec le volume) à la place de la dramaturgie nuit → aube.
 
 Sources des valeurs de l'exosphère lunaire et du vent solaire : NASA (mission LADEE).
 
@@ -59,7 +81,8 @@ Sources des valeurs de l'exosphère lunaire et du vent solaire : NASA (mission L
 | Fichier | Rôle |
 |---|---|
 | `index.html` | L'application (scène 3D, galerie, exports photo et vidéo jusqu'en 8K) |
-| `capteur.html` | Page à ouvrir sur le téléphone (via le QR code) pour en faire le micro de l'application |
+| `capteur.html` | Page à ouvrir sur le téléphone (via le QR code) pour en faire le micro de l'application et la télécommande de réalisation |
+| `public.html` | Page des spectateurs pour semer une graine pendant la composition |
 | `.nojekyll` | Indique à GitHub Pages de servir les fichiers tels quels |
 
 ## Utilisation

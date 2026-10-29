@@ -12,6 +12,10 @@
   html,body { margin:0; height:100%; background:#000; overflow:hidden; color:var(--ink); font-family:Inter,system-ui,sans-serif; }
   canvas#c { position:fixed; inset:0; width:100%; height:100%; display:block; }
   .hidden { display:none !important; }
+  #pubBox { position:fixed; right:26px; bottom:26px; z-index:30; background:rgba(4,5,8,.72); border:1px solid rgba(255,240,220,.16); border-radius:14px; padding:14px 16px; width:190px; text-align:center; backdrop-filter:blur(6px); }
+  #pubQR svg { width:150px; height:150px; background:#fff; border-radius:6px; padding:4px; }
+  #pubBox .pubT { font-family:'Corinthia','Cormorant Garamond',cursive; font-size:30px; line-height:.95; color:#f3ead8; margin:8px 0 4px; }
+  #pubUrl { font-family:Inter,system-ui,sans-serif; font-size:9px; opacity:.45; word-break:break-all; }
   .fadeout { opacity:0 !important; pointer-events:none !important; }
 
   button, .btn { font:inherit; font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--ink); background:rgba(0,0,0,.25);
@@ -282,6 +286,12 @@ SKYIMG.moon = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAUDBAQEAw
   <label class="chk"><input type="checkbox" id="autocam" checked> Réalisation automatique</label>
   <div class="meter" style="display:block;margin-top:10px">Qualité d’affichage</div>
   <select id="quality"><option value="fluide">Fluide — machine modeste</option><option value="haute" selected>Haute</option><option value="ultra">Ultra — sur-échantillonnage</option></select>
+  <div class="meter" style="display:block;margin-top:10px">Sortie de projection</div>
+  <select id="output"><option value="cinema" selected>Cinéma 2.39</option><option value="plein">Plein cadre — écrans ultra-larges</option><option value="dome">Dôme 180° (fisheye)</option></select>
+  <label class="chk"><input type="checkbox" id="stage"> Mode Scène (touche S) : aucun texte à l’écran</label>
+  <label class="chk"><input type="checkbox" id="cycle"> Cycle jour-nuit complet (sinon : de la nuit à l’aube au climax)</label>
+  <label class="chk"><input type="checkbox" id="adaptive" checked> Résolution adaptative (garder 60 i/s)</label>
+  <div class="xnote" style="font-size:10px;opacity:.6;margin-top:8px;line-height:1.5">Scène : 1 ensemble · 2 ras du sol · 3 grue · 4 plongée · 5 cime · 6 canopée · 7 ciel · 8 Terre · 9 contre-jour · E final · Q graines du public · S mode Scène · F plein écran</div>
 </div>
 
 <div id="carnet"></div>
@@ -291,6 +301,8 @@ SKYIMG.moon = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAUDBAQEAw
   <div class="ep-site" id="epSite"></div>
   <div class="row ep-acts"><button id="epGal">Voir la galerie</button><button id="epNew">Nouvelle composition</button><button id="epClose">Fermer</button></div>
 </div>
+
+<div id="pubBox" class="hidden"><div id="pubQR"></div><div class="pubT">Semez une graine<br>sur la Lune</div><div id="pubUrl"></div></div>
 
 <div id="phoneBox" class="hidden">
   <div class="xin">
@@ -595,6 +607,39 @@ const cine = new ShaderPass({
     }`
 });
 composer.addPass(cine);
+
+// Sortie dôme : la scène est rendue dans un cube puis projetée en fisheye 180° (domemaster)
+class DomePass extends Pass {
+  constructor() {
+    super(); this.needsSwap = false; this.enabled = false; this.scene = scene; this.camera = camera; this.setSize2(1536);
+    this.mat = new THREE.ShaderMaterial({
+      uniforms: { tCube: { value: this.crt.texture }, uRot: { value: new THREE.Matrix3() }, uAspect: { value: 1 }, uFov: { value: Math.PI }, uTilt: { value: .35 } },
+      vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }`,
+      fragmentShader: `uniform samplerCube tCube; uniform mat3 uRot; uniform float uAspect,uFov,uTilt; varying vec2 vUv;
+        void main(){ vec2 p=(vUv-.5)*2.; p.x*=uAspect; float r=length(p); if(r>1.){ gl_FragColor=vec4(0.,0.,0.,1.); return; }
+          float th=r*uFov*.5, ph=atan(p.y,p.x); vec3 d=vec3(sin(th)*cos(ph),sin(th)*sin(ph),-cos(th));
+          float c=cos(uTilt), s=sin(uTilt); d=vec3(d.x,d.y*c-d.z*s,d.y*s+d.z*c);
+          gl_FragColor=vec4(textureCube(tCube,uRot*d).rgb*(1.-smoothstep(.985,1.,r)),1.); }`, depthTest: false, depthWrite: false });
+    this.fsq = new FullScreenQuad(this.mat);
+  }
+  setSize2(n) { if (this.crt) this.crt.dispose(); this.crt = new THREE.WebGLCubeRenderTarget(n, { type: THREE.HalfFloatType }); this.cc = new THREE.CubeCamera(.05, 9000, this.crt); if (this.mat) this.mat.uniforms.tCube.value = this.crt.texture; }
+  setNear(n) { for (const c of this.cc.children) { if (c.near !== n) { c.near = n; c.updateProjectionMatrix(); } } }
+  render(renderer, writeBuffer, readBuffer) {
+    const cam = this.camera; cam.updateMatrixWorld(); this.cc.position.setFromMatrixPosition(cam.matrixWorld); this.cc.updateMatrixWorld();
+    const au = renderer.shadowMap.autoUpdate; renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
+    this.cc.update(renderer, this.scene); renderer.shadowMap.autoUpdate = au;
+    this.mat.uniforms.uRot.value.setFromMatrix4(cam.matrixWorld); this.mat.uniforms.uAspect.value = readBuffer.width / readBuffer.height;
+    renderer.setRenderTarget(this.renderToScreen ? null : readBuffer); this.fsq.render(renderer);
+  }
+}
+const domePass = new DomePass(); composer.insertPass(domePass, 1);
+function setScene(sc, cam) { renderPass.scene = domePass.scene = sc; renderPass.camera = domePass.camera = cam; if (domePass.enabled) domePass.setNear(cam === camera ? .05 : .003); }
+function setOutput(m) {
+  S.output = m; const dome = m === 'dome';
+  renderPass.enabled = !dome; dof.enabled = !dome; domePass.enabled = dome;
+  if (dome) domePass.setSize2({ fluide: 1024, haute: 1536, ultra: 2048 }[S.quality] || 1536);
+  try { localStorage.setItem('herba-sortie', m); } catch (e) {}
+}
 composer.setPixelRatio(PR);
 composer.setSize(innerWidth, innerHeight);
 
@@ -607,6 +652,9 @@ const PU = {
   uPB: { value: Array.from({ length: MAXP }, () => new THREE.Vector4()) },   // couleur bioluminescente, phase
   uPC: { value: Array.from({ length: MAXP }, () => new THREE.Vector4(0, 1, 0, 0)) },   // direction du Soleil à la naissance
   uPP: { value: Array.from({ length: MAXP }, () => new THREE.Vector4()) },   // x, z, rayon du biofilm, intensité
+  uPQ: { value: Array.from({ length: MAXP }, () => new THREE.Vector4()) },   // secousse sismique (déplacement à 5 m de haut), altitude du pied
+  uShock: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, -1, 0)) }, uShockCol: { value: new THREE.Color(1, .8, .5) },
+  uFoot: { value: Array.from({ length: 14 }, () => new THREE.Vector4()) }, uFootN: { value: 0 },
   uN: { value: 0 }, uTime: { value: 0 }, uBio: { value: 1 },
   uSunL: { value: new THREE.Vector3(0, 1, 0) },
   tHN: { value: null }, tHF: { value: null }, uTSteps: { value: 44 }, uPxs: { value: 1.5 }, uDay: { value: 1 },
@@ -829,28 +877,41 @@ const LAT_A = ['Mare', 'Lacus', 'Sinus', 'Palus', 'Vallis', 'Rupes', 'Montes', '
 const LAT_B = ['Serenitatis', 'Somniorum', 'Lucis', 'Silentii', 'Aeternitatis', 'Harmoniae', 'Resonantiae', 'Umbrarum', 'Vitrea', 'Florum', 'Noctis', 'Crystallina', 'Memoriae', 'Cantus', 'Tenebrarum', 'Aurorae'];
 
 let world = null;
-function buildWorld(seed, startMs) {
+function buildWorld(seed, startMs, dawn) {
   if (world) { world.group.traverse(o => { if (o.geometry) o.geometry.dispose(); }); scene.remove(world.group); }
   const rng = mulberry32(seed);
-  const W = { seed, startMs, group: new THREE.Group() };
+  const W = { seed, startMs, dawn: !!dawn, group: new THREE.Group() };
   scene.add(W.group);
 
   // --- Site : sur la face visible (Terre au-dessus de l'horizon), choisi parmi des candidats
   //     pour que la création commence près d'une aube lunaire, si le ciel du moment le permet.
   const s0 = Astro.sky(startMs), s6 = Astro.sky(startMs + 6 * 3600e3);
-  let best = null;
+  let best = null, bestSet = null;
   for (let k = 0; k < 64; k++) {
     const dist = (42 + rng() * 34) * D2R, bearing = rng() * Math.PI * 2;
     const lat = Math.asin(Math.sin(dist) * Math.cos(bearing)), lon = Math.atan2(Math.sin(bearing) * Math.sin(dist), Math.cos(dist));
     const B = Astro.siteBasis(s0.frame, lat, lon), sun = Astro.toLocal(B, s0.sun), earth = Astro.toLocal(B, s0.earth);
     const el = Math.asin(sun[1]) / D2R, eel = Math.asin(earth[1]) / D2R;
     const later = Astro.toLocal(Astro.siteBasis(s6.frame, lat, lon), s6.sun), rising = later[1] > sun[1];   // matin lunaire : le jour est devant nous
-    const score = Math.abs(el - 9) + (el < 2 ? 40 : 0) + (eel < 12 ? 30 : 0) + (rising ? 0 : 18) + rng() * 2;
+    const jit = rng() * 2;
+    const score = dawn ? Math.abs(el + 3) * 2 + (el > -.5 ? 40 : 0) + (eel < 12 ? 30 : 0) + (rising ? 0 : 60) + jit      // spectacle : juste avant l'aube
+      : Math.abs(el - 9) + (el < 2 ? 40 : 0) + (eel < 12 ? 30 : 0) + (rising ? 0 : 18) + jit;
     if (!best || score < best.score) best = { score, lat, lon };
+    if (dawn) { const sc2 = Math.abs(el - 3.5) * 2 + (el < .5 ? 40 : 0) + (eel < 12 ? 30 : 0) + (rising ? 60 : 0) + jit;   // ou juste avant le crépuscule
+      if (!bestSet || sc2 < bestSet.score) bestSet = { score: sc2, lat, lon }; }
   }
+  // Lune décroissante : l'aube est sur la face cachée ; on joue alors le crépuscule (le Soleil se couche au climax)
+  W.term = 'aube'; if (dawn && best.score > 16 && bestSet.score < best.score) { best = bestSet; W.term = 'crepuscule'; }
   W.lat = best.lat; W.lon = best.lon;
+  {   // instant du lever de Soleil sur le site (secondes lunaires après le départ)
+    const elAt = h => Astro.toLocal(Astro.siteBasis(Astro.sky(startMs + h * 3600e3).frame, W.lat, W.lon), Astro.sky(startMs + h * 3600e3).sun)[1];
+    let prev = elAt(0); W.tRise = 30 * 3600;
+    for (let hh = 1; hh <= 140; hh++) { const e = elAt(hh); if ((e >= 0) !== (prev >= 0)) { W.tRise = (hh - 1 + prev / (prev - e)) * 3600; break; } prev = e; }
+  }
   W.name = LAT_A[Math.floor(rng() * LAT_A.length)] + ' ' + LAT_B[Math.floor(rng() * LAT_B.length)];
   W.palette = PALETTES[Math.floor(rng() * PALETTES.length)];
+  { const h0 = rgb2hsv(W.palette.a)[0], sch = rng(), d = sch < .34 ? .08 : sch < .67 ? .42 : .333;   // analogue, complémentaire divisée, triade
+    W.harm = [h0, (h0 + d) % 1, (h0 + 1 - d) % 1]; }
   { const fams = FOLIAGE.slice(); W.flora = []; for (let k = 0; k < 5; k++) W.flora.push(fams.splice(Math.floor(rng() * fams.length), 1)[0]); }   // 5 familles de couleurs par monde
   W.sunDir = new THREE.Vector3(0, 1, 0); W.earthDir = new THREE.Vector3(0, 1, 0);
 
@@ -895,18 +956,38 @@ function buildWorld(seed, startMs) {
   const groundMat = new THREE.MeshStandardMaterial({ color: 0x8c8983, roughness: 1, metalness: 0 });
   groundMat.onBeforeCompile = sh => {
     addTerrainShadow(sh);
-    Object.assign(sh.uniforms, { uPP: PU.uPP, uPB: PU.uPB, uN: PU.uN, uBio: PU.uBio, uTime: PU.uTime });
+    Object.assign(sh.uniforms, { uPP: PU.uPP, uPB: PU.uPB, uN: PU.uN, uBio: PU.uBio, uTime: PU.uTime, uShock: PU.uShock, uShockCol: PU.uShockCol, uFoot: PU.uFoot, uFootN: PU.uFootN });
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWN;')
       .replace('#include <project_vertex>', '#include <project_vertex>\nvWN=normalize(mat3(modelMatrix)*objectNormal);');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
       varying vec3 vWN; uniform vec4 uPP[${MAXP}]; uniform vec4 uPB[${MAXP}]; uniform int uN; uniform float uBio, uTime;
-      ${GNOISE2}`)
+      uniform vec4 uShock[6]; uniform vec3 uShockCol; uniform vec4 uFoot[14]; uniform int uFootN;
+      ${GNOISE2}
+      float h12(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+      float mcr(vec2 q){                                   // micro-cratères (un par cellule de 2,4 m au plus, sans déborder)
+        vec2 c=floor(q/2.4); float h=h12(c); if(h<.5) return 0.;
+        vec2 ce=(c+.3+.4*vec2(h12(c+3.1),h12(c+7.7)))*2.4; float r=.1+.26*h12(c+1.3);
+        float d=length(q-ce)/r; return (d<1.?(d*d-1.)*.22:.07*exp(-(d-1.)*(d-1.)*7.))*r; }
+      float foot(vec2 q, out float tread){                 // traces de pas : semelles alternées le long d'un chemin
+        float m=0.; tread=0.;
+        for(int i=0;i<13;i++){ if(i>=uFootN-1) break; vec2 a=uFoot[i].xy, b=uFoot[i+1].xy, ab=b-a; float L=length(ab); if(L<.01) continue;
+          float t=clamp(dot(q-a,ab)/(L*L),0.,1.); vec2 pr=a+ab*t; vec2 dir=ab/L; float side=dot(q-pr,vec2(-dir.y,dir.x)); if(abs(side)>.45) continue;
+          float s=uFoot[i].z+t*L, k=floor(s/.72), u=s-(k+.5)*.72, fs=mod(k,2.)<1.?-1.:1., v=side-fs*.17;
+          float e=(u/.155)*(u/.155)+(v/.062)*(v/.062); float mk=1.-smoothstep(.65,1.,e);
+          if(mk>m){ m=mk; tread=step(.5,fract(u*26.)); } }
+        return m; }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
         float alb=mix(.7,1.16,fbm(vTWPos.xz*.012))*mix(.9,1.06,vn(vTWPos.xz*2.7));
+        float near=1.-smoothstep(25.,60.,length(vViewPosition));
+        float trd=0.; float fp=uFootN>1&&near>0.?foot(vTWPos.xz,trd):0.;
+        alb*=1.-fp*(.16+.14*trd);
         diffuseColor.rgb*=alb;`)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+        { float gl=step(.9982,h12(floor(vTWPos.xz*55.)))*(1.-smoothstep(3.,22.,length(vViewPosition)));   // billes de verre d'impact qui scintillent
+          roughnessFactor=mix(roughnessFactor,.06,gl); }`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         { float fade=1.-smoothstep(30.,110.,length(vViewPosition)); float e=.06;
-          #define HB(q) (vn((q)*.9)*.55+vn((q)*2.3)*.22+vn((q)*5.1)*.08)
+          #define HB(q) (vn((q)*.9)*.55+vn((q)*2.3)*.22+vn((q)*5.1)*.08+mcr(q))
           vec2 q=vTWPos.xz;
           float gx=(HB(q+vec2(e,0.))-HB(q-vec2(e,0.)))/(2.*e), gz=(HB(q+vec2(0.,e))-HB(q-vec2(0.,e)))/(2.*e);
           vec3 nw=normalize(normalize(vWN)-vec3(gx,0.,gz)*.55*fade);
@@ -918,6 +999,9 @@ function buildWorld(seed, startMs) {
           float v1=pow(1.-abs(vn(vTWPos.xz*.85+pp.xy)*2.-1.),12.);
           float v2=pow(1.-abs(vn(vTWPos.xz*2.6-pp.xy*1.7)*2.-1.),16.);
           bio+=uPB[i].rgb*(v1*.9+v2*.55)*fall*pp.w; }
+        for(int i=0;i<6;i++){ vec4 sk=uShock[i]; if(sk.z<0.||sk.z>4.5) continue;   // anneau de l'onde sismique
+          float d=length(vTWPos.xz-sk.xy), R=22.*sk.z, w=.45+sk.z*.55;
+          bio+=uShockCol*exp(-pow((d-R)/w,2.))*sk.w*exp(-sk.z*1.2)*1.05; }
         totalEmissiveRadiance=bio*min(uBio,1.6)*.55;`);
   };
   const ground = new THREE.Mesh(geo, groundMat);
@@ -946,6 +1030,36 @@ function buildWorld(seed, startMs) {
   rocks.castShadow = true; rocks.receiveShadow = true;
   W.group.add(rocks);
 
+  // --- Cailloux autour du jardin : du grain pour les gros plans
+  { const NP = 1600, peb = new THREE.InstancedMesh(rockGeo, rockMat, NP);
+    for (let i = 0; i < NP; i++) {
+      const a = rng() * 6.283, r = 3 + Math.sqrt(rng()) * 62, x = Math.cos(a) * r, z = Math.sin(a) * r, s = .015 + Math.pow(rng(), 3) * .16;
+      e.set(rng() * 6.28, rng() * 6.28, rng() * 6.28); q.setFromEuler(e);
+      m4.compose(new THREE.Vector3(x, h(x, z) - s * .3, z), q, new THREE.Vector3(s * (.8 + rng() * .5), s * (.6 + rng() * .5), s * (.8 + rng() * .5))); peb.setMatrixAt(i, m4);
+    }
+    peb.castShadow = true; peb.receiveShadow = true; W.group.add(peb); }
+
+  // --- Échelle humaine : un vieil étage de descente d'alunisseur, et les pas de ceux qui en sont descendus
+  { const az = rng() * 6.283, R0 = 64 + rng() * 10, lx = Math.cos(az) * R0, lz = Math.sin(az) * R0, gy = h(lx, lz);
+    const LM = new THREE.Group(); LM.position.set(lx, gy, lz); LM.rotation.set((rng() - .5) * .06, rng() * 6.28, (rng() - .5) * .06);
+    const foil = new THREE.MeshStandardMaterial({ color: 0xc8a050, metalness: .95, roughness: .38 }), dark = new THREE.MeshStandardMaterial({ color: 0x1b1a1a, metalness: .3, roughness: .7 }), alu = new THREE.MeshStandardMaterial({ color: 0x9a9a98, metalness: .8, roughness: .35 });
+    foil.onBeforeCompile = sh => { addTerrainShadow(sh); sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n normal=normalize(normal+.18*vec3(sin(vTWPos.x*41.+vTWPos.y*23.),sin(vTWPos.y*37.+vTWPos.z*19.),0.));'); };
+    const add = (g, m, x, y, z, ry = 0) => { const o = new THREE.Mesh(g, m); o.position.set(x, y, z); o.rotation.y = ry; o.castShadow = o.receiveShadow = true; LM.add(o); return o; };
+    add(new THREE.CylinderGeometry(2.1, 2.1, 1.65, 8), foil, 0, 2.25, 0, Math.PI / 8);
+    for (let k = 0; k < 4; k++) add(new THREE.BoxGeometry(1.3, 1.2, .05), dark, Math.cos(k * Math.PI / 2) * 2.0, 2.3, Math.sin(k * Math.PI / 2) * 2.0, -k * Math.PI / 2 + Math.PI / 2);
+    add(new THREE.CylinderGeometry(.35, .78, 1.1, 24, 1, true), dark, 0, .95, 0);
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI / 2 + Math.PI / 4, fx = Math.cos(a) * 4.4, fz = Math.sin(a) * 4.4, tx = Math.cos(a) * 1.9, tz = Math.sin(a) * 1.9;
+      const strut = (x0, y0, z0, x1, y1, z1, r) => { const A = new THREE.Vector3(x0, y0, z0), B = new THREE.Vector3(x1, y1, z1), L = A.distanceTo(B); const o = add(new THREE.CylinderGeometry(r, r, L, 10), alu, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); o.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), B.sub(A).normalize()); };
+      strut(tx, 2.9, tz, fx, .25, fz, .09); strut(tx * .8, 1.5, tz * .8, fx * .78, .65, fz * .78, .05);
+      add(new THREE.CylinderGeometry(.47, .42, .12, 20), alu, fx, .06, fz);
+    }
+    W.group.add(LM); W.lander = { x: lx, z: lz };
+    // chemin de pas : de l'échelle de l'alunisseur jusqu'au bord du jardin, puis un retour qui flâne
+    const pts = [], dir = Math.atan2(-lz, -lx); let x = lx + Math.cos(dir) * 4.6, z = lz + Math.sin(dir) * 4.6, a = dir, L = 0;
+    for (let i = 0; i < 14; i++) { pts.push(new THREE.Vector4(x, z, L, 0)); const st = 3.2 + rng() * 2.2; a += (rng() - .5) * .55 + (i > 8 ? .35 : 0); const nx = x + Math.cos(a) * st, nz = z + Math.sin(a) * st; if (Math.hypot(nx, nz) < 16) a += 1.2; L += Math.hypot(nx - x, nz - z); x = nx; z = nz; }
+    W.foot = pts; }
+
   // --- Lumières : Soleil (le seul vrai éclairage), lumière cendrée de la Terre, rebond du régolithe
   W.sun = new THREE.DirectionalLight(0xfff8f0, 11);
   W.sun.castShadow = true; const shq = QUALITY[S.quality].shadow; W.sun.shadow.mapSize.set(shq, shq);
@@ -953,7 +1067,7 @@ function buildWorld(seed, startMs) {
   W.sun.shadow.bias = -.0012; W.sun.shadow.normalBias = .18;
   W.group.add(W.sun, W.sun.target);
   W.earthshine = new THREE.DirectionalLight(0x9fbaff, .1); W.group.add(W.earthshine);
-  W.bounce = new THREE.HemisphereLight(0x000000, 0x4a4743, .55); W.group.add(W.bounce);
+  W.bounce = new THREE.HemisphereLight(0x000000, 0x4a4743, .32); W.group.add(W.bounce);
 
   // Lueur d'horizon (poussière en lévitation électrostatique, observée par Surveyor au crépuscule)
   W.lhgMat = new THREE.ShaderMaterial({
@@ -1096,7 +1210,19 @@ const VAR_DEF = [
   ['corolle', 'Corolles tournesols d’aluminium', 'Al', .35, .6, .5, { tw: 2, hue: .6 }],
   ['corolle', 'Corolles de chrome', 'Cr', .3, -.1, .8, { hue: 3.2, orn: 'couronne' }],
 ];
-const VARIETIES = VAR_DEF.map(([fam, nom, chem, b, r, p, m], id) => ({ id, fam, nom, chem, b, r, p, m }));
+// silhouettes plus typées : on accentue l'écart de chaque variété à la forme de sa famille
+const amp = m => { const o = Object.assign({}, m); for (const k of ['S', 'H', 'sp']) if (o[k] != null) o[k] = Math.max(.3, 1 + (o[k] - 1) * 1.35); for (const k of ['tw', 'dr', 'ln']) if (o[k] != null) o[k] *= 1.3; return o; };
+const VARIETIES = VAR_DEF.map(([fam, nom, chem, b, r, p, m], id) => ({ id, fam, nom, chem, b, r, p, m: amp(m) }));
+function rgb2hsv(c) { const [r, g, b] = c, mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0;
+  if (d > 1e-6) h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h / 6, mx > 0 ? d / mx : 0, mx]; }
+function hsv2rgb([h, s, v]) { const i = Math.floor(h * 6), f = h * 6 - i, p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+  return [[v, t, p], [q, v, p], [p, v, t], [p, q, v], [t, p, v], [v, p, q]][((i % 6) + 6) % 6]; }
+// harmonie de l'œuvre : chaque teinte glisse vers la plus proche des trois teintes de la composition
+function harmonize(c, harm, k) {
+  if (!harm) return c; const hsv = rgb2hsv(c); if (hsv[1] < .12) return c;
+  let best = harm[0], bd = 9; for (const h of harm) { let d = h - hsv[0]; d -= Math.round(d); if (Math.abs(d) < Math.abs(bd)) { bd = d; best = h; } }
+  hsv[0] = (hsv[0] + bd * k + 1) % 1; return hsv2rgb(hsv); }
 const GASES = [{ g: [.72, .5, 1], b: [.8, .62, 1] }, { g: [1, .62, .12], b: [1, .72, .3] }, { g: [1, .35, .12], b: [1, .5, .3] }, { g: [.62, .3, 1], b: [.75, .5, 1] },
   { g: [1, .3, .62], b: [1, .5, .75] }, { g: [1, .9, .72], b: [1, .95, .85] }, { g: [.35, .75, 1], b: [.6, .88, 1] }];
 const hueRot = (c, a) => {   // rotation de teinte (espace YIQ), luminance conservée
@@ -1217,10 +1343,11 @@ const GEMS = makeInstanced(LOD.haute.gem, 6000, [['iC', 3], ['iD', 4], ['iS', 4]
 const FLORA_SETS = [TUBES, PEARLS, CRYST, GEMS];
 
 const FLORA_COMMON = `
-  uniform vec4 uPA[${MAXP}]; uniform vec4 uPB[${MAXP}]; uniform vec4 uPC[${MAXP}]; uniform float uTime; uniform float uBio; uniform float uDay; uniform vec3 uSunL;
+  uniform vec4 uPA[${MAXP}]; uniform vec4 uPB[${MAXP}]; uniform vec4 uPC[${MAXP}]; uniform vec4 uPQ[${MAXP}]; uniform float uTime; uniform float uBio; uniform float uDay; uniform vec3 uSunL;
   attribute vec3 iCol, iCol2, iMat;
   vec3 segPos; vec3 segN; float segT; float segF; float segH; int segI;
   vec3 rotAB(vec3 v, vec3 a, vec3 b){ vec3 k=cross(a,b); float s=length(k), c=dot(a,b); if(s<1e-5) return v; k/=s; return v*c+cross(k,v)*s+k*dot(k,v)*(1.-c); }
+  vec3 quakeOf(vec3 p){ vec4 q=uPQ[segI]; float k=clamp((p.y-q.w)/5.,0.,1.5); return q.xyz*k*k; }   // la plante vibre depuis le sol
   vec3 sunTarget(){ return normalize(vec3(uSunL.x,max(uSunL.y,.1),uSunL.z)); }
   void frameOf(vec3 t, out vec3 X, out vec3 Z){ vec3 ref=abs(dot(t,vec3(.53,0.,.848)))>.97?vec3(0.,1.,0.):vec3(.53,0.,.848); X=normalize(cross(ref,t)); Z=cross(t,X); }`;
 const TUBE_GLSL = FLORA_COMMON + `
@@ -1294,11 +1421,11 @@ function floraMaterial(key, glsl, emisPre, phys, rim) {
   const m = new THREE.MeshPhysicalMaterial(Object.assign({ color: 0xffffff, roughness: .3, metalness: 0, envMapIntensity: 1 }, phys));
   m.customProgramCacheKey = () => 'flora-' + key;
   m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, { uPA: PU.uPA, uPB: PU.uPB, uPC: PU.uPC, uTime: PU.uTime, uBio: PU.uBio, uDay: PU.uDay });
+    Object.assign(sh.uniforms, { uPA: PU.uPA, uPB: PU.uPB, uPC: PU.uPC, uPQ: PU.uPQ, uTime: PU.uTime, uBio: PU.uBio, uDay: PU.uDay });
     addTerrainShadow(sh);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + glsl + '\nvarying vec3 vCol; varying vec2 vMat; varying vec3 vEmis; varying vec3 vRim;')
       .replace('#include <beginnormal_vertex>', 'floraCompute(position,normal); vec3 objectNormal=segN;')
-      .replace('#include <begin_vertex>', 'vec3 transformed=segPos;')
+      .replace('#include <begin_vertex>', 'vec3 transformed=segPos+quakeOf(segPos);')
       .replace('#include <fog_vertex>', `#include <fog_vertex>
         ${emisPre}
         vec3 base=mix(iCol,iCol2,clamp(cmix,0.,1.));
@@ -1324,9 +1451,9 @@ function floraDepth(key, glsl) {
   const m = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
   m.customProgramCacheKey = () => 'flora-depth-' + key;
   m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, { uPA: PU.uPA, uPB: PU.uPB, uPC: PU.uPC, uTime: PU.uTime, uBio: PU.uBio, uDay: PU.uDay, uSunL: PU.uSunL });
+    Object.assign(sh.uniforms, { uPA: PU.uPA, uPB: PU.uPB, uPC: PU.uPC, uPQ: PU.uPQ, uTime: PU.uTime, uBio: PU.uBio, uDay: PU.uDay, uSunL: PU.uSunL });
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + glsl)
-      .replace('#include <begin_vertex>', 'floraCompute(position,normal); vec3 transformed=segPos;');
+      .replace('#include <begin_vertex>', 'floraCompute(position,normal); vec3 transformed=segPos+quakeOf(segPos);');
   };
   return m;
 }
@@ -1689,12 +1816,13 @@ function genPlant(pl, rng, sunDir, W) {
     for (const s of J) { const c = V(s[0], s[1], s[2]), e = dirT(c, V(s[3], s[4], s[5]), .2); s[0] = e.a.x; s[1] = e.a.y; s[2] = e.a.z; e.d.normalize(); s[3] = e.d.x; s[4] = e.d.y; s[5] = e.d.z; s[7] *= D.S; s[8] *= D.S * Math.sqrt(D.H); s[9] *= D.S; }
   }
   // teinte et lueur propres à la variété
-  const mm = new Map(), remat = m => { if (!mm.has(m)) mm.set(m, { col: hueRot(m.col, D.hue), col2: hueRot(m.col2, D.hue), rough: m.rough, metal: m.metal, trans: m.trans }); return mm.get(m); };
-  for (const s of T) { s[14] *= D.gl; if (D.hue) { s[18] = hueRot(s[18], D.hue); s[19] = hueRot(s[19], D.hue); } }
-  for (const s of P) { s[12] *= D.gl; if (D.hue) s[16] = remat(s[16]); }
-  for (const s of K) { s[8] *= D.gl; if (D.hue) s[12] = remat(s[12]); }
-  for (const s of J) { s[10] *= D.gl; if (D.hue) s[13] = remat(s[13]); }
-  if (D.hue) pl.col = hueRot(pl.col, D.hue);
+  const HK = .42, tint = (c, metal) => metal > .5 ? c : harmonize(hueRot(c, D.hue), W.harm, HK);
+  const mm = new Map(), remat = m => { if (!mm.has(m)) mm.set(m, { col: tint(m.col, m.metal), col2: tint(m.col2, m.metal), rough: m.rough, metal: m.metal, trans: m.trans }); return mm.get(m); };
+  for (const s of T) { s[14] *= D.gl; s[18] = tint(s[18], s[20][1]); s[19] = tint(s[19], s[20][1]); }
+  for (const s of P) { s[12] *= D.gl; s[16] = remat(s[16]); }
+  for (const s of K) { s[8] *= D.gl; s[12] = remat(s[12]); }
+  for (const s of J) { s[10] *= D.gl; s[13] = remat(s[13]); }
+  pl.col = tint(pl.col, 0);
   // hauteur et rayon de la couronne (pour les plans de canopée)
   top = 0; let crown = 0;
   const seeP = (x, y, z) => { top = Math.max(top, y - pl.y); };
@@ -1706,6 +1834,7 @@ function genPlant(pl, rng, sunDir, W) {
 function writePlant(G, idx) {
   if (TUBES.n + G.T.length > TUBES.cap || PEARLS.n + G.P.length > PEARLS.cap || CRYST.n + G.K.length > CRYST.cap || GEMS.n + G.J.length > GEMS.cap) return false;
   const cols = (A, i, c0, c1, m) => { A.iCol.array.set(c0, i * 3); A.iCol2.array.set(c1, i * 3); A.iMat.array.set(m, i * 3); };
+  const N0 = FLORA_SETS.map(I => I.n);
   for (const s of G.T) {
     const i = TUBES.n++, A = TUBES.A;
     A.iP0.array.set(s.slice(0, 3), i * 3); A.iP1.array.set(s.slice(3, 6), i * 3); A.iT0.array.set(s.slice(6, 9), i * 3); A.iT1.array.set(s.slice(9, 12), i * 3);
@@ -1728,7 +1857,8 @@ function writePlant(G, idx) {
     A.iC.array.set(s.slice(0, 3), i * 3); A.iD.array.set([s[3], s[4], s[5], s[6]], i * 4); A.iS.array.set([s[7], s[8], s[9], s[10]], i * 4);
     A.iTime.array.set([s[11], s[12], idx, 0], i * 4); cols(A, i, m.col, m.col2, [m.rough, m.metal, m.trans]);
   }
-  for (const I of FLORA_SETS) { for (const k in I.A) I.A[k].needsUpdate = true; I.g.instanceCount = I.n; }
+  // envoi partiel : seules les nouvelles instances partent vers la carte graphique (plus d'à-coups quand le jardin grandit)
+  FLORA_SETS.forEach((I, j) => { const n0 = N0[j]; if (I.n > n0) for (const k in I.A) { const at = I.A[k]; at.addUpdateRange(n0 * at.itemSize, (I.n - n0) * at.itemSize); at.needsUpdate = true; } I.g.instanceCount = I.n; });
   return true;
 }
 function resetFlora() { for (const I of FLORA_SETS) { I.n = 0; I.g.instanceCount = 0; } PU.uN.value = 0; }
@@ -1776,22 +1906,42 @@ class Sim {
     // lecture musicale : registre (graves/aigus), dynamique (crescendo/decrescendo), densité rythmique ; phrases et bosquets
     this.mu = { vM: 0, vP: 0, dv: 0, vL: 0, vLL: 0, tilt: 0, tiltAvg: 0, ons: 0, b: .5, r: 0, p: 0, e: 0 };
     this.phrase = { id: 0, t0: 0, s: [.5, .5, 0], off: 0, fam: null, cx: 0, cz: 0 }; this.groves = [[0, 0]];
- this.lastSpawn = -99; this.shot = null; this.full = false;
+ this.lastSpawn = -99; this.shot = null; this.prevShot = null; this.full = false;
+    this.shocks = []; this.stillK = 0; this.dawn = !!W.dawn; this.D = 0; this.stage = 0; this.shotPhrase = 0; this.finaleT0 = 0; this.finaleLock = false; this.pubN = 0;
     resetFlora(); resetDust();
     this.cut(this.intro ? 'arrivee' : 'large');
   }
   skyMs() { return this.W.startMs + this.lunarT * 1000; }
   step(fr) {
     this.t += DT; this.tick++;
-    const [bass, mid, high, vol, cent, flag] = fr, f = this.f, onset = flag === 1 || flag === 3, silent = flag >= 2;
+    const [bass, mid, high, vol, cent, flag] = fr, f = this.f, fl = Math.round(flag), onset = !!(fl & 1), silent = !!(fl & 2);
+    const pub = !!(fl & 4), forcedShot = (fl >> 3) & 15, forcedEnd = !!(fl & 128);   // graines du public, plans et final commandés par le musicien
     const sm = (k, x) => { f[k] += (x - f[k]) * (x > f[k] ? .55 : .14); };
     sm('bass', bass); sm('mid', mid); sm('high', high); sm('vol', vol); sm('cent', cent);
     this.listen(onset);
     // le temps lunaire s'écoule : lentement au repos, à toute allure quand la musique s'emporte
     if (onset) this.beatEnv = 1; this.beatEnv *= Math.exp(-DT * 2.2);
-    this.rate = TIME_BASE * this.tscale * (1 + 30 * f.vol * f.vol + 14 * this.beatEnv + 6 * f.bass * f.bass);   // ~×15 sur une musique moyenne : un jour lunaire complet en 4-5 min
-    this.lunarT += DT * this.rate;
-    const t = this.t, n = this.plants.length;
+    const t = this.t, n = this.plants.length, m = this.mu;
+    this.stillK += ((silent ? 1 : 0) - this.stillK) * (1 - Math.exp(-DT / .6));        // le silence fige le jardin
+    if (this.dawn) {
+      // dramaturgie de la lumière : on arrive de nuit, sous la lumière cendrée ; l'aube approche avec l'énergie
+      // de la musique et le Soleil se lève au moment du climax (ou, à défaut, pendant le final)
+      let dD = 0;
+      if (this.introDone) {
+        if (this.D < 1) {
+          dD = .0055 * (.3 + 1.4 * m.e) * (1 - this.stillK);
+          const climax = m.r > .28 && m.vL > .42 && m.vL > m.vLL * 1.18 && t > this.introDoneAt + 35;
+          if (climax || this.finale) dD = Math.max(dD, .06);
+          if (this.D > .96 && dD < .01) dD = 0;                                         // l'aube attend son climax
+        } else dD = this.D < 3 ? .065 : .004 * (1 - this.stillK);
+      }
+      this.D = Math.min(8, this.D + dD * DT);
+      const L = this.W.tRise * this.D * this.tscale;
+      this.rate = (L - this.lunarT) / DT; this.lunarT = L;
+    } else {
+      this.rate = TIME_BASE * this.tscale * (1 + 30 * f.vol * f.vol + 14 * this.beatEnv + 6 * f.bass * f.bass);   // cycle complet : ~×15 sur une musique moyenne
+      this.lunarT += DT * this.rate;
+    }
     this.kick = onset ? 1 : this.kick * Math.exp(-DT * 6);
     if (!this.introDone) {               // ouverture : le voyage avance au rythme de la musique
       this.introTvPrev = this.introTv;
@@ -1805,23 +1955,38 @@ class Sim {
     for (const p of this.plants) {
       const bk = SPECIES[p.sp].band, band = bk === 'cent' ? (f.mid + f.cent) * .5 : f[bk];
       const young = t - p.born < 25 ? 1 : .3;
-      p.growth = Math.min(1, p.growth + DT / SPECIES[p.sp].dur * (.18 + 1.7 * band) * (1 + 1.4 * cre * young));
-      p.glow += (band * (1 + .5 * this.mu.r) - p.glow) * .12;
+      if (p.delay && t < p.born + p.delay) continue;                                     // graine du public encore en chute
+      p.growth = Math.min(1, p.growth + DT / SPECIES[p.sp].dur * (.18 + 1.7 * band) * (1 + 1.4 * cre * young) * (1 - this.stillK));
+      p.glow += (band * (1 + .5 * this.mu.r) * (1 - .8 * this.stillK) - p.glow) * .12;
       p.pulse *= Math.exp(-DT * 1.6);
     }
     if (onset) {
       const dom = bass >= mid && bass >= high ? 'bass' : mid >= high ? 'mid' : 'high';
       for (const p of this.plants) if (SPECIES[p.sp].band === dom || this.rL() < .25) p.pulse = 1;
-      if (n && bass > .3) { const p = this.plants[Math.floor(this.rD() * n)]; emitDust(this.rD, p.x, p.z, Math.floor(40 + bass * 180), t, this.W.h); }
+      if (n && bass > .3 && vol > .1 && (t - (this.lastShock || -9) > 1.6 || bass > .75)) {          // onde sismique : la frappe part d'un point du jardin et traverse toute la flore
+        const p = this.plants[Math.max(0, n - 1 - Math.floor(this.rD() * Math.min(n, 12)))];
+        this.shocks.push({ x: p.x, z: p.z, t0: t, a: clamp(bass * (.4 + vol) * 1.3, .12, 1) }); if (this.shocks.length > 6) this.shocks.shift(); this.lastShock = t;
+        emitDust(this.rD, p.x, p.z, Math.floor(40 + bass * 180), t, this.W.h);
+      }
     }
+    for (const p of this.plants) if (p.delay && !p.landed && t >= p.born + p.delay) { p.landed = true; emitDust(this.rD, p.x, p.z, 220, t, this.W.h); this.shocks.push({ x: p.x, z: p.z, t0: t, a: .7 }); if (this.shocks.length > 6) this.shocks.shift(); }
+    if (pub && seedOpen && !this.full && n < MAXP) this.spawnPublic();
     if (this.intro) {                     // final : à 3 min 30, ou dès 3 s de silence ; annulé si la musique reprend avant 3 min 30
       this.silentT = silent ? this.silentT + DT : 0; this.loudT = silent ? 0 : this.loudT + DT;
-      if (!this.finale && t > this.introEnd && (t >= FINALE_T || this.silentT > 3)) { this.finale = true; this.cut('finale'); }
-      else if (this.finale && t < FINALE_T && this.loudT > 2) { this.finale = false; this.cut(); }
+      if (forcedEnd && !this.finale && t > this.introEnd) { this.finale = true; this.finaleLock = true; this.finaleT0 = t; this.cut('finale'); }
+      if (!this.finale && t > this.introEnd && (t >= FINALE_T || this.silentT > 3)) { this.finale = true; this.finaleT0 = t; this.cut('finale'); }
+      else if (this.finale && !this.finaleLock && t < FINALE_T && this.loudT > 2) { this.finale = false; this.cut('etab'); }
     }
-    if (this.intro && this.shot.type === 'arrivee' && t > this.introEnd) this.cut();
+    if (this.intro && this.shot.type === 'arrivee' && t > this.introEnd) this.cut('etab');
+    // montage musical : plans longs, coupes sur les débuts de phrase et sur les frappes ; fondus enchaînés quand la musique est liée
     const free = !this.finale && t > this.introEnd;
-    if (free && ((onset && t - this.shot.t0 > 7) || t - this.shot.t0 > 15)) this.cut();
+    if (free) {
+      const L = t - this.shot.t0, Lmin = 9 - 3 * m.e, Lmax = 24 - 8 * m.e;
+      if (forcedShot) this.cut(SHOT_KEYS[forcedShot - 1], null, false, true);
+      else if (this.phrase.id !== this.shotPhrase && L > 3) this.cut('etab', null, !onset);
+      else if (L > Lmin && onset && (bass > .45 || f.vol > .55)) this.cut();
+      else if (L > Lmax) this.cut(null, null, true);
+    }
   }
   listen(onset) {
     const m = this.mu, f = this.f, k = x => 1 - Math.exp(-DT / x);
@@ -1864,12 +2029,14 @@ class Sim {
     const m = this.mu;
     return { H: clamp(1 + .42 * m.r + .15 * (m.e - .4), .7, 1.5), dr: Math.max(-m.r, 0) * .35, tw: (m.p - .5) * .5, S: .85 + .3 * m.b, rd: .8 + .4 * m.b, gl: .75 + .6 * this.f.cent };
   }
-  spawn(bass, mid, high, cent) {
+  spawnPublic() { this.spawn(this.f.bass, this.f.mid, this.f.high, this.f.cent, true); }
+  spawn(bass, mid, high, cent, pub) {
     const r = this.rL, W = this.W;
     const v = this.pickVariety(f => f !== 'mycelium'), sp = v.fam, P = this.phrase;
     if (!P.fam) P.fam = sp;
     let px, pz;
-    if (!this.plants.length) { px = (r() - .5) * 4; pz = (r() - .5) * 4; }
+    if (pub) { const a = r() * 6.283, d = 5 + r() * 16, c = this.shot && this.plants.length ? [this.shot.cx, this.shot.cz] : [0, 0]; px = c[0] + Math.cos(a) * d; pz = c[1] + Math.sin(a) * d; }
+    else if (!this.plants.length) { px = (r() - .5) * 4; pz = (r() - .5) * 4; }
     else if (r() < .72) {                       // dans le bosquet de la phrase en cours, en gardant de l'espace
       let bd = -1; for (let i = 0; i < 6; i++) { const a = r() * 6.283, d = 2.5 + Math.sqrt(r()) * 11, x = P.cx + Math.cos(a) * d, z = P.cz + Math.sin(a) * d; let md = 1e9; for (const q of this.plants) md = Math.min(md, Math.hypot(q.x - x, q.z - z) - SPECIES[q.sp].r * .5); if (md > bd) { bd = md; px = x; pz = z; } }
     }
@@ -1885,9 +2052,10 @@ class Sim {
     const G = genPlant(pl, mulberry32(Math.floor(r() * 4294967296)), sun0, W);
     if (!writePlant(G, idx)) { this.full = true; return; }
     pl.height = Math.max(1, G.height); pl.crown = G.crown;
-    this.plants.push(pl); this.lastSpawn = this.t;
+    if (pub) { pl.delay = 1.8; pl.public = true; this.pubN++; this.lastPublic = pl; }
+    this.plants.push(pl); if (!pub) this.lastSpawn = this.t;
     if (idx === 0 && !this.intro) this.cut('ras', pl);
-    if (r() < .2 + .3 * Math.max(-this.mu.r, 0) && this.plants.length < MAXP - 12) this.spawnRhizome(pl);
+    if (!pub && r() < .2 + .3 * Math.max(-this.mu.r, 0) && this.plants.length < MAXP - 12) this.spawnRhizome(pl);
   }
   // Rhizome énergétique : un flux de gaz piégés court sous le régolithe d'une plante à sa voisine, des champignons y percent
   spawnRhizome(a) {
@@ -1901,22 +2069,34 @@ class Sim {
     if (!writePlant(G, idx)) { this.full = true; return; }
     pl.height = Math.max(.6, G.height); this.plants.push(pl);
   }
-  cut(force, plant) {
+  cut(force, plant, soft, manual) {
     const r = this.rC, n = this.plants.length, prev = this.shot && this.shot.type;
     let type = force;
     const tall = this.plants.filter(p => p.height * p.growth > 4 && p.crown > 1.2 && p.sp !== 'mycelium' && p.sp !== 'filament');
-    if (!type) { const types = n ? ['large', 'ras', 'grue', 'contre', 'terre', 'ras', 'ciel', 'plongee', ...(n >= 6 ? ['plongee', 'plongee'] : []), ...(tall.length ? ['cime', 'cime', 'canopee'] : []), ...(tall.length >= 3 ? ['canopee', 'cime'] : [])] : ['large', 'terre', 'ciel']; do { type = types[Math.floor(r() * types.length)]; } while (type === prev && n); }
+    if (type === 'etab') { this.stage = 0; type = null; }
+    if (!type) {   // grammaire : plan d'ensemble → détail → révélation → détail → révélation…
+      const T3 = !n ? [['large', 'ciel', 'terre']] : [
+        ['large', 'plongee', 'contre', 'large', ...(tall.length ? ['canopee', 'canopee'] : [])],
+        ['ras', 'ras', 'terre', ...(tall.length ? ['cime', 'cime', 'cime'] : [])],
+        ['grue', 'ciel', 'contre', n >= 6 ? 'plongee' : 'grue', ...(tall.length ? ['canopee'] : [])]];
+      const types = T3[n ? this.stage : 0];
+      do { type = types[Math.floor(r() * types.length)]; } while (type === prev && types.length > 1);
+      this.stage = this.stage === 0 ? 1 : this.stage === 1 ? 2 : 1;
+    }
+    if (!n && !['large', 'ciel', 'terre', 'finale', 'arrivee'].includes(type)) type = 'large';
+    this.shotPhrase = this.phrase.id;
+    if (this.shot && !manual && soft && type !== 'finale') { this.prevShot = this.shot; } else this.prevShot = null;
     let cx = 0, cz = 0; if (n) { for (const p of this.plants) { cx += p.x; cz += p.z; } cx /= n; cz /= n; }
     const pl = plant || ((type === 'cime' || type === 'canopee') && tall.length ? tall[Math.floor(r() * tall.length)] : n ? this.plants[Math.floor(r() * n)] : null);
     let ext = 12; for (const p of this.plants) ext = Math.max(ext, Math.hypot(p.x - cx, p.z - cz) + p.height * .5);   // étendue de l'œuvre
-    this.shot = { type, t0: this.t, a: r(), b: r(), c: r(), pl: pl ? pl.idx : -1, cx, cz, ext };
+    this.shot = { type, t0: this.t, a: r(), b: r(), c: r(), pl: pl ? pl.idx : -1, cx, cz, ext, blend: this.prevShot ? 2.6 : 0 };
   }
 }
 
 /* ---- Le réalisateur ---- */
 const _v = new THREE.Vector3(), _t = new THREE.Vector3();
-function shotCamera(sim, T, out) {
-  const W = sim.W, s = sim.shot, h = W.h, el = T - s.t0;
+function shotCamera(sim, T, out, shot) {
+  const W = sim.W, s = shot || sim.shot, h = W.h, el = T - s.t0;
   const P = s.pl >= 0 ? sim.plants[s.pl] : null;
   const H = P ? Math.max(1.5, P.height * Math.max(P.growth, .25)) : 3;
   const C = P ? _t.set(P.x, P.y, P.z) : _t.set(s.cx, h(s.cx, s.cz), s.cz);
@@ -1949,7 +2129,7 @@ function shotCamera(sim, T, out) {
     pos.set(gc.x + Math.cos(az) * R, 0, gc.z + Math.sin(az) * R); pos.y = h(pos.x, pos.z) + alt;
     tgt.copy(gc).add(_v.set(0, 1, 0)); fov = 38;
   } else if (s.type === 'finale') {           // final : dézoom lent jusqu'à révéler l'œuvre entière dans son cratère
-    const E = Math.max(22, s.ext), e = 1 - Math.exp(-el / 24), az = s.b * 6.283 + el * .011;
+    const E = Math.max(22, s.ext), e = 1 - Math.exp(-el / 7), az = s.b * 6.283 + el * .016;
     const R = E * .9 + (E * 3 + 60) * e, alt = 10 + (E * 2.4 + 70) * (e * e * .55 + e * .45);
     pos.set(gc.x + Math.cos(az) * R, 0, gc.z + Math.sin(az) * R); pos.y = h(pos.x, pos.z) + alt;
     tgt.copy(gc).add(_v.set(0, 1.5, 0)); fov = 36;
@@ -1991,11 +2171,11 @@ function shotCamera(sim, T, out) {
    ===================================================================== */
 let mode = 'intro', sim = null, frames = [], recFrames = null, replayEl = null, liveT0 = 0, idleAcc = 0, current = null, videoRec = null, videoChunks = [];
 const ZERO = [0, 0, 0, 0, 0, 0], SILENT = [0, 0, 0, 0, 0, 2];
-function startWorld(seed, startMs, intro) { world = buildWorld(seed, startMs); sim = new Sim(seed, world, intro); sim.tscale = S.tscale; CEL = celestial(world, sim.skyMs()); }
+function startWorld(seed, startMs, intro, dawn) { world = buildWorld(seed, startMs, dawn); sim = new Sim(seed, world, intro); sim.tscale = S.tscale; CEL = celestial(world, sim.skyMs()); }
 
 async function startLive(kind, file) {
   const seed = (crypto.getRandomValues(new Uint32Array(1))[0]) >>> 0;
-  startWorld(seed, Date.now(), true); frames = [];
+  startWorld(seed, Date.now(), true, !S.cycle); frames = [];
   if (kind === 'mic') await AE.useMic(); else if (kind === 'phone') await AE.useRemote(PH.stream); else await AE.useFile(file);
   liveT0 = AE.ctx.currentTime; AE.silentFor = 0; AE.heard = 0; AE.silStart = null; AE.lastNow = 0;
   if (AE.el) AE.el.onended = () => { if (mode === 'live') finishLive(true); };
@@ -2012,7 +2192,7 @@ async function finishLive(save) {
   const thumb = await new Promise(res => wantThumb = res);
   const rec = {
     id: Date.now().toString(36) + '-' + sim.W.seed.toString(36), name: sim.W.name, date: new Date().toISOString(), seed: sim.W.seed, startUTC: sim.W.startMs,
-    tscale: sim.tscale, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), varieties: new Set(sim.plants.map(p => p.var)).size, frames: new Float32Array(frames), audio, thumb,
+    tscale: sim.tscale, dawn: sim.dawn, publicSeeds: sim.pubN, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), varieties: new Set(sim.plants.map(p => p.var)).size, frames: new Float32Array(frames), audio, thumb,
   };
   try { await DB.put(rec); } catch (e) { memStore.set(rec.id, rec); }
   showEpilogue(rec);
@@ -2022,7 +2202,7 @@ const speciesLine = c => Object.keys(SPECIES).filter(k => c[k]).map(k => c[k] + 
 
 async function startReplay(rec, exportVideo) {
   closeGallery(); AE.ensure(); AE.stop();
-  startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true); sim.tscale = rec.tscale || 1;
+  startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1;
   recFrames = rec.frames; current = rec; replayEl = null;
   if (rec.audio) {
     const el = new window.Audio(URL.createObjectURL(rec.audio)); replayEl = el;
@@ -2088,7 +2268,7 @@ async function importJSON(file) {
    9. INTERFACE
    ===================================================================== */
 const $ = id => document.getElementById(id);
-const S = { sens: 1.2, tscale: 1, bio: 1, dof: .4, grain: .05, scope: true, autocam: true, annot: false, quality: 'haute', silenceDb: -50, autostop: true };
+const S = { sens: 1.2, tscale: 1, bio: 1, dof: .4, grain: .05, scope: true, autocam: true, annot: false, quality: 'haute', silenceDb: -50, autostop: true, cycle: false, stage: false, output: 'cinema', adaptive: true };
 const step01 = x => x >= 0 ? 1 : 0;
 const bind = (id, key, out, f = v => v.toFixed(2)) => $(id).addEventListener('input', e => { S[key] = parseFloat(e.target.value); $(out).textContent = f(S[key]); });
 bind('sens', 'sens', 'oSens'); bind('bio', 'bio', 'oBio'); bind('dof', 'dof', 'oDof'); bind('grain', 'grain', 'oGrain', v => v.toFixed(3)); bind('tscale', 'tscale', 'oTime');
@@ -2104,7 +2284,42 @@ function applyQuality(qk) {
   if (world) { const sh = world.sun.shadow; sh.mapSize.set(q.shadow, q.shadow); if (sh.map) { sh.map.dispose(); sh.map = null; } }
   try { localStorage.setItem('selene-qualite', qk); } catch (e) {}
 }
-$('quality').addEventListener('change', e => applyQuality(e.target.value));
+$('quality').addEventListener('change', e => { applyQuality(e.target.value); if (S.output === 'dome') setOutput('dome'); });
+$('output').addEventListener('change', e => setOutput(e.target.value));
+$('stage').addEventListener('change', e => setStage(e.target.checked));
+$('cycle').addEventListener('change', e => S.cycle = e.target.checked);
+$('adaptive').addEventListener('change', e => { S.adaptive = e.target.checked; if (!S.adaptive) setResScale(1); });
+try { const o = localStorage.getItem('herba-sortie'); if (o) { $('output').value = o; setOutput(o); } } catch (e) {}
+function setStage(on) {
+  S.stage = on; $('stage').checked = on;
+  if (on !== uiHidden) toggleUI();
+  if (on) { S.annot = false; $('annot').checked = false; SKY.lines.visible = false; $('labels').innerHTML = ''; }
+}
+// Résolution adaptative : on descend la définition quand la machine peine, on la remonte quand elle respire
+let resScale = 1, ftAvg = 1 / 60, ftAcc = 0, ftGood = 0;
+function setResScale(k) { resScale = k; const pr = QUALITY[S.quality].pr() * k; renderer.setPixelRatio(pr); composer.setPixelRatio(pr); composer.setSize(innerWidth, innerHeight); updatePxs(); }
+function adaptRes(dt) {
+  if (!S.adaptive || offline || mode === 'export') return;
+  ftAvg += (dt - ftAvg) * .05; ftAcc += dt; if (ftAcc < 2) return; ftAcc = 0;
+  if (ftAvg > 1 / 47 && resScale > .5) { setResScale(Math.max(.5, resScale * .85)); ftGood = 0; }
+  else if (ftAvg < 1 / 58 && resScale < 1) { if (++ftGood >= 3) { setResScale(Math.min(1, resScale * 1.12)); ftGood = 0; } }
+  else ftGood = 0;
+}
+// Commandes du musicien pendant la composition : elles sont inscrites dans l'empreinte, donc rejouées à l'identique
+const PEND = { shot: 0, end: false };
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  const k = e.key.toLowerCase();
+  if (k === 's') setStage(!S.stage);
+  else if (k === 'q') togglePublic();
+  else if (k === 'e' && mode === 'live') PEND.end = true;
+  else if (/^[1-9]$/.test(k) && mode === 'live') PEND.shot = +k;
+});
+function applyPending(fr) {
+  if (PEND.shot) { fr[5] += 8 * PEND.shot; PEND.shot = 0; }
+  if (PEND.end) { fr[5] += 128; PEND.end = false; }
+  if (PUB.queue.length && sim.introDone && sim.t - PUB.lastT > 2.5) { fr[5] += 4; PUB.lastT = sim.t; PUB.waiting.push(PUB.queue.shift()); }
+}
 $('autocam').addEventListener('change', e => { S.autocam = e.target.checked; controls.enabled = !S.autocam; if (!S.autocam && sim) controls.target.copy(camTarget); });
 
 function setUI() {
@@ -2162,7 +2377,7 @@ const toggleFull = () => { try { document.fullscreenElement ? document.exitFulls
 let uiHidden = false;
 const toggleUI = () => { uiHidden = !uiHidden; for (const id of ['hud', 'top', 'carnet']) $(id).classList.toggle('fadeout', uiHidden); document.body.style.cursor = uiHidden ? 'none' : ''; };
 $('btnFull').addEventListener('click', toggleFull); $('btnHide').addEventListener('click', toggleUI);
-addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.key === 'h' || e.key === 'H') toggleUI(); if (e.key === 'f' || e.key === 'F') toggleFull(); });
+addEventListener('keydown', e => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return; if (e.key === 'h' || e.key === 'H') toggleUI(); if (e.key === 'f' || e.key === 'F') toggleFull(); });
 
 const hhmm = h => String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.floor(h % 1 * 60)).padStart(2, '0');
 function updateCarnet() {
@@ -2209,9 +2424,9 @@ addEventListener('resize', () => {
 /* =====================================================================
    9 bis. LE TÉLÉPHONE COMME CAPTEUR — WebRTC pair à pair (PeerJS), QR code, télécommande
    ===================================================================== */
-const PH = { peer: null, id: null, call: null, conn: null, stream: null, el: null, meter: null, mAn: null, tick: null };
+const PH = { peer: null, id: null, call: null, conn: null, stream: null, el: null, meter: null, mAn: null, tick: null, wait: [] };
 const sdpMusic = sdp => sdp.replace(/a=fmtp:(\d+) ([^\r\n]*useinbandfec=1[^\r\n]*)/g,
-  (m, pt, p) => `a=fmtp:${pt} ${p};stereo=1;sprop-stereo=1;maxaveragebitrate=256000;maxplaybackrate=48000;usedtx=0`);
+  (m, pt, p) => `a=fmtp:${pt} ${p};stereo=1;sprop-stereo=1;maxaveragebitrate=256000;maxplaybackrate=48000;usedtx=0;minptime=10\r\na=ptime:10`);   // paquets de 10 ms : latence minimale
 function capteurBase() {
   if (/^https?:$/.test(location.protocol)) return new URL('capteur.html', location.href).href;
   try { return localStorage.getItem('herba-capteur') || ''; } catch (e) { return ''; }
@@ -2231,11 +2446,17 @@ function openPhone() {
   $('phoneBox').classList.remove('hidden'); $('pMsg').textContent = '';
   if (!/^https?:/.test(location.protocol)) { $('pBaseIn').value = capteurBase(); }
   if (!window.Peer) { pState('Bibliothèque de liaison non chargée : cet ordinateur doit être connecté à internet.', 'err'); return; }
-  if (PH.peer && !PH.peer.destroyed) { drawQR(); return; }
-  const id = 'herba-' + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join('');
+  if (PH.peer && !PH.peer.destroyed && PH.id) { drawQR(); pState(PH.stream ? 'Téléphone connecté.' : 'En attente du téléphone…', PH.stream ? 'ok' : 'wait'); return; }
   pState('Ouverture de la liaison…', 'wait');
+  ensurePeer(() => { drawQR(); pState('En attente du téléphone…', 'wait'); });
+}
+function ensurePeer(onOpen) {
+  if (!window.Peer) return false;
+  if (PH.peer && !PH.peer.destroyed) { if (PH.id) onOpen && onOpen(); else PH.wait.push(onOpen); return true; }
+  PH.wait = [onOpen];
+  const id = 'herba-' + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join('');
   PH.peer = new Peer(id);
-  PH.peer.on('open', pid => { PH.id = pid; drawQR(); pState('En attente du téléphone…', 'wait'); });
+  PH.peer.on('open', pid => { PH.id = pid; for (const f of PH.wait.splice(0)) f && f(); drawQR(); drawPublicQR(); });
   PH.peer.on('call', c => {
     if (PH.call) { try { PH.call.close(); } catch (e) {} }
     PH.call = c;
@@ -2245,6 +2466,7 @@ function openPhone() {
     c.on('error', () => {});
   });
   PH.peer.on('connection', c => {
+    if (c.metadata && c.metadata.role === 'public') { publicConn(c); return; }
     if (PH.conn) { try { PH.conn.close(); } catch (e) {} }
     PH.conn = c;
     c.on('data', d => phoneCommand(d && d.cmd));
@@ -2253,16 +2475,44 @@ function openPhone() {
   PH.peer.on('disconnected', () => { if (!PH.peer.destroyed) setTimeout(() => PH.peer.reconnect(), 1500); });
   PH.peer.on('error', e => {
     if (e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error') pState('Serveur de liaison injoignable, nouvelle tentative…', 'wait');
-    else if (e.type === 'unavailable-id') { PH.peer.destroy(); PH.peer = null; openPhone(); }
+    else if (e.type === 'unavailable-id') { PH.peer.destroy(); PH.peer = null; PH.id = null; ensurePeer(); }
     else pState('Erreur de liaison (' + e.type + ').', 'err');
   });
   clearInterval(PH.tick); PH.tick = setInterval(sendStatus, 1000);
+  return true;
 }
+/* ---- Graines du public : chaque spectateur peut semer depuis son téléphone ---- */
+const PUB = { queue: [], waiting: [], lastT: -99, cool: new Map(), on: false };
+function publicBase() { const b = capteurBase(); return b ? b.replace(/capteur\.html.*$/, 'public.html') : ''; }
+function drawPublicQR() {
+  if (!PUB.on || !PH.id) return;
+  const url = publicBase().split('#')[0] + '#' + PH.id;
+  if (window.qrcode) { const q = qrcode(0, 'M'); q.addData(url); q.make(); $('pubQR').innerHTML = q.createSvgTag({ cellSize: 5, margin: 1, scalable: true }); }
+  $('pubUrl').textContent = url.replace(/^https?:\/\//, '');
+}
+function togglePublic() {
+  PUB.on = !PUB.on; $('pubBox').classList.toggle('hidden', !PUB.on);
+  if (PUB.on && !ensurePeer(drawPublicQR)) $('pubUrl').textContent = 'Liaison indisponible : cet ordinateur doit être connecté à internet.';
+  drawPublicQR();
+}
+function publicConn(c) {
+  c.on('open', () => { try { c.send({ msg: 'hello', site: world ? world.name : '', live: mode === 'live' }); } catch (e) {} });
+  c.on('data', d => {
+    if (!d || !d.seed) return;
+    const now = performance.now(), last = PUB.cool.get(c.peer) || -1e9, say = o => { try { c.send(o); } catch (e) {} };
+    if (mode !== 'live' || !sim.introDone) return say({ msg: 'wait' });
+    if (now - last < 20000) return say({ msg: 'cool', s: Math.ceil((20000 - (now - last)) / 1000) });
+    if (PUB.queue.length >= 6 || sim.full) return say({ msg: 'busy' });
+    PUB.cool.set(c.peer, now); PUB.queue.push(c); say({ msg: 'queued', n: PUB.queue.length });
+  });
+}
+function notifyPublic(pl) { const c = PUB.waiting.shift(); if (c && c.open) try { c.send({ msg: 'planted', nom: pl.v.nom, chem: pl.v.chem, site: world.name }); } catch (e) {} }
 function phoneStream(st) {
   PH.stream = st;
   // Chrome ne livre l'audio d'un flux WebRTC à Web Audio que s'il est aussi attaché à un élément média
   if (!PH.el) { PH.el = new Audio(); PH.el.muted = true; }
   PH.el.srcObject = st; PH.el.play().catch(() => {});
+  try { for (const r of PH.call.peerConnection.getReceivers()) { if ('jitterBufferTarget' in r) r.jitterBufferTarget = 0; if ('playoutDelayHint' in r) r.playoutDelayHint = 0; } } catch (e) {}   // tampon minimal : le son arrive au plus vite
   AE.ensure();
   PH.mAn = AE.ctx.createAnalyser(); PH.mAn.fftSize = 1024; AE.ctx.createMediaStreamSource(st).connect(PH.mAn);
   if (mode === 'live' && AE.remote) AE.attachRemote(st);       // reconnexion en pleine composition : on continue
@@ -2295,6 +2545,10 @@ function sendStatus() {
 async function phoneCommand(cmd) {
   if (cmd === 'start' && PH.stream && (mode === 'intro' || mode === 'idle')) { $('phoneBox').classList.add('hidden'); closeGallery(); await startLive('phone'); }
   else if (cmd === 'finish' && mode === 'live') finishLive(true);
+  else if (cmd === 'finale' && mode === 'live') PEND.end = true;
+  else if (cmd === 'stage') setStage(!S.stage);
+  else if (cmd === 'public') togglePublic();
+  else if (typeof cmd === 'string' && /^shot[1-9]$/.test(cmd) && mode === 'live') PEND.shot = +cmd[4];
   else if (cmd === 'discard' && mode === 'live') finishLive(false);
   sendStatus();
 }
@@ -2306,7 +2560,8 @@ $('pBaseIn').addEventListener('change', e => { try { localStorage.setItem('herba
 /* =====================================================================
    9 ter. OUVERTURE ET FINAL — de la Terre au site lunaire ; dézoom et épilogue
    ===================================================================== */
-const INTRO_SPACE = 16, INTRO_END = 28, FINALE_T = 210;      // secondes de composition
+const INTRO_SPACE = 16, INTRO_END = 28, FINALE_T = 210, FINALE_LEN = 30;      // FINALE_LEN : dézoom puis montée en orbite
+const SHOT_KEYS = ['large', 'ras', 'grue', 'plongee', 'cime', 'canopee', 'ciel', 'terre', 'contre'];      // secondes de composition
 const _dbv = new THREE.Vector2();
 const SPACE = { scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(40, innerWidth / innerHeight, .005, 9000), I: null, seed: -1 };
 SPACE.scene.background = new THREE.Color(0x000000);
@@ -2353,7 +2608,7 @@ SPACE.scene.background = new THREE.Color(0x000000);
         float lon=atan(dot(n,uYb),dot(n,uXb)); float lat=asin(clamp(dot(n,uZb),-1.,1.));
         vec3 alb=texture2D(tMoon,vec2((lon+3.14159265)/6.2831853,.5+lat/3.14159265)).rgb;
         float mu0=max(dot(n,uSun),0.), mu=max(dot(n,v),0.);
-        vec3 col=alb*(mu0/(mu0+mu+1e-4))*2.2 + alb*max(dot(n,uToEarth),0.)*.02*uEL;
+        vec3 col=alb*(mu0/(mu0+mu+1e-4))*2.2 + alb*max(dot(n,uToEarth),0.)*.07*uEL;
         float d=dot(n,uSite); float pulse=.6+.4*sin(uTime*3.);
         col+=uMarkCol*(exp((d-1.)*1.2e5)*3.+exp((d-1.)*2.5e3)*.25)*uMark*pulse;   // la lueur du jardin, vue de l'espace
         gl_FragColor=vec4(col,1.); }`
@@ -2361,8 +2616,8 @@ SPACE.scene.background = new THREE.Color(0x000000);
   SPACE.moon = new THREE.Mesh(new THREE.SphereGeometry(1.7374, 256, 128), SPACE.moonMat); sg.add(SPACE.moon);
 }
 const slerpV = (a, b, t) => { const d = clamp(a.dot(b), -1, 1), w = Math.acos(d); if (w < 1e-4) return a.clone().lerp(b, t).normalize(); const s = Math.sin(w); return a.clone().multiplyScalar(Math.sin((1 - t) * w) / s).addScaledVector(b, Math.sin(t * w) / s).normalize(); };
-function introSetup(W) {
-  const s = Astro.sky(W.startMs);
+function introSetup(W, ms) {
+  const s = Astro.sky(ms || W.startMs);
   const M = V3(s.earth).multiplyScalar(-s.earthDist / 1000), u = M.clone().normalize();
   const sun = V3(s.sun), z = new THREE.Vector3(0, 0, 1);
   const w = new THREE.Vector3().crossVectors(u, z).normalize(), q = new THREE.Vector3().crossVectors(w, u).normalize();
@@ -2403,20 +2658,20 @@ function spaceCamera(I, T) {
   const up = slerpV(I.q, I.site, ez((T - 8) / 7));
   return { pos, look, up, fov };
 }
-function updateSpace(T, f = { bass: 0, high: 0, vol: 0 }, kick = 0) {
+function updateSpace(T, f = { bass: 0, high: 0, vol: 0 }, kick = 0, kOver, Iover) {
   if (SPACE.seed !== world.seed || !SPACE.I || SPACE.I.ms !== world.startMs) { SPACE.I = introSetup(world); SPACE.I.ms = world.startMs; SPACE.seed = world.seed; }
-  const I = SPACE.I, c = SPACE.cam, k = spaceCamera(I, T);
+  const I = Iover || SPACE.I, c = SPACE.cam, k = kOver || spaceCamera(I, T);
   const dl = k.pos.distanceTo(k.look), sh = dl * .006 * kick;      // secousse sur les attaques, souffle sur les graves
   k.pos.add(new THREE.Vector3(Math.sin(T * 41), Math.sin(T * 37 + 1), Math.sin(T * 43 + 2)).multiplyScalar(sh));
   c.position.copy(k.pos); c.up.copy(k.up); c.lookAt(k.look); c.fov = k.fov - 2.5 * kick + 1.5 * f.bass; c.aspect = camera.aspect; c.updateProjectionMatrix();
   SPACE.atmo.material.uniforms.uAmp.value = 1 + 2.2 * f.bass + 1.5 * kick;
   SPACE.sky.position.copy(c.position);
-  SPACE.earthMat.uniforms.uSunI.value.copy(I.sun); SPACE.earthMat.uniforms.uGmst.value = I.s.gmst + T * 4;   // la Terre tourne doucement pendant l'ouverture
+  SPACE.earthMat.uniforms.uSunI.value.copy(I.sun); SPACE.earthMat.uniforms.uGmst.value = I.s.gmst + (kOver ? .02 * T : T * 4);   // la Terre tourne doucement pendant l'ouverture
   SPACE.moon.position.copy(I.M);
   const mu = SPACE.moonMat.uniforms;
   mu.uSun.value.copy(I.sun); mu.uXb.value.set(...I.F.xb); mu.uYb.value.set(...I.F.yb); mu.uZb.value.set(...I.F.zb);
   mu.uSite.value.copy(I.site); mu.uToEarth.value.copy(I.M).multiplyScalar(-1).normalize(); mu.uEL.value = I.s.earthLit;
-  mu.uMark.value = smoothstep(8, 13, T) * (1 + 2.2 * kick); mu.uTime.value = T; mu.uMarkCol.value.setRGB(...world.palette.a);
+  mu.uMark.value = kOver ? 3 + 1.2 * f.vol + 1.5 * kick : smoothstep(8, 13, T) * (1 + 2.2 * kick); mu.uTime.value = T; mu.uMarkCol.value.setRGB(...world.palette.a);
   const rS = Math.asin(696000 / I.s.sunDist);
   SPACE.sun.position.copy(c.position).addScaledVector(I.sun, 2800); SPACE.sun.scale.setScalar(2800 * Math.tan(rS)); SPACE.sun.lookAt(c.position);
   SPACE.glare.position.copy(c.position).addScaledVector(I.sun, 2790); SPACE.glare.scale.setScalar(2800 * Math.tan(5 * D2R)); SPACE.glare.lookAt(c.position);
@@ -2530,9 +2785,41 @@ function updateOverlay(Tv, sinceArr, on) {
   let zi = -1, a = 0;
   if (on) for (let i = 0; i < GAS_ZONES.length; i++) { const Z = GAS_ZONES[i]; if (Tv >= Z.t0 && Tv < Z.t1) { zi = i; a = smoothstep(Z.t0, Z.t0 + .6, Tv) * (1 - smoothstep(Z.t1 - .6, Z.t1, Tv)); } }
   if (on && zi === 3) a *= 1 - smoothstep(5, 7, sinceArr);
+  if (S.stage) a = 0;                                   // mode Scène : aucune donnée à lire, seulement l'image
   if (zi !== ovZone && zi >= 0) drawPanel(zi);
   cine.uniforms.uPanelA.value = a;
   cine.uniforms.uMsgA.value = on ? smoothstep(7.9, 8.9, Tv) * (1 - smoothstep(11.6, 12.6, Tv)) : 0;
+}
+
+/* ---- Final en orbite : le jardin devient un point de lumière sur la Lune, la Terre au-dessus ---- */
+function updateOrbit(t, f) {
+  const ms = Math.round(sim.skyMs() / 6e5) * 6e5;
+  if (!SPACE.Ifin || SPACE.Ifin.ms !== ms || SPACE.Ifin.seed !== world.seed) { SPACE.Ifin = introSetup(world, ms); SPACE.Ifin.ms = ms; SPACE.Ifin.seed = world.seed; }
+  const I = SPACE.Ifin, ez = x => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }, e = ez(t / 15), drift = Math.max(0, t - 15) * .004;
+  const toE = I.M.clone().multiplyScalar(-1).normalize(), ax = new THREE.Vector3().crossVectors(I.site, toE).normalize();
+  const g = I.site.clone().applyAxisAngle(ax, -(.2 * e + drift));                                // on recule à l'opposé de la Terre
+  const h = Math.exp(Math.log(.015) + (Math.log(.09) - Math.log(.015)) * e) + drift * .6;
+  const pos = I.M.clone().addScaledVector(g, I.R + h), Ps = I.M.clone().addScaledVector(I.site, I.R);
+  const dS = Ps.clone().sub(pos).normalize(), dE = pos.clone().multiplyScalar(-1).normalize(), ang = Math.acos(clamp(dS.dot(dE), -1, 1));
+  const look = pos.clone().add(slerpV(dS, slerpV(dS, dE, .5), e));                               // le jardin et la Terre dans le même cadre
+  const fov = 48 + (clamp(ang / D2R * 1.7, 26, 80) / Math.max(.6, Math.min(1, camera.aspect / 1.78)) - 48) * e;
+  updateSpace(30 + t, f, sim.kick * .5, { pos, look, up: g.clone(), fov: Math.min(fov, 85) }, I);
+}
+
+/* ---- Graines du public : elles tombent du ciel sur le jardin ---- */
+const PUB_POOL = [0, 1, 2, 3].map(() => { const g = grainPoints(36); g.visible = false; scene.add(g); return g; });
+function updatePublicFalls(vh) {
+  let k = 0;
+  for (const p of sim.plants) {
+    if (!p.public || k >= PUB_POOL.length) continue;
+    const u0 = (renderT - p.born) / p.delay; if (u0 < 0 || u0 > 1.25) continue;
+    const G = PUB_POOL[k++], pos = G.geometry.attributes.position, gy = world.h(p.x, p.z);
+    for (let j = 0; j < 36; j++) { const u = clamp(u0 - j * .012, 0, 1), fall = Math.pow(1 - u, 1.7); pos.setXYZ(j, p.x + fall * 14, gy + .15 + fall * 110, p.z - fall * 6); }
+    pos.needsUpdate = true; G.visible = true;
+    const U = G.material.uniforms, flash = Math.exp(-Math.pow((u0 - 1) / .06, 2));
+    U.uPx.value = vh / 1080; U.uSize.value = 20 + 90 * flash; U.uI.value = 3 + 5 * flash; U.uOn.value = 1 - smoothstep(1.05, 1.25, u0); U.uCol.value.setRGB(...p.col);
+  }
+  for (; k < PUB_POOL.length; k++) PUB_POOL[k].visible = false;
 }
 
 /* ---- Épilogue ---- */
@@ -2557,7 +2844,7 @@ $('epNew').addEventListener('click', () => { hideEpilogue(); mode = 'intro'; set
    10. BOUCLE — avancer la simulation, mettre la scène à jour, rendre
    ===================================================================== */
 const clock = new THREE.Clock();
-const camOut = { pos: new THREE.Vector3(), tgt: new THREE.Vector3(), fov: 34, focus: 20 };
+const camOut = { pos: new THREE.Vector3(), tgt: new THREE.Vector3(), fov: 34, focus: 20 }, camPrev = { pos: new THREE.Vector3(), tgt: new THREE.Vector3(), fov: 34, focus: 20 };
 const camTarget = new THREE.Vector3();
 const meters = ['mBass', 'mMid', 'mHigh', 'mVol', 'mCent'].map($);
 let renderT = 0, hudTick = 0, offline = false;
@@ -2572,17 +2859,22 @@ sim.lunarT = 0;
 sim.cut('ciel');
 setUI();
 updatePxs();
+try { renderer.compileAsync(SPACE.scene, SPACE.cam).catch(() => {}); renderer.compileAsync(scene, camera).catch(() => {}); } catch (e) {}   // préchauffage des shaders
 try { const q = localStorage.getItem('selene-qualite'); if (q && QUALITY[q]) { $('quality').value = q; applyQuality(q); } } catch (e) {}
 
 function advance(dt) {
   if (mode === 'live') {
     AE.update(dt, S.sens);
     const T = liveTime();
-    while (sim.tick < Math.floor(T * TICK)) { const fr = AE.frame(); frames.push(...fr); sim.step(fr); }
+    while (sim.tick < Math.floor(T * TICK)) {
+      const fr = AE.frame(); applyPending(fr); frames.push(...fr); const lp = sim.lastPublic; sim.step(fr);
+      if (sim.lastPublic && sim.lastPublic !== lp) notifyPublic(sim.lastPublic);
+    }
     renderT = Math.max(sim.t, T);
-    const sil = AE.heard > 3 && AE.silentFor > 2 ? ` · silence, fin dans ${Math.max(0, Math.ceil(10 - AE.silentFor))} s` : '';
+    const finLeft = sim.finale ? Math.max(0, FINALE_LEN - (sim.t - sim.finaleT0)) : 0, left = Math.max(10 - AE.silentFor, finLeft);
+    const sil = AE.heard > 3 && AE.silentFor > 2 ? ` · silence, fin dans ${Math.max(0, Math.ceil(left))} s` : '';
     $('rec').innerHTML = `<span class="dot"></span>Composition ${mmss(T)}${S.autostop ? sil : ''}`;
-    if (S.autostop && AE.heard > 3 && AE.silentFor >= 10) finishLive(true);
+    if (S.autostop && AE.heard > 3 && AE.silentFor >= 10 && finLeft <= 0) finishLive(true);      // l'œuvre s'arrête après sa montée en orbite
   } else if (mode === 'replay' || mode === 'export') {
     const T = replayTime();
     stepRecorded(T);
@@ -2607,7 +2899,7 @@ function updateVisuals(dt, withUI) {
   sun.position.copy(C.sunL).multiplyScalar(320); sun.intensity = 11 * C.sunUp;
   W.earthshine.position.copy(C.earthL).multiplyScalar(300);
   W.earthshine.intensity = (.05 + 2.4 * C.night) * C.s.earthLit * Math.sqrt(Math.max(C.earthL.y, 0)) + .03;
-  W.bounce.intensity = .55 * C.sunUp + .06 * C.night * C.s.earthLit;
+  W.bounce.intensity = .32 * C.sunUp + .06 * C.night * C.s.earthLit;     // ombres presque noires : la règle lunaire
   const elDeg = C.el / D2R, f = sim.f;
   W.lhgMat.uniforms.uAmt.value = (.03 + f.high * .22) * (.35 + 1.8 * Math.exp(-(((elDeg + 1) / 4) ** 2)));
   renderer.toneMappingExposure = 1 + .7 * C.night;
@@ -2622,6 +2914,22 @@ function updateVisuals(dt, withUI) {
     PU.uPC.value[p.idx].set(p.sun0.x, p.sun0.y, p.sun0.z, 0);
     PU.uPP.value[p.idx].set(p.x, p.z, (2.5 + p.height * .55) * p.growth, (.25 + p.glow * .9) * Math.min(1, p.growth * 2));
   }
+  {   // ondes sismiques : anneau au sol, secousse des plantes au passage du front, lumière qui court dans les rhizomes
+    const SH = sim.shocks;
+    for (let i = 0; i < 6; i++) { const sk = SH[SH.length - 1 - i]; if (sk) PU.uShock.value[i].set(sk.x, sk.z, renderT - sk.t0, sk.a); else PU.uShock.value[i].set(0, 0, -1, 0); }
+    PU.uShockCol.value.setRGB(...mixC(W.palette.b, [1, .9, .7], .4));
+    for (const p of sim.plants) {
+      let qx = 0, qy = 0, qz = 0, pw = 0;
+      for (const sk of SH) {
+        const age = renderT - sk.t0; if (age < 0 || age > 4.5) continue;
+        const dx = p.x - sk.x, dz = p.z - sk.z, d = Math.hypot(dx, dz) + 1e-3, ph = d - 22 * age, w = sk.a * Math.exp(-ph * ph / 18) * Math.exp(-age * .9), osc = Math.sin(ph * .8);
+        qx += dx / d * w * .32 * osc; qz += dz / d * w * .32 * osc; qy += w * .1; pw = Math.max(pw, w);
+      }
+      PU.uPQ.value[p.idx].set(qx, qy, qz, p.y + .15);
+      PU.uPA.value[p.idx].z = Math.max(p.pulse, pw * (p.sp === 'mycelium' ? 1.7 : .7));
+    }
+    const FT = W.foot || []; PU.uFootN.value = FT.length; FT.forEach((v, i) => PU.uFoot.value[i].copy(v));
+  }
   const ranked = sim.plants.slice().sort((a, b) => (b.glow + .2) * b.growth * b.height - (a.glow + .2) * a.growth * a.height);
   plantLights.forEach((l, i) => {
     const p = ranked[i];
@@ -2630,12 +2938,24 @@ function updateVisuals(dt, withUI) {
     l.intensity = (.3 + 5 * C.night) * S.bio * (.25 + p.glow) * Math.min(1, p.growth * 2) * 6;
   });
 
-  const inSpace = sim.intro && !sim.introDone;
-  const Tv = inSpace ? sim.introTv + (sim.introTv - sim.introTvPrev) * clamp((renderT - sim.t) / DT, 0, 1) : INTRO_SPACE;
-  renderPass.scene = inSpace ? SPACE.scene : scene; renderPass.camera = inSpace ? SPACE.cam : camera;
-  cine.uniforms.uFade.value = !sim.intro ? 0 : inSpace ? smoothstep(15.1, 15.95, Tv) : 1 - smoothstep(0, 1.2, renderT - sim.introDoneAt);   // plongée dans le noir, puis révélation du site
+  const inIntro = sim.intro && !sim.introDone, finEl = sim.finale && sim.shot.type === 'finale' ? renderT - sim.shot.t0 : -1;
+  const inOrbit = finEl > 13.2, inSpace = inIntro || inOrbit;
+  const Tv = inIntro ? sim.introTv + (sim.introTv - sim.introTvPrev) * clamp((renderT - sim.t) / DT, 0, 1) : INTRO_SPACE;
+  setScene(inSpace ? SPACE.scene : scene, inSpace ? SPACE.cam : camera);
+  cine.uniforms.uFade.value = !sim.intro ? 0 : inIntro ? smoothstep(15.1, 15.95, Tv)
+    : finEl >= 0 ? smoothstep(12.2, 13.2, finEl) * (1 - smoothstep(13.2, 14.8, finEl))                 // final : noir, puis l'orbite
+    : 1 - smoothstep(0, 1.2, renderT - sim.introDoneAt);   // plongée dans le noir, puis révélation du site
   if (S.autocam || offline || sim.t < sim.introEnd) {
     shotCamera(sim, renderT, camOut);
+    const sh = sim.shot;
+    if (sh.blend && sim.prevShot && renderT - sh.t0 < sh.blend) {                     // fondu enchaîné de caméra
+      shotCamera(sim, renderT, camPrev, sim.prevShot);
+      const u = smoothstep(0, 1, (renderT - sh.t0) / sh.blend);
+      camOut.pos.lerpVectors(camPrev.pos, camOut.pos, u); camOut.tgt.lerpVectors(camPrev.tgt, camOut.tgt, u);
+      camOut.fov += (camPrev.fov - camOut.fov) * (1 - u); camOut.focus += (camPrev.focus - camOut.focus) * (1 - u);
+      camOut.pos.y = Math.max(camOut.pos.y, world.h(camOut.pos.x, camOut.pos.z) + .3);
+    }
+    if (camera.aspect > 2.4) camOut.fov = Math.min(camOut.fov, 2 * Math.atan(Math.tan(52 * D2R) / camera.aspect) / D2R * 1.6);
     camera.position.copy(camOut.pos); camera.lookAt(camOut.tgt); camTarget.copy(camOut.tgt);
     camera.fov = camOut.fov; camera.updateProjectionMatrix();
   } else {
@@ -2646,8 +2966,11 @@ function updateVisuals(dt, withUI) {
   updateSky(C);
   dof.u.uFocus.value = camOut.focus; dof.u.uAperture.value = S.dof;
   const vh = renderer.getDrawingBufferSize(_dbv).y;
-  if (inSpace) { updateSpace(Tv, f, sim.kick); updateGrain(SPACE.I, Tv, sim.kick, vh); dof.u.uAperture.value = 0; renderer.toneMappingExposure = 1; }
+  if (inIntro) { updateSpace(Tv, f, sim.kick); updateGrain(SPACE.I, Tv, sim.kick, vh); dof.u.uAperture.value = 0; renderer.toneMappingExposure = 1; }
+  else if (inOrbit) { updateOrbit(finEl - 13.2, f); dof.u.uAperture.value = 0; renderer.toneMappingExposure = 1.4; }
+  SPACE.grain.visible = inIntro;
   updateOverlay(Tv, sim.introDone ? renderT - sim.introDoneAt : 0, sim.intro);
+  updatePublicFalls(vh);
   {  // la graine posée au cœur du site, jusqu'à ce que la première plante en sorte
     const p0 = sim.plants[0], on = sim.intro && sim.introDone ? (p0 ? 1 - smoothstep(0, .35, p0.growth) : 1) : 0;
     landedGrain.visible = on > .001;
@@ -2655,7 +2978,7 @@ function updateVisuals(dt, withUI) {
       const u = landedGrain.material.uniforms; u.uPx.value = vh / 1080; u.uSize.value = 26 + 12 * f.bass + 6 * Math.sin(renderT * 3); u.uI.value = 3.2; u.uOn.value = on; u.uCol.value.setRGB(...mixC([1, .86, .55], world.palette.a, .35)); }
   }
   bloom.strength = .32 + f.bass * .18 + f.vol * .1;
-  cine.uniforms.uTime.value = renderT; cine.uniforms.uGrain.value = S.grain; cine.uniforms.uBars.value = S.scope ? 1 : 0;
+  cine.uniforms.uTime.value = renderT; cine.uniforms.uGrain.value = S.grain; cine.uniforms.uBars.value = S.scope && S.output === 'cinema' ? 1 : 0;
 
   if (withUI) {
     if (++hudTick % 3 === 0) {
@@ -2673,6 +2996,7 @@ function updateVisuals(dt, withUI) {
 function frame() {
   if (!offline) {
     const dt = Math.min(clock.getDelta(), .1);
+    adaptRes(dt);
     advance(dt);
     updateVisuals(dt, true);
     composer.render(dt);
@@ -2794,7 +3118,7 @@ async function runExport() {
   const duration = abuf ? abuf.duration : rec.duration, total = Math.ceil(duration * fps);
   $('xForm').classList.add('hidden'); $('xRun').classList.remove('hidden');
   hdJob.cancel = false; mode = 'hd'; setUI(); closeGallery();
-  AE.stop(); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true); sim.tscale = rec.tscale || 1; recFrames = rec.frames; current = rec;
+  AE.stop(); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; recFrames = rec.frames; current = rec;
   offline = true; hdQuality(true); setRenderSize(w, h);
   const t0 = performance.now();
   try {
