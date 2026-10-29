@@ -2990,6 +2990,7 @@ function bossRQ1(addr, size) { const body = [...addr, 0, 0, 0, size]; bossSend([
 const B_LEVEL = [0x7F, 0, 0, 0], B_MODE = [0x7F, 0, 0, 1];
 function bossEditor(onOff) { if (BOSS.model) bossDT1(B_MODE, [onOff ? 1 : 0]); }
 const hx = b => b.toString(16).padStart(2, '0');
+const GX_PEDAL = { '20 01 50 0b': 'bend', '20 01 50 06': 'wah', '20 01 60 00': 'fv' };
 addEventListener('pagehide', () => { if (BOSS.on) bossEditor(false); });
 function bossMsg(d) {
   if (d[1] === 0x7E && d[3] === 0x06 && d[4] === 0x02 && d[5] === 0x41) {        // réponse d'identité : famille 0D 06, membre 01 00 = guitare
@@ -3016,6 +3017,13 @@ function bossMsg(d) {
   let q = ZM.streams.get(key); if (!q || now - q.t0 > 2500) { q = { t0: now, vals: new Set(), lo: val, hi: val }; ZM.streams.set(key, q); }
   q.vals.add(val); q.lo = Math.min(q.lo, val); q.hi = Math.max(q.hi, val);
   if ((ZM.learn || !ZM.bind) && q.vals.size >= 6 && q.hi - q.lo >= 10) { ZM.bind = { sx: key, lo: q.lo, hi: q.hi, name: 'GX-1' }; ZM.learn = false; saveZM(); }
+  // positions de pédale connues du GX-1 (address_map.js) : Pedal FX bend et wah, puis volume au pied ; toutes de 0 à 100
+  const known = GX_PEDAL[key]; if (known && (ZM.learn || !ZM.bind || GX_PEDAL[ZM.bind.sx])) {
+    if (known === 'fv' && now - (BOSS.pfxT || -1e9) < 2000) return;                 // la Pedal FX a priorité sur le volume au pied
+    if (known !== 'fv') BOSS.pfxT = now;
+    if (!ZM.bind || ZM.bind.sx !== key) { ZM.bind = { sx: key, lo: 0, hi: 100, name: 'GX-1 ' + known }; ZM.learn = false; saveZM(); }
+    const v = clamp(val / 100, 0, 1); setZoom(ZM.inv ? 1 - v : v, 'pédale GX-1'); return;
+  }
   const b = ZM.bind; if (b && b.sx === key && !ZM.learn) {
     if (val < b.lo || val > b.hi) { b.lo = Math.min(b.lo, val); b.hi = Math.max(b.hi, val); saveZM(); }
     const v = (val - b.lo) / Math.max(1, b.hi - b.lo); setZoom(ZM.inv ? 1 - v : v, 'pédale GX-1'); return;
