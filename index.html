@@ -2977,31 +2977,37 @@ async function initMidi() {
 }
 /* ---- Traducteur Boss : le GX-1 ne joue pas sa pédale en MIDI standard, mais il la décrit à son éditeur
    (BOSS TONE STUDIO) en messages exclusifs Roland. La page se présente comme l'éditeur et lit ces messages. ---- */
-const BOSS = { dev: 0x10, fam: null, model: null, cand: [], tries: 0, on: false, n: 0, timer: 0 };
+const BOSS = { dev: 0x10, fam: null, model: null, on: false, n: 0, timer: 0, step: '' };
 const rolSum = a => (128 - (a.reduce((x, y) => x + y, 0) % 128)) % 128;
 function bossOuts() { const o = [...ZM.midi.outputs.values()], g = o.filter(p => /gx|boss|roland/i.test(p.name)); return g.length ? g : o; }
 function bossSend(bytes) { for (const o of bossOuts()) try { o.send(bytes); } catch (e) {} }
-function bossHello() { BOSS.n = 0; bossSend([0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7]); clearTimeout(BOSS.timer); BOSS.timer = setTimeout(() => { if (!BOSS.fam) { ZM.status = (ZM.status || '') + ' · aucune réponse Boss à l’identification'; updZoomUI(); } }, 2500); }
-function bossEditor(onOff) {                                                    // « mode éditeur » : adresse 7F 00 00 01 (convention Roland/Boss)
-  const m = BOSS.model; if (!m) return; const body = [0x7F, 0x00, 0x00, 0x01, onOff ? 1 : 0];
-  bossSend([0xF0, 0x41, BOSS.dev, ...m, 0x12, ...body, rolSum(body), 0xF7]);
-}
-function bossTryNext() {                                                        // identifiant de modèle déduit de la famille ; plusieurs formes essayées
-  if (BOSS.on) return; if (BOSS.tries >= BOSS.cand.length) { ZM.status = `Boss : GX-1 identifié (famille ${hx(BOSS.fam)}) mais muet en mode éditeur`; updZoomUI(); return; }
-  BOSS.model = BOSS.cand[BOSS.tries++]; bossEditor(true); ZM.status = `Boss : identifié, essai du modèle ${BOSS.model.map(hx).join(' ')}…`; updZoomUI();
-  clearTimeout(BOSS.timer); BOSS.timer = setTimeout(bossTryNext, 1600);
-}
+function bossHello() { BOSS.n = 0; BOSS.on = false; BOSS.step = 'id'; bossSend([0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7]); bossWait('aucune réponse Boss à l’identification'); }
+function bossWait(err) { clearTimeout(BOSS.timer); BOSS.timer = setTimeout(() => { ZM.status = 'Boss : ' + err; updZoomUI(); }, 2500); }
+// protocole relevé dans BOSS TONE STUDIO for GX-1 (product_setting.js, midi_connect_controller.js) :
+// modèle 01 06 0D, adresses sur 4 octets ; niveau de communication 7F 00 00 00 (= 1), mode éditeur 7F 00 00 01
+function bossDT1(addr, data) { const body = [...addr, ...data]; bossSend([0xF0, 0x41, BOSS.dev, ...BOSS.model, 0x12, ...body, rolSum(body), 0xF7]); }
+function bossRQ1(addr, size) { const body = [...addr, 0, 0, 0, size]; bossSend([0xF0, 0x41, BOSS.dev, ...BOSS.model, 0x11, ...body, rolSum(body), 0xF7]); }
+const B_LEVEL = [0x7F, 0, 0, 0], B_MODE = [0x7F, 0, 0, 1];
+function bossEditor(onOff) { if (BOSS.model) bossDT1(B_MODE, [onOff ? 1 : 0]); }
 const hx = b => b.toString(16).padStart(2, '0');
 addEventListener('pagehide', () => { if (BOSS.on) bossEditor(false); });
 function bossMsg(d) {
-  if (d[1] === 0x7E && d[3] === 0x06 && d[4] === 0x02 && d[5] === 0x41) {        // réponse d'identité Roland
-    BOSS.dev = d[2]; BOSS.fam = d[6]; const f1 = d[6], f2 = d[7];
-    BOSS.cand = [[0, 0, 0, f1], [0, 0, f1], [0, 0, 0, f1, f2], [0, f1]]; BOSS.tries = 0; BOSS.on = false; bossTryNext(); return;
+  if (d[1] === 0x7E && d[3] === 0x06 && d[4] === 0x02 && d[5] === 0x41) {        // réponse d'identité : famille 0D 06, membre 01 00 = guitare
+    BOSS.dev = d[2]; BOSS.fam = d[6];
+    BOSS.model = [d[8] === 1 && d[9] === 0 ? 0x01 : 0x02, d[7], d[6]];
+    BOSS.step = 'level'; bossRQ1(B_LEVEL, 1); ZM.status = `Boss : GX-1 identifié (modèle ${BOSS.model.map(hx).join(' ')})`; bossWait('GX-1 identifié, mais pas de réponse au niveau de communication'); updZoomUI(); return;
   }
   if (d[1] !== 0x41 || !BOSS.model) return;
-  const L = BOSS.model.length, i = 3 + L; if (d[i] !== 0x12 && d[i] !== 0x11) return;
+  const L = BOSS.model.length, i = 3 + L; if (d[i] !== 0x12) return;
   for (let k = 0; k < L; k++) if (d[3 + k] !== BOSS.model[k]) return;
-  if (!BOSS.on) { BOSS.on = true; clearTimeout(BOSS.timer); }
+  const a4 = d.slice(i + 1, i + 5).map(hx).join(''), v0 = d[i + 5];
+  if (a4 === '7f000000' && BOSS.step === 'level') { BOSS.step = 'mode'; bossDT1(B_MODE, [0]); setTimeout(() => bossRQ1(B_MODE, 1), 60); bossWait('pas de réponse au mode éditeur'); return; }
+  if (a4 === '7f000001' && BOSS.step === 'mode') {
+    clearTimeout(BOSS.timer);
+    if (v0 !== 0) { ZM.status = 'Boss : un autre éditeur est déjà branché au GX-1 — ferme BOSS TONE STUDIO, puis recommence'; updZoomUI(); return; }
+    bossEditor(true); BOSS.step = 'on'; BOSS.on = true; ZM.status = 'Boss : mode éditeur actif — bouge la pédale'; updZoomUI(); return;
+  }
+  if (a4.startsWith('7f')) return;
   BOSS.n++; ZM.status = `Boss : mode éditeur actif (modèle ${BOSS.model.map(hx).join(' ')}) · ${BOSS.n} messages`;
   const addr = d.slice(i + 1, i + 5), p = d.slice(i + 5, d.length - 2); if (!p.length) return;
   const val = p.length >= 3 ? p.reduce((a, b) => a * 16 + (b & 15), 0) : p.length === 2 ? p[0] * 128 + p[1] : p[0];
