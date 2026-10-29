@@ -2613,6 +2613,7 @@ var qrcode = function() {
   <label class="chk"><input type="checkbox" id="adaptive" checked> Résolution adaptative (garder 60 i/s)</label>
   <label class="ctl">Latence de la chaîne <output id="oLat">100 ms</output><input type="range" id="latency" min="0" max="400" step="5" value="100"></label>
   <label class="chk"><input type="checkbox" id="lowlat"> Affichage faible latence (au prochain chargement ; peut déchirer l’image)</label>
+  <label class="chk"><input type="checkbox" id="names" checked> Noms des plantes du public à l’écran (touche N)</label>
   <label class="chk"><input type="checkbox" id="instru" checked> Instruments de scène (touche I) : égaliseur, compteur, matrice du jardin</label>
   <label class="chk"><input type="checkbox" id="mire"> Mire de synchronisation (touche M) : éclair à chaque attaque</label>
     <div class="xnote" style="font-size:10px;opacity:.6;margin-top:8px;line-height:1.5">Scène : 1 ensemble · 2 ras du sol · 3 grue · 4 plongée · 5 cime · 6 canopée · 7 ciel · 8 Terre · 9 contre-jour · E final · Q graines du public · S mode Scène · F plein écran · + / − zoom, 0 retour au sol</div>
@@ -4880,6 +4881,7 @@ class Sim {
         sd.lean[0] += (tx - sd.lean[0]) * k; sd.lean[1] += (tz - sd.lean[1]) * k; sd.plant.lean = sd.lean;
       }
       if (this.finale && sd.state === 'dormant' && t - this.finaleT0 > 1 + (sd.id % 7) * .4) this.growSeed(sd, t);   // au final, toutes les graines en attente germent
+      else if (sd.spec.auto && sd.state === 'dormant' && t - sd.land > 1.6) this.growSeed(sd, t);                       // la graine germe d'elle-même peu après s'être posée
     }
   }
   listen(onset) {
@@ -5311,6 +5313,7 @@ addEventListener('keydown', e => {
   else if (k === '+' || k === '=' || k === 'pageup') setZoom(ZM.v + .04, 'clavier');
   else if (k === '-' || k === '_' || k === 'pagedown') setZoom(ZM.v - .04, 'clavier');
   else if (k === '0') setZoom(0, 'clavier');
+  else if (k === 'n') { S.names = S.names === false; $('names').checked = S.names; try { localStorage.setItem('herba-noms', S.names ? '1' : '0'); } catch (e) {} }
   else if (k === 'i') { INS.on = !INS.on; $('instru').checked = INS.on; try { localStorage.setItem('herba-instruments', INS.on ? '1' : '0'); } catch (e) {} }
 });
 /* ---- Zoom sur la Lune : pédale d'expression du GX-1 (MIDI CC), molette, clavier, téléphone ----
@@ -5525,6 +5528,8 @@ $('btnGo').addEventListener('click', async () => {
   } catch (e) { mode = 'intro'; setUI(); status(e.name === 'NotAllowedError' ? 'Accès au micro refusé. Autorise-le via l’icône à gauche de l’adresse, puis réessaie.' : 'Impossible de démarrer (' + (e.message || e.name) + ').'); }
 });
 setTimeout(() => setSrc(S.src), 0);
+try { S.names = localStorage.getItem('herba-noms') !== '0'; } catch (e) { S.names = true; }
+setTimeout(() => { $('names').checked = S.names; $('names').addEventListener('change', e => { S.names = e.target.checked; try { localStorage.setItem('herba-noms', S.names ? '1' : '0'); } catch (er) {} }); }, 0);
 setTimeout(() => { $('instru').checked = INS.on; $('instru').addEventListener('change', e => { INS.on = e.target.checked; try { localStorage.setItem('herba-instruments', INS.on ? '1' : '0'); } catch (er) {} }); }, 0);
 // lieu du spectacle : point de départ et d'arrivée du voyage astral
 try { S.venue = { ...VENUE_DEF }; try { const v = JSON.parse(localStorage.getItem('herba-lieu') || 'null'); if (v && isFinite(v.lat) && isFinite(v.lon)) S.venue = v; } catch (e) {}
@@ -5750,6 +5755,7 @@ function togglePublic() {
 }
 // Graines composées par les spectateurs : une par personne (identifiant gardé par le téléphone), puis germination et mouvements
 const PUB_FAMS = ['arbre', 'saule', 'arborescente', 'fougere', 'fleur', 'corolle', 'cristal', 'amethyste', 'herbe', 'filament', 'arbuste', 'succulente'];
+const PUB_COLN = ['Ambre', 'Corail', 'Rose', 'Violette', 'Azur', 'Turquoise', 'Émeraude', 'Lime', 'Givre'];
 const PUB_COLS = [[1, .62, .16], [1, .36, .3], [1, .38, .78], [.66, .36, 1], [.25, .5, 1], [.2, .95, .88], [.25, 1, .55], [.66, 1, .2], [.8, .9, 1]];
 PUB.clients = new Map(); PUB.byId = new Map(); PUB.nextId = 1;
 function pubSummary() { if (!PUB.on && !PUB.clients.size) return 'fermé'; const n = { fall: 0, dormant: 0, growing: 0, grown: 0 }; for (const c of PUB.clients.values()) n[c.state] = (n[c.state] || 0) + 1; return PUB.clients.size ? `${PUB.clients.size} · ${n.dormant} en sommeil · ${n.grown + n.growing} germées` : 'ouvert · aucune'; }
@@ -5791,10 +5797,12 @@ function publicConn(c) {
         if (mode !== 'live' || !sim.introDone || !PUB.on) return publicSay(c, { msg: 'wait' });
         if (cl) return publicSay(c, { msg: 'deja', state: cl.state });                       // une seule graine par personne
         const sp = d.spec || {}, spec = { fam: PUB_FAMS.includes(sp.fam) ? sp.fam : 'fleur', col: clamp(sp.col | 0, 0, PUB_COLS.length - 1), size: clamp(sp.size | 0, 0, 2), form: clamp(sp.form | 0, 0, 3) };
+        spec.auto = 1; spec.name = String(sp.name || '').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 18);
         if (isFinite(+sp.x) && isFinite(+sp.z)) { spec.x = Math.round(clamp(+sp.x, -56, 56) * 10) / 10; spec.z = Math.round(clamp(+sp.z, -56, 56) * 10) / 10; }
-        const id = PUB.nextId++; cl = { cid, id, conn: c, state: 'fall', col: hexCol(PUB_COLS[spec.col]), name: String(sp.name || '').slice(0, 18), lastTilt: 0, lastShake: 0, tx: 0, ty: 0 };
+        const id = PUB.nextId++; if (!spec.name) spec.name = PUB_COLN[spec.col] + ' ' + id;
+        cl = { cid, id, conn: c, state: 'fall', col: hexCol(PUB_COLS[spec.col]), name: spec.name, lastTilt: 0, lastShake: 0, tx: 0, ty: 0 };
         PUB.clients.set(cid, cl); PUB.byId.set(id, cl); LIVE_EV.push({ type: 'seed', id, spec });
-        return publicSay(c, { msg: 'accepted', id, col: cl.col });
+        return publicSay(c, { msg: 'accepted', id, col: cl.col, name: cl.name });
       }
       if (!cl || mode !== 'live') return;
       const now = performance.now();
@@ -6169,7 +6177,37 @@ const BEAMS = [0, 1, 2, 3].map(() => { const m = new THREE.Mesh(new THREE.Cylind
   vertexShader: `varying float vY; varying vec3 vN, vV; void main(){ vY=position.y; vec4 w=modelMatrix*vec4(position,1.); vN=normalize(mat3(modelMatrix)*normal); vV=normalize(cameraPosition-w.xyz); gl_Position=projectionMatrix*viewMatrix*w; }`,
   fragmentShader: `uniform vec3 uCol; uniform float uA; varying float vY; varying vec3 vN, vV; void main(){ float e=pow(1.-abs(dot(normalize(vN),vV)),1.5); float f=(1.-vY)*(1.-vY)*smoothstep(0.,.04,vY);
     gl_FragColor=vec4(uCol*(.35+e*1.6)*f*uA*1.8,1.); }` })); m.visible = false; m.frustumCulled = false; scene.add(m); return m; });
+const NAMES = new Map(), NAMESC = new THREE.Scene();      // les noms sont dessinés après les effets d'image : toujours nets
+function renderNames() {
+  if (!NAMES.size || NAMES.hide || S.output === 'dome' || S.names === false) return;
+  const ac = renderer.autoClear; renderer.autoClear = false; renderer.setRenderTarget(null); renderer.render(NAMESC, camera); renderer.autoClear = ac;
+}
+function nameSprite(sd) {
+  let o = NAMES.get(sd.id); if (o) return o;
+  const txt = (sd.spec.name || 'Graine ' + sd.id), cv = document.createElement('canvas'), c = cv.getContext('2d'), fs = 46;
+  c.font = `500 ${fs}px "Cormorant Garamond", Georgia, serif`; const tw = Math.ceil(c.measureText(txt).width), W = tw + 92, H = 74; cv.width = W; cv.height = H;
+  const col = 'rgb(' + sd.col.map(v => Math.round(v * 255)).join(',') + ')';
+  c.fillStyle = 'rgba(5,8,14,.72)'; rrect(c, 3, 3, W - 6, H - 6, 32); c.fill(); c.strokeStyle = col; c.lineWidth = 3; c.stroke();
+  c.shadowColor = col; c.shadowBlur = 16; c.fillStyle = col; c.beginPath(); c.arc(38, H / 2, 10, 0, 6.283); c.fill();
+  c.shadowBlur = 0; c.font = `500 ${fs}px "Cormorant Garamond", Georgia, serif`; c.textBaseline = 'middle'; c.lineJoin = 'round'; c.strokeStyle = 'rgba(0,0,0,.6)'; c.lineWidth = 5; c.strokeText(txt, 62, H / 2 + 2); c.fillStyle = '#fff'; c.fillText(txt, 62, H / 2 + 2);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false, toneMapped: false }));
+  sp.renderOrder = 20; sp.center.set(.5, 0); sp.userData.ar = W / H; NAMESC.add(sp); o = { sp, a: 0 }; NAMES.set(sd.id, o); return o;
+}
+function updateNames(vh) {
+  if (NAMES.sim !== sim) { for (const o of NAMES.values()) { NAMESC.remove(o.sp); o.sp.material.map.dispose(); o.sp.material.dispose(); } NAMES.clear(); NAMES.sim = sim; }   // nouvelle composition
+  const on = S.names !== false && !!sim, seen = new Set();
+  if (on) for (const sd of sim.seeds.values()) {
+    if (sd.state === 'fall') continue; const o = nameSprite(sd), p = sd.plant; seen.add(sd.id);
+    const y = p && !p.dead ? p.y + p.height * p.growth + .9 : world.h(sd.x, sd.z) + 1.1;
+    o.sp.position.set(p ? p.x : sd.x, y, p ? p.z : sd.z);
+    o.a += ((p && (p.dead || p.dying) ? 0 : 1) - o.a) * .08; const h = .042 * (1 + .15 * (p ? clamp(p.pulse, 0, 1) : 0));
+    o.sp.scale.set(h * o.sp.userData.ar, h, 1); o.sp.material.opacity = o.a; o.sp.visible = o.a > .02;
+  }
+  for (const [id, o] of NAMES) if (!seen.has(id)) { if (!sim || !sim.seeds.has(id)) { NAMESC.remove(o.sp); o.sp.material.map.dispose(); o.sp.material.dispose(); NAMES.delete(id); } else o.sp.visible = false; }
+}
 function updatePublicFalls(vh) {
+  updateNames(vh);
   let k = 0, ns = 0, kb = 0;
   for (const sd of sim.seeds.values()) {                                                      // colonne de lumière : là où la graine va tomber, puis l'accueil
     if (kb >= BEAMS.length) break; const el = renderT - sd.t0, fall = sd.land - sd.t0; if (el < 0 || el > fall + 2.5) continue;
@@ -6329,7 +6367,7 @@ function updateVisuals(dt, withUI) {
 
   const inIntro = sim.intro && !sim.introDone, finEl = sim.finale && sim.shot.type === 'finale' ? renderT - sim.shot.t0 : -1;
   const zoomZ = sim.introDone && !sim.finale ? sim.zoom : 0, zoomOrbit = zoomZ > ZOOM_SPLIT;
-  const inOrbit = finEl > 13.2, inSpace = inIntro || inOrbit || zoomOrbit;
+  const inOrbit = finEl > 13.2, inSpace = inIntro || inOrbit || zoomOrbit; NAMES.hide = inSpace || finEl > 11.5;
   const Tv = inIntro ? sim.introTv + (sim.introTv - sim.introTvPrev) * clamp((renderT - sim.t) / DT, 0, 1) : INTRO_SPACE;
   setScene(inSpace ? SPACE.scene : scene, inSpace ? SPACE.cam : camera);
   cine.uniforms.uFade.value = !sim.intro ? 0 : inIntro ? smoothstep(15.1, 15.95, Tv)
@@ -6522,7 +6560,7 @@ function frame() {
       cv.getContext('2d').drawImage(canvas, 0, (canvas.height - sh) / 2, sw, sh, 0, 0, tw, th);
       const r = wantThumb; wantThumb = null; r(cv.toDataURL('image/jpeg', .85));
     }
-    if (!ctxLost) renderInstruments(dt);
+    if (!ctxLost) { renderNames(); renderInstruments(dt); }
   } else clock.getDelta();
   lastFrameT = performance.now(); frameDur += (lastFrameT - fs0 - frameDur) * .1;
   schedule();

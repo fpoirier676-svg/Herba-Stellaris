@@ -78,7 +78,7 @@
     <h2><b>4</b> Le port</h2>
     <div class="grid g4" id="forms"></div>
 
-    <h2><b>5</b> Son nom <span style="text-transform:none;letter-spacing:0;color:var(--faint)">(facultatif)</span></h2>
+    <h2><b>5</b> Son nom <span style="text-transform:none;letter-spacing:0;color:var(--faint)">(affiché à l’écran au-dessus de votre plante)</span></h2>
     <input type="text" id="name" maxlength="18" placeholder="Par exemple : Lumière de Léa" autocomplete="off">
 
     <h2><b>6</b> L’endroit où la planter</h2>
@@ -96,7 +96,6 @@
     <div id="orb"><div id="dot"></div></div>
     <div id="state"></div>
     <div id="hint"></div>
-    <button class="big hidden" id="grow">Faire germer</button>
     <button class="big hidden" id="motion" style="border-color:var(--line)">Activer les mouvements</button>
   </section>
 
@@ -227,7 +226,7 @@ function onMsg(d) {
   if (d.msg === 'state') { if (d.col) tint(d.col); setState(d.state === 'growing' ? 'grown' : d.state); }
   else if (d.msg === 'wait') say('Le semis n’est pas encore ouvert.<br><i>Attendez que le musicien invite le public, puis réessayez.</i>');
   else if (d.msg === 'deja') { say('Ce téléphone a déjà semé sa graine pour ce concert.'); setState(d.state === 'growing' ? 'grown' : d.state); }
-  else if (d.msg === 'accepted') { if (d.col) tint(d.col); setState('fall'); buzz([20]); }
+  else if (d.msg === 'accepted') { if (d.col) tint(d.col); if (d.name) { MYNAME = d.name; try { localStorage.setItem('herba-nom', d.name); } catch (e) {} } setState('fall'); buzz([20]); }
   else if (d.msg === 'landed') { setState('dormant'); buzz([30, 50, 30]); }
   else if (d.msg === 'map') { MAP = d; drawMap(); }
   else if (d.msg === 'buzz') {                                  // une nouvelle graine vient de se poser : toute la communauté la sent
@@ -236,7 +235,7 @@ function onMsg(d) {
     b.style.setProperty('--wc', WEL.col); b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
   }
   else if (d.msg === 'live') { LIVE = d; LIVE.at = performance.now(); if (d.st && d.st !== st && (d.st === 'dormant' || d.st === 'grown') && st !== d.st && st !== 'none') setState(d.st); }
-  else if (d.msg === 'grown') { $('state').innerHTML = 'Votre graine a germé :<br><b>' + d.nom + '</b><br><i style="color:var(--dim)">' + d.chem + '</i>'; setState('grown', true); buzz([40, 60, 40, 60, 80]); }
+  else if (d.msg === 'grown') { $('state').innerHTML = 'Votre plante a germé' + nameLine() + '<br><span style="font-size:15px;color:var(--dim)">' + d.nom + ' · <i>' + d.chem + '</i></span>'; setState('grown', true); buzz([40, 60, 40, 60, 80]); }
 }
 const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
 function tint(c) { document.documentElement.style.setProperty('--seed', c); }
@@ -245,12 +244,11 @@ function setState(s, keepText) {
   const play = st !== 'none';
   $('menu').classList.toggle('hidden', play); $('play').classList.toggle('hidden', !play);
   if (!play) { refresh(); return; }
-  $('grow').classList.toggle('hidden', st !== 'dormant');
   $('orb').classList.toggle('hidden', st !== 'dormant'); $('liftBox').classList.toggle('hidden', st !== 'grown');
   $('motion').classList.toggle('hidden', motionOn || st === 'fall');
-  if (st === 'fall') { $('state').innerHTML = 'Votre graine traverse le vide…'; $('hint').innerHTML = 'Regardez l’écran : elle tombe du ciel, de votre couleur.'; }
-  else if (st === 'dormant') { $('state').innerHTML = 'Elle s’est posée sur la Lune.'; $('hint').innerHTML = 'Inclinez votre téléphone pour l’ajuster en la faisant rouler.<br>Puis, au moment que vous choisirez — sur une note, un silence — <b>faites-la germer</b>.'; }
-  else if (st === 'grown') { if (!keepText) $('state').innerHTML = 'Votre plante pousse sur la Lune.'; $('hint').innerHTML = 'Elle grandit et s’illumine avec la musique jouée devant vous.<br><b>Levez le téléphone vers le ciel</b> : elle prend de l’élan. Inclinez-le : elle se penche. Secouez-le : elle s’illumine.'; }
+  if (st === 'fall') { $('state').innerHTML = 'Votre graine traverse le vide…' + nameLine(); $('hint').innerHTML = 'Regardez l’écran : une colonne de lumière de votre couleur marque l’endroit où elle tombe.'; }
+  else if (st === 'dormant') { $('state').innerHTML = 'Elle s’est posée sur la Lune… elle germe.' + nameLine(); $('hint').innerHTML = 'À l’écran, son nom flotte au-dessus d’elle : c’est ainsi que vous la reconnaîtrez.'; }
+  else if (st === 'grown') { if (!keepText) $('state').innerHTML = 'Votre plante pousse sur la Lune.' + nameLine(); $('hint').innerHTML = 'Repérez son nom à l’écran, au-dessus d’elle. Elle grandit et s’illumine avec la musique.<br><b>Levez le téléphone vers le ciel</b> : elle prend de l’élan. Inclinez-le : elle se penche. Secouez-le : elle s’illumine.'; }
   calib = null;
 }
 $('sow').onclick = async () => {
@@ -261,7 +259,6 @@ $('sow').onclick = async () => {
   conn.send({ cid, type: 'seed', spec: sp });
   $('sow').disabled = true; say('Envoi de votre graine…'); setTimeout(refresh, 3000);
 };
-$('grow').onclick = () => { if (conn && conn.open && st === 'dormant') { conn.send({ cid, type: 'grow' }); $('grow').classList.add('hidden'); $('state').innerHTML = 'Elle germe…'; buzz([60]); } };
 $('motion').onclick = async () => { await askMotion(); setState(st); };
 
 /* ---- Mouvements du téléphone : inclinaison (déplacer / pencher) et secousse ---- */
@@ -332,6 +329,8 @@ setInterval(() => { if (st === 'none' && spec.x != null) drawMap(); }, 120);
 
 /* ---- Vue en direct de sa propre plante ---- */
 const WEL = { t: -1e9, col: '#fff' };
+let MYNAME = ''; try { MYNAME = localStorage.getItem('herba-nom') || ''; } catch (e) {}
+const nameLine = () => MYNAME ? '<br><span style="display:inline-block;margin-top:8px;padding:5px 14px;border:1px solid var(--seed);border-radius:999px;font-size:17px;box-shadow:0 0 14px var(--seed)">« ' + MYNAME.replace(/</g, '&lt;') + ' »</span>' : '';
 let LIVE = null; const lcv = $('live'), lcx = lcv.getContext('2d'); const SM = { b: 0, m: 0, h: 0, g: 0, gl: 0, pu: 0 };
 try { const sp = JSON.parse(localStorage.getItem('herba-graine') || 'null'); if (sp && sp.fam) Object.assign(spec, sp); } catch (e) {}
 (function liveLoop() {

@@ -96,7 +96,7 @@ est un point lumineux à sa place, à la hauteur de sa croissance. Les instrumen
 
 ### Pendant le spectacle (clavier)
 1 à 9 : plans (ensemble, ras du sol, grue, plongée, cime, canopée, ciel, Terre, contre-jour) · **A** lève le Soleil · **E** conclut ·
-**Q** graines du public · **S** mode Scène · **+ / −** zoom, **0** retour au sol · **I** instruments de scène · **H** commandes · **F** plein écran.
+**Q** graines du public · **N** noms du public · **S** mode Scène · **+ / −** zoom, **0** retour au sol · **I** instruments de scène · **H** commandes · **F** plein écran.
 Tout est inscrit dans l'empreinte : la galerie et les exports rejouent l'œuvre à l'identique.
 
 ### Sorties et robustesse
@@ -143,8 +143,10 @@ comme une commande : **espèce** (12), **couleur** de sa lumière (9), **taille*
 s'il le veut, puis **l'endroit** : une carte du jardin vu de haut montre les plantes déjà là, les graines des autres et, par un triangle,
 ce que la caméra regarde à l'écran. Un toucher choisit l'endroit. Récapitulatif « Votre commande », puis **Semer ma graine**.
 
-1. La graine tombe du ciel lunaire à l'écran, à l'endroit choisi, et se pose en dormance (on peut encore l'ajuster en inclinant le téléphone).
-2. Le spectateur choisit son moment et touche **Faire germer**.
+1. La graine tombe du ciel lunaire à l'écran, à l'endroit choisi, se pose et **germe d'elle-même** un instant plus tard.
+2. **Son nom s'affiche à l'écran au-dessus de sa plante**, dans une étiquette de sa couleur : chacun reconnaît sa création dans la vue
+   d'ensemble. Sans nom choisi, la plante reçoit celui de sa couleur et son numéro (« Turquoise 3 »). Touche **N** (ou la case de la carte 3)
+   pour masquer ou réafficher les noms ; ils s'effacent pendant les voyages dans l'espace.
 3. Son téléphone montre alors **sa propre plante en direct** : elle grandit, s'illumine et ondule au rythme de la musique jouée devant lui.
 4. **Lever le téléphone vers le ciel** donne de l'élan : la plante pousse plus vite, brille davantage et lance des étincelles à l'écran
    (sans capteurs, garder le doigt sur la vue en direct). Incliner le téléphone la penche ; le secouer l'illumine.
