@@ -77,8 +77,7 @@ Pensé pour une projection derrière le musicien.
 - **Mode Scène** (S) : plus aucun texte ni interface. Seul le message poétique de l'ouverture reste.
 - **Plans** : 1 ensemble, 2 ras du sol, 3 grue, 4 plongée, 5 cime, 6 canopée, 7 ciel, 8 Terre, 9 contre-jour. **A** lève le Soleil (force le climax), **E** lance le final.
   Mêmes commandes dans la régie et sur le téléphone-capteur. Elles sont inscrites dans l'empreinte : la galerie et les exports les rejouent à l'identique.
-- **Graines du public** (Q) : QR code dans un coin ; les spectateurs ouvrent `public.html` et touchent « Semer ». Chaque graine a sa propre couleur,
-  visible sur le téléphone et dans la traînée à l'écran ; les graines semées ensemble tombent en grappe et la caméra va voir l'atterrissage.
+- **Graines du public** (Q) : voir *Les graines du public* plus bas.
 - **Applaudissements** : reconnus (bruit large bande sans hauteur). Ils déclenchent le final et un salut lumineux de toute la flore, sans bloquer l'arrêt.
 
 ### Sorties et robustesse
@@ -117,6 +116,41 @@ le mode jeu du projecteur ; la mire (touche M) pour mesurer le décalage restant
 
 Les nouvelles œuvres sont calculées 60 fois par seconde (au lieu de 30) et enregistrent, en plus du son, la hauteur, l'accord,
 la tonalité, la tension, le bend et le vibrato : la galerie et les exports les rejouent à l'identique.
+
+## Les graines du public
+
+**Q** (ou la régie, ou le téléphone-capteur) affiche un QR code. Chaque spectateur compose sa graine comme une commande :
+**espèce** (12 au choix), **couleur** de sa lumière (9), **taille** (petite, moyenne, grande), **port** (élancé, rond, retombant, torsadé)
+et, s'il le veut, un **nom**. Un aperçu dessiné suit ses choix, un récapitulatif « Votre commande » s'affiche, puis **Semer ma graine**.
+
+1. La graine tombe du ciel lunaire à l'écran, de sa couleur, et se pose en dormance : un point de lumière au sol.
+2. En **inclinant le téléphone**, le spectateur la fait rouler où il veut, dans le sens de l'image projetée.
+3. Il choisit son moment, sur une note ou un silence, et touche **Faire germer**. La plante pousse avec l'espèce, la couleur,
+   la taille et le port demandés ; le téléphone affiche son nom savant et vibre.
+4. Ensuite, incliner le téléphone **penche la plante** avec lui, et **secouer** le téléphone l'illumine d'une gerbe d'étincelles.
+
+**Une seule graine par personne** : chaque téléphone garde un identifiant ; une seconde commande est refusée (« déjà semée »)
+et un rechargement de la page retrouve la graine où elle en est. Au final, les graines encore endormies germent toutes seules.
+Le semis n'est accepté qu'une fois le site révélé et le QR code ouvert. Tout est inscrit dans l'empreinte : la relecture rejoue chaque graine et chaque geste.
+La régie affiche le nombre de graines, endormies et germées.
+
+## Zoom sur la Lune à la pédale d'expression
+
+La pédale d'expression du GX-1 règle le zoom : pédale levée, on est au sol ; en l'enfonçant, la caméra s'élève au-dessus du jardin
+(jusqu'à 450 m) ; aux trois quarts, un bref fondu au noir, puis l'orbite, de 40 km jusqu'à 3 600 km, où la Lune entière apparaît, le jardin
+en point de lumière qui bat avec la musique. Relâcher la pédale ramène au sol.
+
+**Réglage** (panneau Réglages, rubrique *Zoom sur la Lune*), dans Chrome ou Edge :
+1. Brancher le GX-1 en USB-C, pilote Boss installé.
+2. Dans le GX-1, sur un preset dédié, assigner la pédale **EXP1** à l'envoi d'un **Control Change MIDI** (par exemple CC 7 ou CC 11).
+3. **Activer la pédale MIDI** (le navigateur demande l'autorisation), puis **Apprendre la pédale** et la balayer de haut en bas.
+   La pédale est retenue (contrôleur et canal) pour les fois suivantes ; une entrée nommée GX ou BOSS est même reconnue seule au premier balayage.
+   Le dernier message reçu s'affiche : s'il n'en vient aucun, le GX-1 n'émet pas cette pédale en MIDI (voir ci-dessous).
+4. **Inverser le sens** si besoin.
+
+Si le GX-1 n'envoie pas sa pédale en MIDI : une pédale MIDI USB ou sans fil (Boss EV-1-WL, par exemple) fonctionne de la même façon.
+Sinon, le zoom se règle aussi à la **molette** (caméra automatique), au clavier (**+** / **−**, **0** pour revenir au sol), au curseur de la régie
+ou à celui du **téléphone-capteur**. Les mouvements du zoom sont enregistrés et rejoués dans la galerie et les exports.
 
 ## Comment le son agit sur l'image
 

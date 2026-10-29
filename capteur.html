@@ -78,6 +78,8 @@
     <div class="lbl" style="margin-top:20px">Réalisation en direct</div>
     <div class="shots" id="shots"></div>
     <div class="row3"><button id="rAube">Aube</button><button id="rFinale">Final</button><button id="rStage">Mode Scène</button></div><div class="row3" style="margin-top:8px"><button id="rPublic">Graines du public</button></div>
+    <label style="display:block;margin-top:14px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;opacity:.7">Zoom sur la Lune <span id="rZv">sol</span>
+      <input type="range" id="rZoom" min="0" max="1" step="0.005" value="0" style="width:100%;margin-top:8px"></label>
   </div>
 
   <p class="note" style="text-align:center">Garde cette page ouverte et l’écran allumé pendant que tu joues.</p>
@@ -191,6 +193,8 @@ function onStatus(m) {
 const send = cmd => { if (conn && conn.open) conn.send({ cmd }); };
 ['Ensemble', 'Ras du sol', 'Grue', 'Plongée', 'Cime', 'Canopée', 'Ciel', 'Terre', 'Contre-jour'].forEach((n, i) => { const b = document.createElement('button'); b.textContent = n; b.onclick = () => send('shot' + (i + 1)); $('shots').appendChild(b); });
 $('rFinale').onclick = () => send('finale'); $('rAube').onclick = () => send('aube'); $('rStage').onclick = () => send('stage'); $('rPublic').onclick = () => send('public');
+let zLast = 0; $('rZoom').addEventListener('input', e => { const v = +e.target.value, now = performance.now(); $('rZv').textContent = v < .01 ? 'sol' : v < .72 ? 'au-dessus du jardin' : 'orbite'; if (now - zLast > 40 || v === 0 || v === 1) { zLast = now; if (conn && conn.open) conn.send({ cmd: 'zoom', v }); } });
+$('rZoom').addEventListener('change', e => { if (conn && conn.open) conn.send({ cmd: 'zoom', v: +e.target.value }); });
 $('rStart').onclick = () => send('start');
 $('rFinish').onclick = () => send('finish');
 $('rDiscard').onclick = () => { if (confirmTap($('rDiscard'))) send('discard'); };

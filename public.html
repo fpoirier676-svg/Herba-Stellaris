@@ -4,67 +4,258 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#000000">
-<title>Herba Stellaris — Semer une graine</title>
+<title>Herba Stellaris — Composer sa graine</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Corinthia:wght@400;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
-  :root { --ink:#efe8da; --dim:rgba(239,232,218,.62); --faint:rgba(239,232,218,.34); }
+  :root { --ink:#efe8da; --dim:rgba(239,232,218,.62); --faint:rgba(239,232,218,.34); --line:rgba(239,232,218,.16); --seed:#ffe2a0; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html,body { margin:0; height:100%; background:#000; color:var(--ink); font-family:Inter,system-ui,sans-serif; overflow:hidden; }
-  body { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:calc(env(safe-area-inset-top) + 24px) 26px calc(env(safe-area-inset-bottom) + 24px);
-    background:radial-gradient(ellipse at 50% 110%, rgba(70,60,40,.35), transparent 60%), radial-gradient(ellipse at 50% -10%, rgba(40,52,80,.35), transparent 60%), #000; }
-  h1 { font-family:'Corinthia','Cormorant Garamond',cursive; font-weight:400; font-size:64px; line-height:1; margin:0; text-align:center; }
-  .sub { font-family:'Cormorant Garamond',serif; font-style:italic; color:var(--dim); font-size:20px; text-align:center; margin:6px 0 38px; line-height:1.35; }
-  #seed { width:210px; height:210px; border-radius:50%; border:1px solid rgba(239,232,218,.5); background:radial-gradient(circle at 50% 45%, rgba(255,226,160,.22), rgba(255,226,160,.02) 60%, transparent 70%);
-    color:var(--ink); font:inherit; font-size:13px; letter-spacing:.22em; text-transform:uppercase; cursor:pointer; position:relative; transition:transform .2s, opacity .3s; }
-  #seed::after { content:''; position:absolute; left:50%; top:50%; width:14px; height:14px; margin:-7px; border-radius:50%; background:var(--seed,#fff3d0); box-shadow:0 0 22px 8px var(--seed,rgba(255,226,160,.8)); transform:translateY(-34px); transition:background .6s, box-shadow .6s; }
-  #seed:active { transform:scale(.96); } #seed:disabled { opacity:.35; }
-  #msg { min-height:70px; margin-top:30px; text-align:center; font-family:'Cormorant Garamond',serif; font-size:21px; line-height:1.4; max-width:340px; }
-  #msg i { color:var(--dim); font-size:16px; }
-  .note { position:fixed; bottom:calc(env(safe-area-inset-bottom) + 14px); left:0; right:0; text-align:center; color:var(--faint); font-size:11px; letter-spacing:.06em; }
+  html,body { margin:0; min-height:100%; background:#000; color:var(--ink); font-family:Inter,system-ui,sans-serif; }
+  body { padding:calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 28px);
+    background:radial-gradient(ellipse at 50% 110%, rgba(70,60,40,.35), transparent 60%), radial-gradient(ellipse at 50% -10%, rgba(40,52,80,.35), transparent 60%), #000; background-attachment:fixed; }
+  .wrap { max-width:460px; margin:0 auto; }
+  h1 { font-family:'Corinthia','Cormorant Garamond',cursive; font-weight:400; font-size:54px; line-height:1; margin:0; text-align:center; }
+  .sub { font-family:'Cormorant Garamond',serif; font-style:italic; color:var(--dim); font-size:18px; text-align:center; margin:4px 0 18px; line-height:1.35; }
+  .hidden { display:none !important; }
+  h2 { font-size:10px; letter-spacing:.24em; text-transform:uppercase; color:var(--dim); font-weight:500; margin:22px 0 10px; display:flex; gap:10px; align-items:center; }
+  h2 b { display:inline-flex; width:20px; height:20px; border-radius:50%; border:1px solid var(--line); align-items:center; justify-content:center; font-size:9px; letter-spacing:0; color:var(--ink); }
+  .grid { display:grid; gap:8px; }
+  .g3 { grid-template-columns:repeat(3,1fr); } .g4 { grid-template-columns:repeat(4,1fr); } .g2 { grid-template-columns:repeat(2,1fr); }
+  .opt { background:rgba(239,232,218,.04); border:1px solid var(--line); border-radius:12px; color:var(--ink); font:inherit; font-size:11.5px; padding:10px 6px; cursor:pointer; text-align:center; line-height:1.25; transition:border-color .2s, background .2s; }
+  .opt small { display:block; color:var(--faint); font-size:9.5px; margin-top:3px; font-style:italic; font-family:'Cormorant Garamond',serif; font-size:12px; }
+  .opt.on { border-color:var(--seed); background:rgba(239,232,218,.1); box-shadow:0 0 0 1px var(--seed) inset; }
+  .sw { height:44px; border-radius:50%; aspect-ratio:1; padding:0; justify-self:center; width:44px; }
+  .sw.on { box-shadow:0 0 0 2px #000 inset, 0 0 18px 2px currentColor; }
+  input[type=text] { width:100%; background:rgba(239,232,218,.05); border:1px solid var(--line); border-radius:12px; color:var(--ink); font:inherit; font-size:15px; padding:12px 14px; }
+  #prev { display:block; width:100%; height:200px; border-radius:16px; border:1px solid var(--line); background:radial-gradient(ellipse at 50% 120%, rgba(120,110,90,.25), transparent 65%); }
+  .ticket { margin-top:22px; border:1px dashed rgba(239,232,218,.35); border-radius:14px; padding:14px 16px; font-family:'Cormorant Garamond',serif; font-size:18px; line-height:1.5; }
+  .ticket .t { font-family:Inter,sans-serif; font-size:10px; letter-spacing:.24em; text-transform:uppercase; color:var(--dim); margin-bottom:6px; }
+  .ticket div span { color:var(--dim); font-size:15px; }
+  .big { display:block; width:100%; margin-top:16px; padding:18px; border-radius:999px; border:1px solid var(--seed); background:radial-gradient(circle at 50% 0%, rgba(255,240,200,.18), transparent 70%); color:var(--ink); font:inherit; font-size:12px; letter-spacing:.24em; text-transform:uppercase; cursor:pointer; }
+  .big:disabled { opacity:.35; }
+  #msg { min-height:28px; margin-top:16px; text-align:center; font-family:'Cormorant Garamond',serif; font-size:19px; line-height:1.4; }
+  #msg i { color:var(--dim); font-size:15px; }
+  /* phase de jeu */
+  #play { text-align:center; }
+  #orb { position:relative; width:240px; height:240px; margin:16px auto 6px; border-radius:50%; border:1px solid var(--line);
+    background:radial-gradient(circle, rgba(239,232,218,.05), transparent 70%); }
+  #orb::before, #orb::after { content:''; position:absolute; left:50%; top:8%; bottom:8%; width:1px; background:var(--line); }
+  #orb::after { top:50%; left:8%; right:8%; width:auto; height:1px; bottom:auto; }
+  #dot { position:absolute; left:50%; top:50%; width:26px; height:26px; margin:-13px; border-radius:50%; background:var(--seed); box-shadow:0 0 26px 10px var(--seed); transition:transform .08s linear; }
+  #state { font-family:'Cormorant Garamond',serif; font-size:22px; line-height:1.4; margin:12px 0 4px; }
+  #hint { color:var(--dim); font-size:12.5px; line-height:1.5; }
+  .note { margin-top:26px; text-align:center; color:var(--faint); font-size:11px; letter-spacing:.04em; line-height:1.5; }
 </style>
 </head>
 <body>
+<div class="wrap">
   <h1>Herba Stellaris</h1>
-  <div class="sub" id="sub">Une flore naît sur la Lune, en musique.<br>Semez-y votre graine.</div>
-  <button id="seed" disabled>Semer</button>
+  <div class="sub" id="sub">Une flore naît sur la Lune, en musique.<br>Composez votre graine : une seule par personne.</div>
+
+  <section id="menu">
+    <canvas id="prev" width="920" height="400"></canvas>
+
+    <h2><b>1</b> L’espèce</h2>
+    <div class="grid g3" id="fams"></div>
+
+    <h2><b>2</b> La couleur de sa lumière</h2>
+    <div class="grid" id="cols" style="grid-template-columns:repeat(5,1fr);row-gap:12px"></div>
+
+    <h2><b>3</b> La taille</h2>
+    <div class="grid g3" id="sizes"></div>
+
+    <h2><b>4</b> Le port</h2>
+    <div class="grid g4" id="forms"></div>
+
+    <h2><b>5</b> Son nom <span style="text-transform:none;letter-spacing:0;color:var(--faint)">(facultatif)</span></h2>
+    <input type="text" id="name" maxlength="18" placeholder="Par exemple : Lumière de Léa" autocomplete="off">
+
+    <div class="ticket" id="ticket"></div>
+    <button class="big" id="sow" disabled>Semer ma graine</button>
+  </section>
+
+  <section id="play" class="hidden">
+    <div id="orb"><div id="dot"></div></div>
+    <div id="state"></div>
+    <div id="hint"></div>
+    <button class="big hidden" id="grow">Faire germer</button>
+    <button class="big hidden" id="motion" style="border-color:var(--line)">Activer les mouvements</button>
+  </section>
+
   <div id="msg">Connexion…</div>
-  <div class="note">Regardez l’écran : votre graine tombera du ciel lunaire.</div>
+  <div class="note">Regardez l’écran derrière le musicien : votre graine y tombe du ciel lunaire.</div>
+</div>
 <script>
 const $ = id => document.getElementById(id);
+const FAMS = [['arbre', 'Arbre-lanterne', 'cime lumineuse'], ['saule', 'Saule', 'branches en pluie'], ['arborescente', 'Fougère géante', 'palmes en tronc'],
+  ['fougere', 'Fougère', 'crosses déroulées'], ['fleur', 'Lys', 'grande fleur'], ['corolle', 'Corolle', 'pétales en coupe'], ['cristal', 'Cristal', 'aiguilles minérales'],
+  ['amethyste', 'Géode', 'gemmes en grappe'], ['herbe', 'Herbes', 'touffe souple'], ['filament', 'Filaments', 'fils de lumière'], ['arbuste', 'Arbuste à baies', 'buisson perlé'], ['succulente', 'Rosette', 'feuilles charnues']];
+const COLS = ['#ff9e29', '#ff5c4d', '#ff61c7', '#a85cff', '#4080ff', '#33f2e0', '#40ff8c', '#a8ff33', '#cce6ff'];
+const COLN = ['Ambre', 'Corail', 'Rose', 'Violette', 'Azur', 'Turquoise', 'Émeraude', 'Lime', 'Givre'];
+const SIZES = [['Petite', 'discrète'], ['Moyenne', 'équilibrée'], ['Grande', 'majestueuse']];
+const FORMS = [['Élancée', 'vers le ciel'], ['Ronde', 'en boule'], ['Retombante', 'qui pleure'], ['Torsadée', 'en spirale']];
+const spec = { fam: null, col: null, size: 1, form: 0, name: '' };
+
+// identifiant du téléphone : une graine par personne
+let cid = null; try { cid = localStorage.getItem('herba-cid'); } catch (e) {}
+if (!cid) { cid = 'c' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); try { localStorage.setItem('herba-cid', cid); } catch (e) {} }
+
+function opts(el, list, key, cls = 'opt') {
+  list.forEach((o, i) => {
+    const b = document.createElement('button'); b.className = cls; b.type = 'button';
+    if (key === 'col') { b.className = 'opt sw'; b.style.background = o; b.style.color = o; b.title = COLN[i]; b.setAttribute('aria-label', COLN[i]); }
+    else b.innerHTML = o[1] && key === 'fam' ? o[1] + '<small>' + o[2] + '</small>' : o[0] + (o[1] ? '<small>' + o[1] + '</small>' : '');
+    b.onclick = () => { spec[key] = key === 'fam' ? o[0] : i; [...el.children].forEach(c => c.classList.toggle('on', c === b)); refresh(); };
+    if ((key === 'size' && i === spec.size) || (key === 'form' && i === spec.form)) b.classList.add('on');
+    el.appendChild(b);
+  });
+}
+opts($('fams'), FAMS, 'fam'); opts($('cols'), COLS, 'col'); opts($('sizes'), SIZES, 'size'); opts($('forms'), FORMS, 'form');
+$('name').addEventListener('input', e => { spec.name = e.target.value.trim(); refresh(); });
+
+function refresh() {
+  const col = spec.col != null ? COLS[spec.col] : '#ffe2a0'; document.documentElement.style.setProperty('--seed', col);
+  const f = FAMS.find(x => x[0] === spec.fam);
+  $('ticket').innerHTML = '<div class="t">Votre commande</div>' +
+    `<div>${f ? f[1] : '<span>— choisissez une espèce</span>'}</div>` +
+    `<div>${spec.col != null ? 'lumière ' + COLN[spec.col].toLowerCase() : '<span>— choisissez une couleur</span>'} · ${SIZES[spec.size][0].toLowerCase()} · ${FORMS[spec.form][0].toLowerCase()}</div>` +
+    (spec.name ? `<div><i>« ${spec.name.replace(/</g, '&lt;')} »</i></div>` : '');
+  $('sow').disabled = !(spec.fam && spec.col != null && conn && conn.open);
+  draw();
+}
+
+/* ---- Aperçu dessiné de la graine composée ---- */
+const cv = $('prev'), cx = cv.getContext('2d');
+function rnd(s) { return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; }
+function draw() {
+  const W = cv.width, H = cv.height, col = spec.col != null ? COLS[spec.col] : '#ffe2a0', fam = spec.fam || 'fleur', r = rnd(7 + FAMS.findIndex(x => x[0] === fam) * 31);
+  cx.clearRect(0, 0, W, H);
+  const sc = [.7, 1, 1.3][spec.size], tall = [1.3, .8, 1, 1][spec.form], weep = spec.form === 2, twist = spec.form === 3, round = spec.form === 1;
+  const gx = W / 2, gy = H - 40, h = 210 * sc * tall;
+  cx.strokeStyle = 'rgba(239,232,218,.25)'; cx.lineWidth = 2; cx.beginPath(); cx.ellipse(gx, gy, 150, 12, 0, 0, 6.283); cx.stroke();
+  cx.shadowColor = col; cx.shadowBlur = 24; cx.strokeStyle = col; cx.fillStyle = col; cx.lineCap = 'round';
+  const stem = (x0, y0, len, ang, w, depth) => {           // tige courbée, torsadée si demandé
+    cx.lineWidth = w; cx.beginPath(); cx.moveTo(x0, y0); let x = x0, y = y0, a = ang;
+    for (let i = 0; i < 12; i++) { a += (twist ? Math.sin(i * .9) * .22 : 0) + (weep && i > 5 ? (a < 0 ? -.12 : .12) * (depth ? 1 : .2) : 0); x += Math.sin(a) * len / 12; y -= Math.cos(a) * len / 12; cx.lineTo(x, y); }
+    cx.stroke(); return [x, y, a];
+  };
+  const blob = (x, y, rad, a = .85) => { cx.globalAlpha = a; cx.beginPath(); cx.arc(x, y, rad, 0, 6.283); cx.fill(); cx.globalAlpha = 1; };
+  const fan = (x, y, n, len, spread, ang0 = 0, w = 3) => { for (let i = 0; i < n; i++) { const a = ang0 + (i / (n - 1) - .5) * spread; stem(x, y, len * (.8 + r() * .3), a, w, 1); } };
+  if (fam === 'arbre' || fam === 'arbuste') {
+    const [x, y] = stem(gx, gy, fam === 'arbre' ? h * .7 : h * .35, 0, 9 * sc, 0);
+    const n = fam === 'arbre' ? 26 : 16, R = (fam === 'arbre' ? 70 : 85) * sc * (round ? 1.25 : 1);
+    for (let i = 0; i < n; i++) { const a = r() * 6.283, d = r() * R; blob(x + Math.cos(a) * d * 1.2, y + Math.sin(a) * d * (weep ? 1.1 : .6) + (weep ? 30 : -10), (fam === 'arbre' ? 16 + r() * 12 : 10) * sc, .32); }
+    if (fam === 'arbuste') for (let i = 0; i < 18; i++) { const a = r() * 6.283, d = r() * R; cx.fillStyle = '#fff'; blob(x + Math.cos(a) * d, y + Math.sin(a) * d * .7, 5 * sc, .9); cx.fillStyle = col; }
+  } else if (fam === 'saule') {
+    const [x, y] = stem(gx, gy, h * .6, 0, 8 * sc, 0);
+    for (let i = 0; i < 11; i++) { const a = (i / 10 - .5) * 2.6; cx.lineWidth = 2.2; cx.beginPath(); cx.moveTo(x, y); const ex = x + Math.sin(a) * 120 * sc, ey = y - 20; cx.quadraticCurveTo(ex, ey - 50 * sc, ex + Math.sin(a) * 10, Math.min(gy - 6, y + (weep ? 150 : 110) * sc)); cx.stroke(); }
+  } else if (fam === 'arborescente' || fam === 'fougere') {
+    const tall2 = fam === 'arborescente', [x, y] = tall2 ? stem(gx, gy, h * .6, 0, 9 * sc, 0) : [gx, gy];
+    const n = tall2 ? 9 : 7; for (let i = 0; i < n; i++) { const a = (i / (n - 1) - .5) * (round ? 3.6 : 2.6), [ex, ey, ea] = stem(x, y, (tall2 ? 120 : 160) * sc, a, 3, 1);
+      for (let j = 0; j < 9; j++) { /* folioles */ } cx.beginPath(); cx.arc(ex, ey, 10 * sc, ea, ea + 4.5); cx.stroke(); }
+  } else if (fam === 'fleur' || fam === 'corolle') {
+    const [x, y] = stem(gx, gy, h * .85, twist ? .1 : 0, 4 * sc, 0), P = fam === 'fleur' ? 6 : 10, R = (fam === 'fleur' ? 50 : 38) * sc * (round ? 1.2 : 1);
+    stem(gx, gy - h * .25, 50 * sc, -.9, 3, 1); stem(gx, gy - h * .35, 45 * sc, .9, 3, 1);
+    for (let i = 0; i < P; i++) { const a = i / P * 6.283; cx.globalAlpha = .55; cx.beginPath(); cx.ellipse(x + Math.cos(a) * R * .55, y + Math.sin(a) * R * .55 * (weep ? 1.1 : .6) + (weep ? 14 : 0), R * .55, R * .2, a, 0, 6.283); cx.fill(); }
+    cx.globalAlpha = 1; cx.fillStyle = '#fff'; blob(x, y, 7 * sc, 1); cx.fillStyle = col;
+  } else if (fam === 'cristal' || fam === 'amethyste') {
+    const n = fam === 'cristal' ? 7 : 11; for (let i = 0; i < n; i++) {
+      const a = (i / (n - 1) - .5) * (round ? 2.2 : 1.3) + (twist ? .3 : 0), L = (fam === 'cristal' ? h : h * .55) * (.5 + r() * .5), w = (fam === 'cristal' ? 12 : 20) * sc;
+      const ex = gx + Math.sin(a) * L, ey = gy - Math.cos(a) * L, nx = Math.cos(a) * w, ny = Math.sin(a) * w;
+      cx.globalAlpha = .5; cx.beginPath(); cx.moveTo(gx - nx, gy - ny); cx.lineTo(ex - nx * .6, ey - ny * .6); cx.lineTo(ex + Math.sin(a) * w * 1.6, ey - Math.cos(a) * w * 1.6); cx.lineTo(ex + nx * .6, ey + ny * .6); cx.lineTo(gx + nx, gy + ny); cx.closePath(); cx.fill(); cx.globalAlpha = 1; cx.lineWidth = 1.5; cx.stroke(); }
+  } else if (fam === 'herbe' || fam === 'filament') {
+    const n = fam === 'herbe' ? 22 : 16; for (let i = 0; i < n; i++) { const a = (r() - .5) * (round ? 1.8 : 1.1), [ex, ey] = stem(gx + (r() - .5) * 60, gy, h * (.5 + r() * .5), a, fam === 'herbe' ? 3 : 1.5, 1); if (fam === 'filament') { cx.fillStyle = '#fff'; blob(ex, ey, 4 * sc, 1); cx.fillStyle = col; } }
+  } else {                                                    // rosette
+    for (let k = 3; k >= 1; k--) for (let i = 0; i < 8; i++) { const a = i / 8 * 6.283 + k, R = 34 * k * sc * (round ? 1.15 : 1); cx.globalAlpha = .35 + .15 * (3 - k); cx.beginPath(); cx.ellipse(gx + Math.cos(a) * R * .6, gy - 30 * sc - Math.sin(a) * R * .25 - (spec.form === 0 ? 20 * k : 0), R * .5, R * .17, a, 0, 6.283); cx.fill(); }
+    cx.globalAlpha = 1;
+  }
+  cx.shadowBlur = 0;
+  if (!spec.fam) { cx.fillStyle = 'rgba(239,232,218,.55)'; cx.font = 'italic 30px "Cormorant Garamond", serif'; cx.textAlign = 'center'; cx.fillText('Choisissez une espèce pour dessiner votre graine', W / 2, 46); }
+}
+
+/* ---- Liaison avec la composition ---- */
 const target = decodeURIComponent((location.hash || '').slice(1));
-let conn = null, peer = null, cool = 0, timer = null;
+let conn = null, peer = null, st = 'none', retry = 0;
 const say = h => $('msg').innerHTML = h;
 function connect() {
   if (!target) { say('Scannez le QR code affiché sur l’écran.'); return; }
   if (!window.Peer) { say('Connexion impossible : vérifiez votre accès à internet.'); return; }
-  peer = new Peer();
-  peer.on('open', () => {
+  peer = peer && !peer.destroyed ? peer : new Peer();
+  const go = () => {
     conn = peer.connect(target, { metadata: { role: 'public' }, reliable: true });
-    conn.on('open', () => { $('seed').disabled = false; say('Touchez la graine quand vous le souhaitez.'); });
+    conn.on('open', () => { retry = 0; say(''); conn.send({ cid, type: 'hello' }); refresh(); });
     conn.on('data', d => onMsg(d || {}));
-    conn.on('close', () => { $('seed').disabled = true; say('La liaison s’est interrompue. Rechargez la page pour revenir.'); });
-  });
-  peer.on('error', () => say('La composition n’est pas joignable pour l’instant. Rechargez la page dans un moment.'));
+    conn.on('close', () => { refresh(); say('Liaison interrompue… <i>reconnexion</i>'); setTimeout(connect, 2000 + 1000 * Math.min(retry++, 8)); });
+  };
+  if (peer.open) go(); else peer.on('open', go);
+  peer.on('error', () => { say('La composition n’est pas joignable pour l’instant.<br><i>Nouvel essai dans un instant…</i>'); setTimeout(() => { try { peer.destroy(); } catch (e) {} peer = null; connect(); }, 4000); });
 }
 function onMsg(d) {
-  if (d.msg === 'hello' && d.site) $('sub').innerHTML = 'Une flore naît en ce moment sur la Lune,<br>au site <b>' + d.site + '</b>.';
-  else if (d.msg === 'wait') say('La graine attend : le voyage vers la Lune n’est pas terminé.<br><i>Réessayez dans un instant.</i>');
-  else if (d.msg === 'busy') say('Le ciel est plein de graines.<br><i>Réessayez dans quelques secondes.</i>');
-  else if (d.msg === 'cool') startCool(d.s || 20, 'Votre dernière graine germe encore.');
-  else if (d.msg === 'queued') { if (d.col) tint(d.col); say('Votre graine traverse le vide…<br><i>Regardez l’écran : elle est de cette couleur.</i>'); }
-  else if (d.msg === 'planted') { if (d.col) tint(d.col); say('Votre graine a germé :<br><b>' + d.nom + '</b><br><i>' + d.chem + '</i>'); if (navigator.vibrate) navigator.vibrate([30, 60, 30]); startCool(20); }
+  if ((d.msg === 'hello' || d.msg === 'state') && d.site) $('sub').innerHTML = 'Une flore naît en ce moment sur la Lune,<br>au site <b>' + d.site + '</b>. Une graine par personne.';
+  if (d.msg === 'state') { if (d.col) tint(d.col); setState(d.state === 'growing' ? 'grown' : d.state); }
+  else if (d.msg === 'wait') say('Le semis n’est pas encore ouvert.<br><i>Attendez que le musicien invite le public, puis réessayez.</i>');
+  else if (d.msg === 'deja') { say('Ce téléphone a déjà semé sa graine pour ce concert.'); setState(d.state === 'growing' ? 'grown' : d.state); }
+  else if (d.msg === 'accepted') { if (d.col) tint(d.col); setState('fall'); buzz([20]); }
+  else if (d.msg === 'landed') { setState('dormant'); buzz([30, 50, 30]); }
+  else if (d.msg === 'grown') { $('state').innerHTML = 'Votre graine a germé :<br><b>' + d.nom + '</b><br><i style="color:var(--dim)">' + d.chem + '</i>'; setState('grown', true); buzz([40, 60, 40, 60, 80]); }
 }
+const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
 function tint(c) { document.documentElement.style.setProperty('--seed', c); }
-function startCool(s, txt) {
-  cool = s; $('seed').disabled = true; clearInterval(timer);
-  if (txt) say(txt);
-  timer = setInterval(() => { if (--cool <= 0) { clearInterval(timer); $('seed').disabled = false; $('seed').textContent = 'Semer'; } else $('seed').textContent = cool + ' s'; }, 1000);
-  $('seed').textContent = cool + ' s';
+function setState(s, keepText) {
+  st = s || 'none';
+  const play = st !== 'none';
+  $('menu').classList.toggle('hidden', play); $('play').classList.toggle('hidden', !play);
+  if (!play) { refresh(); return; }
+  $('grow').classList.toggle('hidden', st !== 'dormant');
+  $('motion').classList.toggle('hidden', motionOn || st === 'fall');
+  if (st === 'fall') { $('state').innerHTML = 'Votre graine traverse le vide…'; $('hint').innerHTML = 'Regardez l’écran : elle tombe du ciel, de votre couleur.'; }
+  else if (st === 'dormant') { $('state').innerHTML = 'Elle s’est posée sur la Lune.'; $('hint').innerHTML = 'Inclinez votre téléphone pour la faire rouler où vous voulez.<br>Puis, au moment que vous choisirez — sur une note, un silence — <b>faites-la germer</b>.'; }
+  else if (st === 'grown') { if (!keepText) $('state').innerHTML = 'Votre plante pousse sur la Lune.'; $('hint').innerHTML = 'Inclinez le téléphone : elle se penche avec vous.<br>Secouez-le : elle s’illumine.'; }
+  calib = null;
 }
-$('seed').onclick = () => { if (conn && conn.open) { conn.send({ seed: true }); $('seed').disabled = true; setTimeout(() => { if (!cool) $('seed').disabled = false; }, 2500); } };
-connect();
+$('sow').onclick = async () => {
+  if (!conn || !conn.open || !spec.fam || spec.col == null) return;
+  await askMotion();                                           // demander l'accès aux capteurs pendant ce geste (iPhone)
+  conn.send({ cid, type: 'seed', spec: { fam: spec.fam, col: spec.col, size: spec.size, form: spec.form, name: spec.name } });
+  $('sow').disabled = true; say('Envoi de votre graine…'); setTimeout(refresh, 3000);
+};
+$('grow').onclick = () => { if (conn && conn.open && st === 'dormant') { conn.send({ cid, type: 'grow' }); $('grow').classList.add('hidden'); $('state').innerHTML = 'Elle germe…'; buzz([60]); } };
+$('motion').onclick = async () => { await askMotion(); setState(st); };
+
+/* ---- Mouvements du téléphone : inclinaison (déplacer / pencher) et secousse ---- */
+let motionOn = false, calib = null, tx = 0, ty = 0, lastSend = 0, lastShake = 0, prevA = null;
+async function askMotion() {
+  if (motionOn) return true;
+  try {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') { if (await DeviceOrientationEvent.requestPermission() !== 'granted') return false; }
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') { try { await DeviceMotionEvent.requestPermission(); } catch (e) {} }
+  } catch (e) { return false; }
+  addEventListener('deviceorientation', onOri); addEventListener('devicemotion', onMot); motionOn = true; return true;
+}
+function onOri(e) {
+  if (e.beta == null || e.gamma == null) return;
+  if (!calib) calib = { b: e.beta, g: e.gamma };                // la position de départ devient le centre
+  const cl = v => Math.max(-1, Math.min(1, v));
+  tx = cl((e.gamma - calib.g) / 30); ty = cl((e.beta - calib.b) / 30);
+  const dz = v => Math.abs(v) < .08 ? 0 : v;                     // zone morte : la graine ne glisse pas toute seule
+  tx = dz(tx); ty = dz(ty);
+  $('dot').style.transform = `translate(${tx * 95}px, ${ty * 95}px)`;
+  const now = performance.now();
+  if ((st === 'dormant' || st === 'grown') && conn && conn.open && now - lastSend > 100) { lastSend = now; conn.send({ cid, type: 'tilt', x: Math.round(tx * 100) / 100, y: Math.round(ty * 100) / 100 }); }
+}
+function onMot(e) {
+  const a = e.accelerationIncludingGravity || e.acceleration; if (!a || a.x == null) return;
+  if (prevA) { const j = Math.abs(a.x - prevA.x) + Math.abs(a.y - prevA.y) + Math.abs(a.z - prevA.z), now = performance.now();
+    if (j > 22 && now - lastShake > 450 && (st === 'dormant' || st === 'grown') && conn && conn.open) { lastShake = now; conn.send({ cid, type: 'shake' }); buzz([25]); $('dot').animate([{ boxShadow: '0 0 60px 30px var(--seed)' }, { boxShadow: '0 0 26px 10px var(--seed)' }], 500); } }
+  prevA = { x: a.x, y: a.y, z: a.z };
+}
+// sans capteurs (ordinateur), on peut glisser le point du doigt
+(() => { const o = $('orb'); let on = false; const mv = e => { if (!on) return; const r = o.getBoundingClientRect(), p = e.touches ? e.touches[0] : e; const x = Math.max(-1, Math.min(1, (p.clientX - r.left - r.width / 2) / 95)), y = Math.max(-1, Math.min(1, (p.clientY - r.top - r.height / 2) / 95)); onOri({ beta: (calib ? calib.b : 0) + y * 30, gamma: (calib ? calib.g : 0) + x * 30 }); e.preventDefault(); };
+  o.addEventListener('pointerdown', e => { if (motionOn && calib && !e.isPrimary) return; on = true; if (!calib) calib = { b: 0, g: 0 }; mv(e); }); addEventListener('pointermove', mv, { passive: false });
+  addEventListener('pointerup', () => { if (!on) return; on = false; onOri({ beta: calib ? calib.b : 0, gamma: calib ? calib.g : 0 }); }); })();
+document.addEventListener('visibilitychange', () => { if (!document.hidden && conn && !conn.open) connect(); });
+refresh(); connect();
 </script>
 </body>
 </html>

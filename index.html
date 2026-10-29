@@ -311,9 +311,14 @@ SKYIMG.moon = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAUDBAQEAw
   <label class="chk"><input type="checkbox" id="adaptive" checked> Résolution adaptative (garder 60 i/s)</label>
   <label class="ctl">Latence de la chaîne <output id="oLat">100 ms</output><input type="range" id="latency" min="0" max="400" step="5" value="100"></label>
   <label class="chk"><input type="checkbox" id="lowlat"> Affichage faible latence (au prochain chargement ; peut déchirer l’image)</label>
+  <div class="meter" style="display:block;margin-top:12px">Zoom sur la Lune — pédale d’expression</div>
+  <label class="ctl">Zoom <output id="oZoom">sol</output><input type="range" id="zRange" min="0" max="1" step="0.005" value="0"></label>
+  <button class="small" id="btnMidi">Activer la pédale MIDI</button> <button class="small" id="btnLearn">Apprendre la pédale</button>
+  <label class="chk"><input type="checkbox" id="zInv"> Inverser le sens de la pédale</label>
+  <div id="zMsg" class="xnote" style="font-size:10px;opacity:.75;line-height:1.5">Branche le GX-1 en USB, puis active le MIDI. Molette (caméra auto), touches + / − et 0 pour revenir au sol.</div>
   <label class="chk"><input type="checkbox" id="mire"> Mire de synchronisation (touche M) : éclair à chaque attaque</label>
   <button class="small" id="btnCalib2" style="margin-top:8px">Étalonner la salle</button> <span id="calibMsg2" class="xnote"></span>
-  <div class="xnote" style="font-size:10px;opacity:.6;margin-top:8px;line-height:1.5">Scène : 1 ensemble · 2 ras du sol · 3 grue · 4 plongée · 5 cime · 6 canopée · 7 ciel · 8 Terre · 9 contre-jour · E final · Q graines du public · S mode Scène · F plein écran</div>
+  <div class="xnote" style="font-size:10px;opacity:.6;margin-top:8px;line-height:1.5">Scène : 1 ensemble · 2 ras du sol · 3 grue · 4 plongée · 5 cime · 6 canopée · 7 ciel · 8 Terre · 9 contre-jour · E final · Q graines du public · S mode Scène · F plein écran · + / − zoom, 0 retour au sol</div>
 </div>
 
 <div id="carnet"></div>
@@ -333,6 +338,7 @@ SKYIMG.moon = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAUDBAQEAw
     <button id="rgAube">Aube (A)</button><button id="rgFin">Final (E)</button><button id="rgPub">Graines public (Q)</button>
     <button id="rgStage">Mode Scène (S)</button><button id="rgMire">Mire (M)</button><button id="rgClose">Fermer la projection</button>
   </div>
+  <label class="rg-zoom" style="display:flex;align-items:center;gap:10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin:4px 0 8px">Zoom <input type="range" id="rgZoom" min="0" max="1" step="0.005" value="0" style="flex:1"></label>
   <div class="rg-msg" id="rgMsg"></div>
 </div>
 
@@ -2098,7 +2104,7 @@ function genPlant(pl, rng, sunDir, W) {
     for (const s of J) { const c = V(s[0], s[1], s[2]), e = dirT(c, V(s[3], s[4], s[5]), .2); s[0] = e.a.x; s[1] = e.a.y; s[2] = e.a.z; e.d.normalize(); s[3] = e.d.x; s[4] = e.d.y; s[5] = e.d.z; s[7] *= D.S; s[8] *= D.S * Math.sqrt(D.H); s[9] *= D.S; }
   }
   // teinte et lueur propres à la variété
-  const HK = .42, tint = (c, metal) => metal > .5 ? c : harmonize(hueRot(c, D.hue), pl.harm || W.harm, HK);
+  const HK = pl.harmK || .42, tint = (c, metal) => metal > .5 ? c : harmonize(hueRot(c, D.hue), pl.harm || W.harm, HK);
   const mm = new Map(), remat = m => { if (!mm.has(m)) mm.set(m, { col: tint(m.col, m.metal), col2: tint(m.col2, m.metal), rough: m.rough, metal: m.metal, trans: m.trans }); return mm.get(m); };
   for (const s of T) { s[14] *= D.gl; s[18] = tint(s[18], s[20][1]); s[19] = tint(s[19], s[20][1]); }
   for (const s of P) { s[12] *= D.gl; s[16] = remat(s[16]); }
@@ -2278,12 +2284,13 @@ class Sim {
     this.mu = { vM: 0, vP: 0, dv: 0, vL: 0, vLL: 0, tilt: 0, tiltAvg: 0, ons: 0, b: .5, r: 0, p: 0, e: 0 };
     this.phrase = { id: 0, t0: 0, s: [.5, .5, 0], off: 0, fam: null, cx: 0, cz: 0 }; this.groves = [[0, 0]];
  this.lastSpawn = -99; this.shot = null; this.prevShot = null; this.full = false;
+    this.seeds = new Map(); this.notes = []; this.zoom = 0; this.zoomT = 0;
     this.shocks = []; this.stillK = 0; this.loud = 0; this.pan = 0; this.lat = .1; this.predict = false; this.dawn = !!W.dawn; this.D = 0; this.stage = 0; this.shotPhrase = 0; this.finaleT0 = 0; this.finaleLock = false; this.pubN = 0;
     resetFlora(); resetDust();
     this.cut(this.intro ? 'arrivee' : 'large');
   }
   skyMs() { return this.W.startMs + this.lunarT * 1000; }
-  step(fr) {
+  step(fr, evs) {
     this.t += DT; this.tick++;
     const [bass, mid, high, vol, cent, flag] = fr, f = this.f, fl = Math.round(flag), onset = !!(fl & 1), silent = !!(fl & 2);
     const pub = !!(fl & 4), forcedShot = (fl >> 3) & 15, forcedEnd = !!(fl & 128);   // graines du public, plans et final commandés par le musicien
@@ -2390,6 +2397,9 @@ class Sim {
       }
     }
     if (n && this.introDone) this.guitar(t, live, { noteOn, harm, muted, percLo, percHi, slide, strum });
+    if (evs) for (const e of evs) this.event(e, t);
+    this.updateSeeds(t, live);
+    this.zoom += (this.zoomT - this.zoom) * (1 - Math.exp(-DT / .14));        // zoom à la pédale, lissé
     for (const p of this.plants) if (p.delay && !p.landed && t >= p.born + p.delay) { p.landed = true; emitDust(this.rD, p.x, p.z, 220, t, this.W.h); this.shocks.push({ x: p.x, z: p.z, t0: t, a: .7 }); if (this.shocks.length > 6) this.shocks.shift(); }
     if (pub && seedOpen && !this.full && n < MAXP) this.spawnPublic();
     if (this.intro) {                     // final : à 3 min 30, ou dès 3 s de silence ; annulé si la musique reprend avant 3 min 30
@@ -2463,6 +2473,48 @@ class Sim {
     }
     if (e.strum) for (let k = 0; k < 3; k++) { const p = live[Math.floor(r() * n)]; emitSparks(r, p.x, p.y + p.height * p.growth * .8, p.z, 16, p.col, t); }   // rasgueado : un éventail d'étincelles
   }
+  // ---- Événements extérieurs : graines des spectateurs, pédale de zoom
+  event(e, t) {
+    if (e.type === 'zoom') { this.zoomT = clamp(e.v, 0, 1); return; }
+    const sd = this.seeds.get(e.id);
+    if (e.type === 'seed' && !sd) {
+      const r = this.rD, recent = [...this.seeds.values()].filter(q => t - q.t0 < 5).pop(), c = recent ? [recent.x, recent.z] : this.shot ? [this.shot.cx, this.shot.cz] : [0, 0];
+      const a = r() * 6.283, d = recent ? 2 + r() * 4 : 5 + r() * 12;                        // les graines semées ensemble tombent en grappe
+      this.seeds.set(e.id, { id: e.id, spec: e.spec, col: PUB_COLS[e.spec.col], x: c[0] + Math.cos(a) * d, z: c[1] + Math.sin(a) * d, t0: t, land: t + 1.8, state: 'fall', tilt: [0, 0], lean: [0, 0], plant: null });
+      this.pubN++;
+    } else if (!sd) return;
+    else if (e.type === 'tilt') sd.tilt = [e.x, e.y];
+    else if (e.type === 'grow' && sd.state === 'dormant') this.growSeed(sd, t);
+    else if (e.type === 'shake') {
+      if (sd.plant && !sd.plant.dead) { const p = sd.plant; p.pulse = 1; p.flut = 1; emitSparks(this.rD, p.x, p.y + p.height * p.growth * .8, p.z, 26, sd.col, t); }
+      else if (sd.state === 'dormant') emitDust(this.rD, sd.x, sd.z, 30, t, this.W.h);
+    }
+  }
+  growSeed(sd, t) {
+    const before = this.plants.length; this.spawn(this.f.bass, this.f.mid, this.f.high, this.f.cent, true, sd.spec, [sd.x, sd.z], sd.col);
+    if (this.plants.length === before) return;                                             // jardin plein : la graine attend
+    const p = this.plants[this.plants.length - 1]; p.seedId = sd.id; sd.plant = p; sd.state = 'grown';
+    emitRing(this.rD, sd.x, sd.z, .5, t, this.W.h); this.shocks.push({ x: sd.x, z: sd.z, t0: t, a: .45 }); if (this.shocks.length > 6) this.shocks.shift();
+    this.notes.push({ id: sd.id, msg: 'grown', nom: p.v.nom, chem: p.v.chem });
+    if (!this.finale && t - this.shot.t0 > 3 && t - (this.lastPubCut || -99) > 10) { this.cut('grue', p); this.lastPubCut = t; }   // la caméra va voir la germination
+  }
+  updateSeeds(t, live) {
+    if (!this.seeds.size) return;
+    let basis = null;
+    const getBasis = () => { if (basis) return basis; const o = { pos: new THREE.Vector3(), tgt: new THREE.Vector3(), fov: 34, focus: 20 }; shotCamera(this, t, o); let fx = o.tgt.x - o.pos.x, fz = o.tgt.z - o.pos.z; const l = Math.hypot(fx, fz) || 1; fx /= l; fz /= l; return basis = { fx, fz, rx: -fz, rz: fx }; };
+    for (const sd of this.seeds.values()) {
+      if (sd.state === 'fall' && t >= sd.land) { sd.state = 'dormant'; emitDust(this.rD, sd.x, sd.z, 160, t, this.W.h); this.shocks.push({ x: sd.x, z: sd.z, t0: t, a: .6 }); if (this.shocks.length > 6) this.shocks.shift(); this.notes.push({ id: sd.id, msg: 'landed' }); }
+      if (sd.state === 'dormant' && (sd.tilt[0] || sd.tilt[1])) {                           // incliner le téléphone fait rouler la graine, dans le repère de l'écran
+        const B = getBasis(), sp = 3.2 * DT; sd.x += (B.rx * sd.tilt[0] - B.fx * sd.tilt[1]) * sp; sd.z += (B.rz * sd.tilt[0] - B.fz * sd.tilt[1]) * sp;
+        const R = Math.hypot(sd.x, sd.z); if (R > 58) { sd.x *= 58 / R; sd.z *= 58 / R; }
+      }
+      if (sd.state === 'grown' && sd.plant) {                                                // puis la plante penche avec le téléphone
+        const B = getBasis(), k = 1 - Math.exp(-DT / .18), tx = B.rx * sd.tilt[0] - B.fx * sd.tilt[1], tz = B.rz * sd.tilt[0] - B.fz * sd.tilt[1];
+        sd.lean[0] += (tx - sd.lean[0]) * k; sd.lean[1] += (tz - sd.lean[1]) * k; sd.plant.lean = sd.lean;
+      }
+      if (this.finale && sd.state === 'dormant' && t - this.finaleT0 > 1 + (sd.id % 7) * .4) this.growSeed(sd, t);   // au final, toutes les graines en attente germent
+    }
+  }
   listen(onset) {
     const m = this.mu, f = this.f, k = x => 1 - Math.exp(-DT / x);
     m.vP = m.vM; m.vM += (this.loud - m.vM) * k(1.2);
@@ -2510,12 +2562,13 @@ class Sim {
     const fx = o.tgt.x - o.pos.x, fz = o.tgt.z - o.pos.z; return (x, z) => (x - o.pos.x) * -fz + (z - o.pos.z) * fx;   // > 0 : à droite
   }
   spawnPublic() { this.spawn(this.f.bass, this.f.mid, this.f.high, this.f.cent, true); }
-  spawn(bass, mid, high, cent, pub) {
+  spawn(bass, mid, high, cent, pub, spec, at, scol) {
     const r = this.rL, W = this.W;
-    const v = this.pickVariety(f => f !== 'mycelium'), sp = v.fam, P = this.phrase;
+    const v = spec ? this.pickVariety(f => f === spec.fam) : this.pickVariety(f => f !== 'mycelium'), sp = v.fam, P = this.phrase;
     if (!P.fam) P.fam = sp;
     let px, pz;
-    if (pub) { const lp = this.lastPublic && this.t - this.lastPublic.born < 5 ? this.lastPublic : null;   // graines semées ensemble : elles tombent en grappe
+    if (at) { px = at[0]; pz = at[1]; }
+    else if (pub) { const lp = this.lastPublic && this.t - this.lastPublic.born < 5 ? this.lastPublic : null;   // graines semées ensemble : elles tombent en grappe
       const a = r() * 6.283, d = lp ? 2 + r() * 4 : 5 + r() * 16, c = lp ? [lp.x, lp.z] : this.shot && this.plants.length ? [this.shot.cx, this.shot.cz] : [0, 0]; px = c[0] + Math.cos(a) * d; pz = c[1] + Math.sin(a) * d; }
     else if (!this.plants.length) { px = (r() - .5) * 4; pz = (r() - .5) * 4; }
     else if (r() < .72) {                       // dans le bosquet de la phrase en cours, en gardant de l'espace ; du côté de l'écran d'où vient le son (stéréo)
@@ -2531,12 +2584,15 @@ class Sim {
     const col = baseCol.map(c => clamp(c * (.85 + r() * .3), 0, 1.2));
     // direction du Soleil à l'instant (déterministe) de la naissance, relevée au-dessus de l'horizon
     const C = celestial(W, this.skyMs()); const sun0 = new THREE.Vector3(C.sunL.x, Math.max(C.sunL.y, .1), C.sunL.z).normalize();
-    const pl = { idx, sp, var: v.id, v, harm: this.g && this.g.harm, mod: this.birthMod(), mus: [this.mu.b, this.mu.r, this.mu.p], phraseId: P.id, born: this.t, x: px, z: pz, y: W.h(px, pz) - .15, growth: 0, glow: 0, pulse: 1, col, phase: r(), height: 0, crown: 0, sun0 };
+    const md = this.birthMod();
+    if (spec) { md.S *= [.75, 1, 1.35][spec.size]; if (spec.form === 0) md.H *= 1.35; else if (spec.form === 1) { md.H *= .8; md.S *= 1.08; } else if (spec.form === 2) md.dr += .55; else md.tw += 1.4; }   // taille et port choisis par le spectateur
+    const pl = { idx, sp, var: v.id, v, harm: scol ? [rgb2hsv(scol)[0], rgb2hsv(scol)[0], rgb2hsv(scol)[0]] : this.g && this.g.harm, harmK: scol ? .92 : 0, mod: md, mus: [this.mu.b, this.mu.r, this.mu.p], phraseId: P.id, born: this.t, x: px, z: pz, y: W.h(px, pz) - .15, growth: 0, glow: 0, pulse: 1, col, phase: r(), height: 0, crown: 0, sun0 };
     const G = genPlant(pl, mulberry32(Math.floor(r() * 4294967296)), sun0, W);
     if (!writePlant(G, idx)) { compactFlora(this.plants); idx = allocSlot(this.plants); pl.idx = idx; if (idx < 0 || !writePlant(G, idx)) { SLOTS[idx] = 0; this.full = true; return; } }
     pl.height = Math.max(1, G.height); pl.crown = G.crown; pl.G = G; this.full = false;
-    if (pub) { pl.delay = 1.8; pl.public = true; pl.col = pubColor(this.pubN); this.pubN++; this.lastPublic = pl; }
-    if (pub && !this.finale && this.t > this.introEnd && this.t - this.shot.t0 > 4 && this.t - (this.lastPubCut || -99) > 12) { this.plants.push(pl); this.cut('grue', pl); this.plants.pop(); this.lastPubCut = this.t; }
+    if (pub && !spec) { pl.delay = 1.8; pl.public = true; pl.col = pubColor(this.pubN); this.pubN++; this.lastPublic = pl; }
+    if (spec) { pl.public = true; pl.col = scol.slice(); }
+    if (pub && !spec && !this.finale && this.t > this.introEnd && this.t - this.shot.t0 > 4 && this.t - (this.lastPubCut || -99) > 12) { this.plants.push(pl); this.cut('grue', pl); this.plants.pop(); this.lastPubCut = this.t; }
     this.plants.push(pl); if (!pub) this.lastSpawn = this.t;
     if (idx === 0 && !this.intro) this.cut('ras', pl);
     if (!pub && r() < .2 + .3 * Math.max(-this.mu.r, 0) && this.plants.length < MAXP - 12) this.spawnRhizome(pl);
@@ -2680,13 +2736,16 @@ function shotCamera(sim, T, out, shot) {
 /* =====================================================================
    8. SESSIONS
    ===================================================================== */
+// journal d'événements (graines du public, zoom à la pédale) : inscrit avec le numéro de pas, rejoué à l'identique
+const LIVE_EV = []; let recEvents = [], EVIDX = new Map();
+const indexEvents = evs => { const m = new Map(); for (const e of evs || []) { if (!m.has(e.k)) m.set(e.k, []); m.get(e.k).push(e); } return m; };
 let recStride = 6, mode = 'intro', sim = null, frames = [], recFrames = null, replayEl = null, liveT0 = 0, idleAcc = 0, current = null, videoRec = null, videoChunks = [];
 const FSTRIDE = 16, ZERO = new Array(FSTRIDE).fill(0), SILENT = ZERO.slice(); SILENT[5] = 2;
 function startWorld(seed, startMs, intro, dawn) { world = buildWorld(seed, startMs, dawn); sim = new Sim(seed, world, intro); sim.tscale = S.tscale; CEL = celestial(world, sim.skyMs()); }
 
 async function startLive(kind, file) {
   const seed = (crypto.getRandomValues(new Uint32Array(1))[0]) >>> 0;
-  setTick(LIVE_TICK); startWorld(seed, Date.now(), true, !S.cycle); frames = []; sim.lat = S.latency / 1000; sim.predict = true;
+  setTick(LIVE_TICK); startWorld(seed, Date.now(), true, !S.cycle); frames = []; recEvents = []; LIVE_EV.length = 0; PUB.clients.clear(); ZM.sent = 0; ZM.sentT = 0; sim.lat = S.latency / 1000; sim.predict = true;
   if (kind === 'mic') await AE.useMic(); else if (kind === 'phone') await AE.useRemote(PH.stream); else await AE.useFile(file);
   liveT0 = AE.ctx.currentTime; AE.silentFor = 0; AE.heard = 0; AE.silStart = null; AE.lastNow = 0;
   if (AE.el) AE.el.onended = () => { if (mode === 'live') finishLive(true); };
@@ -2703,7 +2762,7 @@ async function finishLive(save) {
   const thumb = await new Promise(res => wantThumb = res);
   const rec = {
     id: Date.now().toString(36) + '-' + sim.W.seed.toString(36), name: sim.W.name, date: new Date().toISOString(), seed: sim.W.seed, startUTC: sim.W.startMs,
-    stride: FSTRIDE, tick: TICK, lat: S.latency / 1000, tscale: sim.tscale, dawn: sim.dawn, publicSeeds: sim.pubN, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), varieties: new Set(sim.plants.map(p => p.var)).size, frames: new Float32Array(frames), audio, thumb,
+    stride: FSTRIDE, tick: TICK, events: recEvents.slice(), lat: S.latency / 1000, tscale: sim.tscale, dawn: sim.dawn, publicSeeds: sim.pubN, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), varieties: new Set(sim.plants.map(p => p.var)).size, frames: new Float32Array(frames), audio, thumb,
   };
   try { await DB.put(rec); } catch (e) { memStore.set(rec.id, rec); }
   showEpilogue(rec);
@@ -2714,7 +2773,7 @@ const speciesLine = c => Object.keys(SPECIES).filter(k => c[k]).map(k => c[k] + 
 async function startReplay(rec, exportVideo) {
   closeGallery(); AE.ensure(); AE.stop();
   setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0;
-  recFrames = rec.frames; recStride = rec.stride || 6; current = rec; replayEl = null;
+  recFrames = rec.frames; recStride = rec.stride || 6; EVIDX = indexEvents(rec.events); current = rec; replayEl = null;
   if (rec.audio) {
     const el = new window.Audio(URL.createObjectURL(rec.audio)); replayEl = el;
     const src = AE.ctx.createMediaElementSource(el); src.connect(AE.ctx.destination);
@@ -2881,7 +2940,58 @@ addEventListener('keydown', e => {
   else if (k === 'a' && mode === 'live') PEND.dawn = true;
   else if (k === 'm') { S.mire = !S.mire; $('mire').checked = S.mire; }
   else if (/^[1-9]$/.test(k) && mode === 'live') PEND.shot = +k;
+  else if (k === '+' || k === '=' || k === 'pageup') setZoom(ZM.v + .04, 'clavier');
+  else if (k === '-' || k === '_' || k === 'pagedown') setZoom(ZM.v - .04, 'clavier');
+  else if (k === '0') setZoom(0, 'clavier');
 });
+/* ---- Zoom sur la Lune : pédale d'expression du GX-1 (MIDI CC), molette, clavier, téléphone ----
+   0 → 0.72 : on s'élève au-dessus du jardin ; au-delà, l'orbite, jusqu'à voir la Lune entière. */
+const ZM = { v: 0, sent: 0, sentT: 0, src: '', midi: null, bind: null, learn: false, learnSeen: null, inv: false, last: '', status: '', streams: new Map() };
+try { const o = JSON.parse(localStorage.getItem('herba-pedale') || 'null'); if (o) { ZM.bind = o.bind || null; ZM.inv = !!o.inv; } } catch (e) {}
+const saveZM = () => { try { localStorage.setItem('herba-pedale', JSON.stringify({ bind: ZM.bind, inv: ZM.inv })); } catch (e) {} };
+function setZoom(v, src) {
+  ZM.v = clamp(+v || 0, 0, 1); ZM.src = src || '';
+  if (sim && mode !== 'live' && mode !== 'replay' && mode !== 'export') sim.zoomT = ZM.v;
+  updZoomUI();
+}
+function flushZoom() {           // en direct : le zoom devient un événement enregistré (la relecture rejoue la pédale)
+  const now = performance.now(), d = Math.abs(ZM.v - ZM.sent);
+  if (d > .004 && (now - ZM.sentT > 33 || ZM.v === 0 || ZM.v === 1)) { LIVE_EV.push({ type: 'zoom', v: Math.round(ZM.v * 1000) / 1000 }); ZM.sent = ZM.v; ZM.sentT = now; }
+}
+const zoomLabel = v => v < .01 ? 'sol' : v < ZOOM_SPLIT ? 'altitude ' + Math.round(8 * Math.pow(450 / 8, v / ZOOM_SPLIT)) + ' m' : 'orbite ' + Math.round(40 * Math.pow(90, (v - ZOOM_SPLIT) / (1 - ZOOM_SPLIT))) + ' km';
+function updZoomUI() {
+  $('oZoom').textContent = zoomLabel(ZM.v); if (document.activeElement !== $('zRange')) $('zRange').value = ZM.v; if (document.activeElement !== $('rgZoom')) $('rgZoom').value = ZM.v;
+  const b = ZM.bind ? `Pédale : CC ${ZM.bind.cc}, canal ${ZM.bind.ch + 1}${ZM.bind.name ? ' (' + ZM.bind.name + ')' : ''}` : 'Pédale non apprise';
+  $('zMsg').textContent = [ZM.status, ZM.learn ? 'Écoute… bouge la pédale d’expression de haut en bas' : b, ZM.last ? 'Dernier message : ' + ZM.last : ''].filter(Boolean).join(' · ');
+  $('btnLearn').textContent = ZM.learn ? 'Annuler' : 'Apprendre la pédale';
+}
+async function initMidi() {
+  if (!navigator.requestMIDIAccess) { ZM.status = 'MIDI indisponible ici : ouvre Herba Stellaris dans Chrome ou Edge'; updZoomUI(); return false; }
+  if (ZM.midi) return true;
+  try { ZM.midi = await navigator.requestMIDIAccess({ sysex: false }); } catch (e) { ZM.status = 'Accès MIDI refusé par le navigateur'; updZoomUI(); return false; }
+  const hook = () => {
+    const names = []; for (const inp of ZM.midi.inputs.values()) { inp.onmidimessage = onMidi; names.push(inp.name); }
+    ZM.status = names.length ? 'MIDI : ' + names.join(', ') : 'Aucune entrée MIDI : branche le GX-1 en USB (pilote Boss installé)'; updZoomUI();
+  };
+  ZM.midi.onstatechange = hook; hook(); return true;
+}
+function onMidi(e) {
+  const [st, d1, d2] = e.data; if ((st & 0xF0) !== 0xB0 || d2 == null) return;      // seuls les Control Change nous intéressent
+  const ch = st & 15, name = (e.target && e.target.name) || '', now = performance.now();
+  ZM.last = `CC ${d1} = ${d2} · canal ${ch + 1}`;
+  const key = ch * 128 + d1; let q = ZM.streams.get(key); if (!q || now - q.t0 > 1500) { q = { t0: now, vals: new Set() }; ZM.streams.set(key, q); } q.vals.add(d2);
+  // apprentissage : le premier contrôleur qui balaie au moins 4 valeurs (une pédale, pas un interrupteur) ; sans réglage, détection automatique
+  if ((ZM.learn || (!ZM.bind && /gx|boss/i.test(name))) && q.vals.size >= 4) { ZM.bind = { ch, cc: d1, name }; ZM.learn = false; saveZM(); }
+  if (ZM.bind && !ZM.learn && ZM.bind.ch === ch && ZM.bind.cc === d1) { const v = d2 / 127; setZoom(ZM.inv ? 1 - v : v, 'pédale'); }
+  else updZoomUI();
+}
+$('btnMidi').onclick = () => initMidi();
+$('btnLearn').onclick = async () => { if (!(await initMidi())) return; ZM.learn = !ZM.learn; ZM.streams.clear(); updZoomUI(); };
+$('zInv').checked = ZM.inv; $('zInv').addEventListener('change', e => { ZM.inv = e.target.checked; saveZM(); updZoomUI(); });
+$('zRange').addEventListener('input', e => setZoom(+e.target.value, 'curseur')); $('rgZoom').addEventListener('input', e => setZoom(+e.target.value, 'régie'));
+canvas.addEventListener('wheel', e => { if (!S.autocam || !sim || !sim.introDone) return; e.preventDefault(); setZoom(ZM.v + clamp(e.deltaY, -100, 100) * .0012, 'molette'); }, { passive: false });
+if (ZM.bind && navigator.permissions) navigator.permissions.query({ name: 'midi' }).then(p => { if (p.state === 'granted') initMidi(); }).catch(() => {});
+updZoomUI();
 function applyPending(fr) {
   if (PEND.shot) { fr[5] += 8 * PEND.shot; PEND.shot = 0; }
   if (PEND.end) { fr[5] += 128; PEND.end = false; }
@@ -3018,7 +3128,8 @@ function updateRegie() {
   const items = [['Temps', mode === 'live' ? mmss(liveTime()) : mmss(sim.t)], ['Phrase', ph], ['Plantes', sim.plants.length + (sim.full ? ' (plein)' : '')], ['Soleil', el + (sim.dawn ? (sim.D < 1 ? ' · avant l’' + (world.term === 'crepuscule' ? 'ombre' : 'aube') : '') : '')],
     ['Niveau', Math.round((sim.loud || 0) * 100) + ' %'], ['Dynamique', (sim.mu.r > .15 ? 'crescendo' : sim.mu.r < -.15 ? 'decrescendo' : 'stable')], ['Plan', sim.shot.type], ['Image', fps + ' i/s · ' + Math.round(resScale * 100) + ' %'],
     ['Note', GT.note ? NOTE_NAMES[((GT.note.m0 % 12) + 12) % 12] + (Math.floor(GT.note.m0 / 12) - 1) : '—'], ['Accord', GT.chordName || '—'], ['Tonalité', GT.keyName || '—'], ['Tension', Math.round(GT.tension * 100) + ' %'],
-    ['Source', lien], ['Public', PUB.on ? PUB.queue.length + ' en attente · ' + sim.pubN + ' semées' : 'fermé'], ['Silence', AE.silentFor > 1 ? AE.silentFor.toFixed(0) + ' s' : '—'], ['Applaudis.', AE.applause ? 'oui' : '—']];
+    ['Source', lien], ['Public', PUB.on ? PUB.queue.length + ' en attente · ' + sim.pubN + ' semées' : 'fermé'], ['Silence', AE.silentFor > 1 ? AE.silentFor.toFixed(0) + ' s' : '—'], ['Applaudis.', AE.applause ? 'oui' : '—'], ['Zoom', zoomLabel(ZM.v) + (ZM.src ? ' · ' + ZM.src : '')], ['Pédale', ZM.bind ? 'CC ' + ZM.bind.cc : ZM.midi ? 'à apprendre' : 'MIDI inactif'],
+    ['Spectateurs', pubSummary()]];
   $('rgStat').innerHTML = items.map(([k, v]) => `<div><span>${k}</span>${v}</div>`).join('');
 }
 /* ---- Perte du contexte graphique : on continue d'écouter et d'enregistrer, l'image revient dès que possible ---- */
@@ -3088,7 +3199,7 @@ function ensurePeer(onOpen) {
     if (c.metadata && c.metadata.role === 'public') { publicConn(c); return; }
     if (PH.conn) { try { PH.conn.close(); } catch (e) {} }
     PH.conn = c;
-    c.on('data', d => phoneCommand(d && d.cmd));
+    c.on('data', d => { if (d && d.cmd === 'zoom') { setZoom(+d.v, 'téléphone'); return; } phoneCommand(d && d.cmd); });
     c.on('open', sendStatus);
   });
   PH.peer.on('disconnected', () => { if (!PH.peer.destroyed) setTimeout(() => PH.peer.reconnect(), 1500); });
@@ -3114,10 +3225,37 @@ function togglePublic() {
   if (PUB.on && !ensurePeer(drawPublicQR)) $('pubUrl').textContent = 'Liaison indisponible : cet ordinateur doit être connecté à internet.';
   drawPublicQR();
 }
+// Graines composées par les spectateurs : une par personne (identifiant gardé par le téléphone), puis germination et mouvements
+const PUB_FAMS = ['arbre', 'saule', 'arborescente', 'fougere', 'fleur', 'corolle', 'cristal', 'amethyste', 'herbe', 'filament', 'arbuste', 'succulente'];
+const PUB_COLS = [[1, .62, .16], [1, .36, .3], [1, .38, .78], [.66, .36, 1], [.25, .5, 1], [.2, .95, .88], [.25, 1, .55], [.66, 1, .2], [.8, .9, 1]];
+PUB.clients = new Map(); PUB.byId = new Map(); PUB.nextId = 1;
+function pubSummary() { if (!PUB.on && !PUB.clients.size) return 'fermé'; const n = { fall: 0, dormant: 0, growing: 0, grown: 0 }; for (const c of PUB.clients.values()) n[c.state] = (n[c.state] || 0) + 1; return PUB.clients.size ? `${PUB.clients.size} · ${n.dormant} en sommeil · ${n.grown + n.growing} germées` : 'ouvert · aucune'; }
+function publicSay(c, o) { try { if (c && c.open) c.send(o); } catch (e) {} }
+function notifySeed(n) { const cl = PUB.byId.get(n.id); if (!cl) return; if (n.msg === 'grown') cl.state = 'grown'; if (n.msg === 'landed') cl.state = 'dormant'; publicSay(cl.conn, n); }
 function publicConn(c) {
-  c.on('open', () => { try { c.send({ msg: 'hello', site: world ? world.name : '', live: mode === 'live' }); } catch (e) {} });
+  c.on('open', () => publicSay(c, { msg: 'hello', site: world ? world.name : '', live: mode === 'live' && sim.introDone }));
   c.on('data', d => {
-    if (!d || !d.seed) return;
+    if (!d) return;
+    if (d.cid) {                                                           // protocole des graines composées
+      const cid = String(d.cid).slice(0, 40); let cl = PUB.clients.get(cid);
+      if (cl) cl.conn = c;
+      if (d.type === 'hello') return publicSay(c, cl ? { msg: 'state', state: cl.state, id: cl.id, col: cl.col } : { msg: 'state', state: 'none', live: mode === 'live' && sim.introDone, site: world.name });
+      if (d.type === 'seed') {
+        if (mode !== 'live' || !sim.introDone || !PUB.on) return publicSay(c, { msg: 'wait' });
+        if (cl) return publicSay(c, { msg: 'deja', state: cl.state });                       // une seule graine par personne
+        const sp = d.spec || {}, spec = { fam: PUB_FAMS.includes(sp.fam) ? sp.fam : 'fleur', col: clamp(sp.col | 0, 0, PUB_COLS.length - 1), size: clamp(sp.size | 0, 0, 2), form: clamp(sp.form | 0, 0, 3) };
+        const id = PUB.nextId++; cl = { cid, id, conn: c, state: 'fall', col: hexCol(PUB_COLS[spec.col]), name: String(sp.name || '').slice(0, 18), lastTilt: 0, lastShake: 0, tx: 0, ty: 0 };
+        PUB.clients.set(cid, cl); PUB.byId.set(id, cl); LIVE_EV.push({ type: 'seed', id, spec });
+        return publicSay(c, { msg: 'accepted', id, col: cl.col });
+      }
+      if (!cl || mode !== 'live') return;
+      const now = performance.now();
+      if (d.type === 'grow' && cl.state === 'dormant') { LIVE_EV.push({ type: 'grow', id: cl.id }); cl.state = 'growing'; }
+      else if (d.type === 'tilt' && now - cl.lastTilt > 90) { const x = clamp(+d.x || 0, -1, 1), y = clamp(+d.y || 0, -1, 1); if (Math.abs(x - cl.tx) + Math.abs(y - cl.ty) > .04) { cl.tx = x; cl.ty = y; cl.lastTilt = now; LIVE_EV.push({ type: 'tilt', id: cl.id, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 }); } }
+      else if (d.type === 'shake' && now - cl.lastShake > 350) { cl.lastShake = now; LIVE_EV.push({ type: 'shake', id: cl.id }); }
+      return;
+    }
+    if (!d.seed) return;
     const now = performance.now(), last = PUB.cool.get(c.peer) || -1e9, say = o => { try { c.send(o); } catch (e) {} };
     if (mode !== 'live' || !sim.introDone) return say({ msg: 'wait' });
     if (now - last < 20000) return say({ msg: 'cool', s: Math.ceil((20000 - (now - last)) / 1000) });
@@ -3291,7 +3429,7 @@ function updateSpace(T, f = { bass: 0, high: 0, vol: 0 }, kick = 0, kOver, Iover
   const mu = SPACE.moonMat.uniforms;
   mu.uSun.value.copy(I.sun); mu.uXb.value.set(...I.F.xb); mu.uYb.value.set(...I.F.yb); mu.uZb.value.set(...I.F.zb);
   mu.uSite.value.copy(I.site); mu.uToEarth.value.copy(I.M).multiplyScalar(-1).normalize(); mu.uEL.value = I.s.earthLit;
-  mu.uMark.value = kOver ? 3 + 1.2 * f.vol + 1.5 * kick : smoothstep(8, 13, T) * (1 + 2.2 * kick); mu.uTime.value = T; mu.uMarkCol.value.setRGB(...world.palette.a);
+  mu.uMark.value = k.mark != null ? k.mark : kOver ? 3 + 1.2 * f.vol + 1.5 * kick : smoothstep(8, 13, T) * (1 + 2.2 * kick); mu.uTime.value = T; mu.uMarkCol.value.setRGB(...world.palette.a);
   const rS = Math.asin(696000 / I.s.sunDist);
   SPACE.sun.position.copy(c.position).addScaledVector(I.sun, 2800); SPACE.sun.scale.setScalar(2800 * Math.tan(rS)); SPACE.sun.lookAt(c.position);
   SPACE.glare.position.copy(c.position).addScaledVector(I.sun, 2790); SPACE.glare.scale.setScalar(2800 * Math.tan(5 * D2R)); SPACE.glare.lookAt(c.position);
@@ -3412,10 +3550,19 @@ function updateOverlay(Tv, sinceArr, on) {
 }
 
 /* ---- Final en orbite : le jardin devient un point de lumière sur la Lune, la Terre au-dessus ---- */
+function finI() { const ms = Math.round(sim.skyMs() / 6e5) * 6e5; if (!SPACE.Ifin || SPACE.Ifin.ms !== ms || SPACE.Ifin.seed !== world.seed) { SPACE.Ifin = introSetup(world, ms); SPACE.Ifin.ms = ms; SPACE.Ifin.seed = world.seed; } return SPACE.Ifin; }
+// zoom de la pédale au-delà du sol : de quelques kilomètres jusqu'à voir la Lune entière, le jardin en point de lumière
+const ZOOM_SPLIT = .72, _zp = new THREE.Vector3(), _zt = new THREE.Vector3();
+function updateZoomOrbit(u, f) {
+  const I = finI(), h = Math.exp(Math.log(.04) + (Math.log(3.6) - Math.log(.04)) * u);
+  const toE = I.M.clone().multiplyScalar(-1).normalize(), ax = new THREE.Vector3().crossVectors(I.site, toE).normalize();
+  const g = I.site.clone().applyAxisAngle(ax, -.08 * u), pos = I.M.clone().addScaledVector(g, I.R + h), Ps = I.M.clone().addScaledVector(I.site, I.R);
+  const look = pos.clone().add(slerpV(Ps.clone().sub(pos).normalize(), I.M.clone().sub(pos).normalize(), smoothstep(.05, 1.2, h)));
+  const up = new THREE.Vector3().crossVectors(ax, g).normalize();
+  updateSpace(30 + renderT * .1, f, sim.kick * .4, { pos, look, up, fov: 46, mark: smoothstep(.03, .5, h) * (1.4 + f.vol + 1.2 * sim.kick) }, I);
+}
 function updateOrbit(t, f) {
-  const ms = Math.round(sim.skyMs() / 6e5) * 6e5;
-  if (!SPACE.Ifin || SPACE.Ifin.ms !== ms || SPACE.Ifin.seed !== world.seed) { SPACE.Ifin = introSetup(world, ms); SPACE.Ifin.ms = ms; SPACE.Ifin.seed = world.seed; }
-  const I = SPACE.Ifin, ez = x => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }, e = ez(t / 15), drift = Math.max(0, t - 15) * .004;
+  const I = finI(), ez = x => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }, e = ez(t / 15), drift = Math.max(0, t - 15) * .004;
   const toE = I.M.clone().multiplyScalar(-1).normalize(), ax = new THREE.Vector3().crossVectors(I.site, toE).normalize();
   const g = I.site.clone().applyAxisAngle(ax, -(.2 * e + drift));                                // on recule à l'opposé de la Terre
   const h = Math.exp(Math.log(.015) + (Math.log(.09) - Math.log(.015)) * e) + drift * .6;
@@ -3428,10 +3575,29 @@ function updateOrbit(t, f) {
 
 /* ---- Graines du public : elles tombent du ciel sur le jardin ---- */
 const PUB_POOL = [0, 1, 2, 3].map(() => { const g = grainPoints(36); g.visible = false; scene.add(g); return g; });
+// graines posées, en attente de germer : un point de lumière qui respire, de la couleur choisie
+const SEEDN = 160, seedGeo = new THREE.BufferGeometry(), seedP = new Float32Array(SEEDN * 3), seedC = new Float32Array(SEEDN * 4);
+seedGeo.setAttribute('position', new THREE.BufferAttribute(seedP, 3)); seedGeo.setAttribute('aC', new THREE.BufferAttribute(seedC, 4)); seedGeo.setDrawRange(0, 0);
+const seedPts = new THREE.Points(seedGeo, new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uPx: { value: 1 }, uTime: PU.uTime },
+  vertexShader: `attribute vec4 aC; uniform float uPx,uTime; varying vec3 vC; void main(){ vC=aC.rgb; vec4 mv=modelViewMatrix*vec4(position,1.); gl_Position=projectionMatrix*mv;
+    gl_PointSize=clamp(uPx*(14.+6.*sin(uTime*3.+aC.a*7.))*(1.+18./max(-mv.z,1.)),3.,60.); }`,
+  fragmentShader: `varying vec3 vC; void main(){ float d=length(gl_PointCoord-.5)*2.; if(d>1.) discard; float g=exp(-d*d*7.)+exp(-d*2.5)*.35; gl_FragColor=vec4((mix(vC,vec3(1.),exp(-d*d*40.)*.7))*g*2.4,1.); }` }));
+seedPts.frustumCulled = false; scene.add(seedPts);
 function updatePublicFalls(vh) {
-  let k = 0;
+  let k = 0, ns = 0;
+  for (const sd of sim.seeds.values()) {
+    const gy = world.h(sd.x, sd.z);
+    if (sd.state === 'fall' && k < PUB_POOL.length) {                                          // la graine tombe du ciel lunaire
+      const u0 = (renderT - sd.t0) / (sd.land - sd.t0), G = PUB_POOL[k++], pos = G.geometry.attributes.position;
+      for (let j = 0; j < 36; j++) { const u = clamp(u0 - j * .012, 0, 1), fall = Math.pow(1 - u, 1.7); pos.setXYZ(j, sd.x + fall * 14, gy + .15 + fall * 110, sd.z - fall * 6); }
+      pos.needsUpdate = true; G.visible = true; const U = G.material.uniforms; U.uPx.value = vh / 1080; U.uSize.value = 22; U.uI.value = 3.2; U.uOn.value = 1; U.uCol.value.setRGB(...sd.col);
+    } else if ((sd.state === 'dormant' || sd.state === 'growing' || (sd.state === 'fall' && k >= PUB_POOL.length)) && ns < SEEDN) {
+      seedP.set([sd.x, gy + .14, sd.z], ns * 3); seedC.set([...sd.col, sd.id], ns * 4); ns++;
+    }
+  }
+  seedGeo.setDrawRange(0, ns); if (ns) { seedGeo.attributes.position.needsUpdate = seedGeo.attributes.aC.needsUpdate = true; seedPts.material.uniforms.uPx.value = vh / 1080; }
   for (const p of sim.plants) {
-    if (!p.public || k >= PUB_POOL.length) continue;
+    if (!p.public || p.seedId || !p.delay || k >= PUB_POOL.length) continue;
     const u0 = (renderT - p.born) / p.delay; if (u0 < 0 || u0 > 1.25) continue;
     const G = PUB_POOL[k++], pos = G.geometry.attributes.position, gy = world.h(p.x, p.z);
     for (let j = 0; j < 36; j++) { const u = clamp(u0 - j * .012, 0, 1), fall = Math.pow(1 - u, 1.7); pos.setXYZ(j, p.x + fall * 14, gy + .15 + fall * 110, p.z - fall * 6); }
@@ -3488,8 +3654,11 @@ function advance(dt) {
     AE.update(dt, S.sens);
     const T = liveTime();
     while (sim.tick < Math.floor(T * TICK)) {
-      const fr = AE.frame(); applyPending(fr); frames.push(...fr); const lp = sim.lastPublic; sim.step(fr);
+      const fr = AE.frame(); applyPending(fr); frames.push(...fr); const lp = sim.lastPublic;
+      flushZoom(); const evs = LIVE_EV.length ? LIVE_EV.splice(0) : null; if (evs) for (const e of evs) recEvents.push({ k: sim.tick, ...e });
+      sim.step(fr, evs);
       if (sim.lastPublic && sim.lastPublic !== lp) notifyPublic(sim.lastPublic);
+      if (sim.notes.length) for (const n of sim.notes.splice(0)) notifySeed(n);
     }
     renderT = Math.max(sim.t, T);
     const finLeft = sim.finale ? Math.max(0, FINALE_LEN - (sim.t - sim.finaleT0)) : 0, left = Math.max(10 - AE.silentFor, finLeft);
@@ -3510,7 +3679,7 @@ function advance(dt) {
 }
 function stepRecorded(T) {
   const total = recFrames.length / recStride, Tl = T + (current && current.lat ? current.lat : 0);   // en relecture, l'image rattrape la latence d'analyse
-  while (sim.tick < Math.floor(Tl * TICK)) { const i = sim.tick * recStride; sim.step(sim.tick < total ? recFrames.subarray(i, i + recStride) : ZERO); }
+  while (sim.tick < Math.floor(Tl * TICK)) { const i = sim.tick * recStride; sim.step(sim.tick < total ? recFrames.subarray(i, i + recStride) : ZERO, EVIDX.get(sim.tick)); sim.notes.length = 0; }
 }
 
 function updateVisuals(dt, withUI) {
@@ -3549,6 +3718,7 @@ function updateVisuals(dt, withUI) {
         const dx = p.x - sk.x, dz = p.z - sk.z, d = Math.hypot(dx, dz) + 1e-3, ph = d - 22 * age, w = sk.a * Math.exp(-ph * ph / 18) * Math.exp(-age * .9), osc = Math.sin(ph * .8);
         qx += dx / d * w * .32 * osc; qz += dz / d * w * .32 * osc; qy += w * .1; pw = Math.max(pw, w);
       }
+      if (p.lean) { qx += p.lean[0] * 1.1; qz += p.lean[1] * 1.1; qy -= (p.lean[0] * p.lean[0] + p.lean[1] * p.lean[1]) * .25; }   // le spectateur fait pencher sa plante
       if (p === sim.bendHost && sim.g && sim.g.bend && sim.g.note) { const bd = sim.g.note.bendDir, k = clamp(sim.g.bend, -1.5, 1.5) * .9; qx += bd[0] * k; qz += bd[1] * k; }   // le bend courbe la tige
       PU.uPQ.value[p.idx].set(qx, qy, qz, p.y + .15);
       PU.uPA.value[p.idx].z = Math.max(p.pulse, pw * (p.sp === 'mycelium' ? 1.7 : .7));
@@ -3566,12 +3736,13 @@ function updateVisuals(dt, withUI) {
   });
 
   const inIntro = sim.intro && !sim.introDone, finEl = sim.finale && sim.shot.type === 'finale' ? renderT - sim.shot.t0 : -1;
-  const inOrbit = finEl > 13.2, inSpace = inIntro || inOrbit;
+  const zoomZ = sim.introDone && !sim.finale ? sim.zoom : 0, zoomOrbit = zoomZ > ZOOM_SPLIT;
+  const inOrbit = finEl > 13.2, inSpace = inIntro || inOrbit || zoomOrbit;
   const Tv = inIntro ? sim.introTv + (sim.introTv - sim.introTvPrev) * clamp((renderT - sim.t) / DT, 0, 1) : INTRO_SPACE;
   setScene(inSpace ? SPACE.scene : scene, inSpace ? SPACE.cam : camera);
   cine.uniforms.uFade.value = !sim.intro ? 0 : inIntro ? smoothstep(15.1, 15.95, Tv)
     : finEl >= 0 ? smoothstep(12.2, 13.2, finEl) * (1 - smoothstep(13.2, 14.8, finEl))                 // final : noir, puis l'orbite
-    : 1 - smoothstep(0, 1.2, renderT - sim.introDoneAt);   // plongée dans le noir, puis révélation du site
+    : Math.max(1 - smoothstep(0, 1.2, renderT - sim.introDoneAt), 1 - smoothstep(0, .035, Math.abs(zoomZ - ZOOM_SPLIT)));   // révélation du site ; passage sol ↔ orbite au zoom
   if (S.autocam || offline || sim.t < sim.introEnd) {
     shotCamera(sim, renderT, camOut);
     const sh = sim.shot;
@@ -3581,6 +3752,12 @@ function updateVisuals(dt, withUI) {
       camOut.pos.lerpVectors(camPrev.pos, camOut.pos, u); camOut.tgt.lerpVectors(camPrev.tgt, camOut.tgt, u);
       camOut.fov += (camPrev.fov - camOut.fov) * (1 - u); camOut.focus += (camPrev.focus - camOut.focus) * (1 - u);
       camOut.pos.y = Math.max(camOut.pos.y, world.h(camOut.pos.x, camOut.pos.z) + .3);
+    }
+    if (zoomZ > 0 && !zoomOrbit) {                                                           // pédale : on s'élève au-dessus du jardin
+      const b = smoothstep(0, .18, zoomZ), A = Math.exp(Math.log(8) + (Math.log(450) - Math.log(8)) * clamp(zoomZ / ZOOM_SPLIT, 0, 1));
+      const gx = sim.shot ? sim.shot.cx || 0 : 0, gz = sim.shot ? sim.shot.cz || 0 : 0, gy = world.h(gx, gz); let dx = camOut.pos.x - gx, dz = camOut.pos.z - gz; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+      const Rz = A * .55 + 12; _zp.set(gx + dx * Rz, gy + A, gz + dz * Rz); _zt.set(gx, gy + 1, gz);
+      camOut.pos.lerp(_zp, b); camOut.tgt.lerp(_zt, b); camOut.fov += (44 - camOut.fov) * b; camOut.focus += (camOut.pos.distanceTo(camOut.tgt) - camOut.focus) * b;
     }
     if (camera.aspect > 2.4) camOut.fov = Math.min(camOut.fov, 2 * Math.atan(Math.tan(52 * D2R) / camera.aspect) / D2R * 1.6);
     camera.position.copy(camOut.pos); camera.lookAt(camOut.tgt); camTarget.copy(camOut.tgt);
@@ -3595,6 +3772,7 @@ function updateVisuals(dt, withUI) {
   const vh = renderer.getDrawingBufferSize(_dbv).y;
   if (inIntro) { updateSpace(Tv, f, sim.kick); updateGrain(SPACE.I, Tv, sim.kick, vh); dof.u.uAperture.value = 0; renderer.toneMappingExposure = 1; }
   else if (inOrbit) { updateOrbit(finEl - 13.2, f); dof.u.uAperture.value = 0; renderer.toneMappingExposure = 1.4; }
+  else if (zoomOrbit) { updateZoomOrbit((zoomZ - ZOOM_SPLIT) / (1 - ZOOM_SPLIT), f); dof.u.uAperture.value = 0; renderer.toneMappingExposure = 1.4; }
   SPACE.grain.visible = inIntro;
   updateOverlay(Tv, sim.introDone ? renderT - sim.introDoneAt : 0, sim.intro);
   updatePublicFalls(vh);
@@ -3755,7 +3933,7 @@ async function runExport() {
   const duration = abuf ? abuf.duration : rec.duration, total = Math.ceil(duration * fps);
   $('xForm').classList.add('hidden'); $('xRun').classList.remove('hidden');
   hdJob.cancel = false; mode = 'hd'; setUI(); closeGallery();
-  AE.stop(); setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; recFrames = rec.frames; recStride = rec.stride || 6; current = rec;
+  AE.stop(); setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; recFrames = rec.frames; recStride = rec.stride || 6; EVIDX = indexEvents(rec.events); current = rec;
   offline = true; hdQuality(true); setRenderSize(w, h);
   const t0 = performance.now();
   try {
