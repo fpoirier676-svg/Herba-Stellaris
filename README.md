@@ -54,36 +54,49 @@ Chaque variété a une signature musicale : **registre** (graves ↔ aigus), **d
 4. **Climax** — le Soleil se lève au moment où la musique atteint son sommet (crescendo fort et soutenu), avec des ombres de plusieurs
    dizaines de mètres et la lueur de poussière à l'horizon. En Lune décroissante, l'aube est sur la face cachée : c'est alors le
    **coucher** du Soleil qui marque le climax et la bioluminescence prend le relais.
-5. **Final** — à 3 min 30 (ou touche E) : dézoom sur l'œuvre entière, puis montée en orbite. Le jardin devient un point de lumière
-   sur la Lune, avec la Terre dans le ciel. Après 10 s de silence, la composition s'arrête une fois la montée achevée (environ 30 s).
+5. **Conclusion** — quand tu touches *Conclure la composition* sur le téléphone (ou E) : dézoom sur l'œuvre entière, puis montée
+   en orbite. Le jardin devient un point de lumière sur la Lune, avec la Terre dans le ciel ; l'œuvre est conservée une fois la montée achevée.
 
 Repères d'échelle : un vieil étage de descente d'alunisseur se trouve à 65‑75 m du jardin, avec les traces de pas de ceux qui en sont descendus.
 
 ## Guide de scène
 
-Pensé pour une projection derrière le musicien.
+Pensé pour une projection derrière le musicien. **Tout se prépare sur la page d'accueil** ; pendant la composition, l'écran
+ne montre plus que l'image, sans aucune commande (H les fait réapparaître au besoin).
 
-### Avant le spectacle
-1. **Étalonner la salle** (bouton d'accueil ou panneau) : 4 s de silence de la salle, puis 4 s de jeu fort. Le seuil de silence
-   et la plage de dynamique sont réglés sur la salle, et gardés pour les fois suivantes.
-2. **Fenêtre de projection** : l'image seule s'ouvre dans une fenêtre à placer sur le projecteur (placée automatiquement sur le
-   second écran si le navigateur le permet ; touche F ou double-clic dedans pour le plein écran). La fenêtre principale devient la
-   **régie** : aperçu, temps, phrase, plantes, Soleil, niveau, dynamique, plan en cours, images par seconde, source, public, silence, applaudissements.
-3. **Mire de synchronisation** (touche M) : un éclair coloré à chaque attaque (rouge grave, vert médium, bleu aigu). Filmer l'écran
-   au ralenti avec un téléphone pendant que tu joues, mesurer l'écart, et le reporter dans **Latence de la chaîne** : les pulsations
-   régulières sont alors anticipées de ce délai et tombent avec le son.
+### L'accueil, en trois cartes
+1. **Le son** : *Ordinateur · GX-1* (choisir l'entrée « GX-1 » et l'instrument, puis **Tester le son** : la jauge et le message
+   disent si le signal est correct, faible ou saturé), *Téléphone* (le micro du téléphone relié devient la source) ou *Fichier audio*.
+   **Étalonner la salle** : 4 s de silence de la salle, puis 4 s de jeu fort ; gardé pour les fois suivantes.
+2. **La pédale de zoom** : *Activer la pédale MIDI*, bouger la pédale ; le curseur Zoom suit le pied (voir plus bas).
+3. **Scène et image** : fenêtre de projection, graines du public, **téléphone-capteur** (QR code), puis tous les réglages
+   (sensibilité, temps, bioluminescence, profondeur de champ, grain, carte du ciel, format, réalisation, qualité, sortie de projection,
+   mode Scène, cycle jour-nuit, résolution adaptative, latence, mire).
 
-### Pendant le spectacle
-- **Mode Scène** (S) : plus aucun texte ni interface. Seul le message poétique de l'ouverture reste.
-- **Plans** : 1 ensemble, 2 ras du sol, 3 grue, 4 plongée, 5 cime, 6 canopée, 7 ciel, 8 Terre, 9 contre-jour. **A** lève le Soleil (force le climax), **E** lance le final.
-  Mêmes commandes dans la régie et sur le téléphone-capteur. Elles sont inscrites dans l'empreinte : la galerie et les exports les rejouent à l'identique.
-- **Graines du public** (Q) : voir *Les graines du public* plus bas.
-- **Applaudissements** : reconnus (bruit large bande sans hauteur). Ils déclenchent le final et un salut lumineux de toute la flore, sans bloquer l'arrêt.
+Puis **Commencer la composition**.
+
+### Le téléphone-capteur
+Scanner le QR code de la carte 3. Deux façons de le relier : **Micro + télécommande** ou **Télécommande seulement** (quand le son
+passe par le GX-1). La télécommande lance la composition, change de plan, lève l'aube, ouvre les graines du public, règle le zoom, et
+surtout **Conclure la composition** : un toucher fait décoller la conclusion (dézoom, montée en orbite), puis l'œuvre est
+conservée d'elle-même environ 40 s plus tard. Il n'y a plus de fin au silence : la composition dure tant que tu ne la conclus pas
+(**E** au clavier fait de même ; *Arrêter et conserver* coupe sans conclusion).
+
+### Fenêtre de projection et régie
+L'image seule s'ouvre dans une fenêtre à placer sur le projecteur (touche F ou double-clic dedans pour le plein écran). La fenêtre
+principale devient la **régie** : aperçu, temps, phrase, plantes, Soleil, niveau, dynamique, plan, images par seconde, source, public,
+note, accord, tonalité, tension, zoom, pédale, spectateurs. **Mire de synchronisation** (M) : un éclair à chaque attaque, pour mesurer
+la latence et la reporter dans *Latence de la chaîne*.
+
+### Pendant le spectacle (clavier)
+1 à 9 : plans (ensemble, ras du sol, grue, plongée, cime, canopée, ciel, Terre, contre-jour) · **A** lève le Soleil · **E** conclut ·
+**Q** graines du public · **S** mode Scène · **+ / −** zoom, **0** retour au sol · **H** commandes · **F** plein écran.
+Tout est inscrit dans l'empreinte : la galerie et les exports rejouent l'œuvre à l'identique.
 
 ### Sorties et robustesse
 - **Sortie de projection** : *Cinéma 2.39*, *Plein cadre* (écrans ultra-larges), *Dôme 180°* (fisheye domemaster, centre relevé de 20°).
 - **Sans réseau** : après une première visite, la page se relance depuis le cache. La **version hors ligne** (`herba-stellaris-hors-ligne.html`)
-  embarque tout dans un seul fichier, à ouvrir avec le micro de l'ordinateur ou une interface audio USB (le téléphone et les graines du public demandent le réseau).
+  embarque tout dans un seul fichier (le téléphone et les graines du public demandent le réseau).
 - Si la carte graphique décroche, l'écoute et l'enregistrement continuent et l'image revient seule. L'écran reste allumé pendant une composition.
 - **Sauvegarder toute la galerie** (dans la galerie) : un seul fichier, à restaurer par « Importer / restaurer ».
 
@@ -119,7 +132,7 @@ la tonalité, la tension, le bend et le vibrato : la galerie et les exports les 
 
 ## Les graines du public
 
-**Q** (ou la régie, ou le téléphone-capteur) affiche un QR code. Chaque spectateur compose sa graine comme une commande :
+**Graines du public** (carte 3 de l'accueil, Q, la régie ou le téléphone-capteur) affiche un QR code. Chaque spectateur compose sa graine comme une commande :
 **espèce** (12 au choix), **couleur** de sa lumière (9), **taille** (petite, moyenne, grande), **port** (élancé, rond, retombant, torsadé)
 et, s'il le veut, un **nom**. Un aperçu dessiné suit ses choix, un récapitulatif « Votre commande » s'affiche, puis **Semer ma graine**.
 

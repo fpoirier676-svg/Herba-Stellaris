@@ -32,13 +32,29 @@
   button.small { padding:9px 13px; font-size:9.5px; letter-spacing:.16em; }
   input[type=file] { display:none; }
 
-  #intro { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; z-index:6;
+  #intro { position:fixed; inset:0; display:block; overflow:auto; z-index:6;
     background:radial-gradient(ellipse at 50% 55%, rgba(0,0,0,.05), rgba(0,0,0,.8) 75%); transition:opacity 1.2s ease; text-align:center; padding:20px; }
-  #intro h1 { font-family:'Corinthia','Cormorant Garamond',cursive; font-weight:400; font-size:clamp(76px,13.5vw,190px); line-height:1.05; letter-spacing:0; margin:0; padding:0 .25em;
+  #intro h1 { font-family:'Corinthia','Cormorant Garamond',cursive; font-weight:400; font-size:clamp(64px,9vw,150px); line-height:1; letter-spacing:0; margin:0; padding:0 .25em;
     text-shadow:0 0 40px rgba(0,0,0,.6); }
   #intro .sub { font-family:'Cormorant Garamond',serif; font-style:italic; font-weight:300; font-size:clamp(19px,2.2vw,26px); letter-spacing:.02em; color:rgba(233,228,218,.72); margin:-4px 0 6px; }
   #intro .sci { font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--faint); max-width:680px; line-height:1.9; }
   .row { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:14px; }
+  #intro .iwrap { min-height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:10px 0 26px; }
+  #intro .prep { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:16px; width:min(1240px, 96vw); text-align:left; margin-top:6px; }
+  @media (max-width:1050px) { #intro .prep { grid-template-columns:1fr; width:min(560px, 94vw); } }
+  #intro .card { background:rgba(8,9,12,.62); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid var(--line); padding:16px 18px 14px; font-size:11px; }
+  #intro .card h5 { margin:0 0 12px; font-family:'Cormorant Garamond',serif; font-weight:300; font-size:24px; letter-spacing:.06em; display:flex; align-items:center; gap:12px; }
+  #intro .card h5 b { font-family:Inter,sans-serif; font-weight:400; font-size:11px; width:24px; height:24px; border:1px solid var(--line); border-radius:50%; display:inline-flex; align-items:center; justify-content:center; }
+  #intro .card .xnote { display:block; color:var(--dim); font-size:10.5px; line-height:1.6; margin:6px 0; letter-spacing:.02em; }
+  #intro .brow { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 4px; }
+  #intro .seg { display:flex; margin-bottom:10px; } #intro .seg button { flex:1; padding:10px 6px; font-size:9px; letter-spacing:.12em; } #intro .seg button + button { border-left:none; }
+  #intro .seg button.on { background:rgba(233,228,218,.14); border-color:rgba(233,228,218,.55); }
+  #intro .tmeter { margin:12px 0 4px; } #intro .tmeter .bar { height:6px; } #intro .tmeter .bar i { transition:width .06s linear; background:linear-gradient(90deg,#9fe3c8,#e9e4da 75%,#e8b98a); }
+  #intro .tmeter span { display:block; font-size:10px; color:var(--dim); margin-top:6px; letter-spacing:.04em; }
+  #intro .cscroll { max-height:46vh; overflow:auto; padding-right:6px; margin-top:6px; }
+  #intro #phoneHome .pgrid { grid-template-columns:150px 1fr; gap:14px; margin:6px 0; } #intro #phoneHome #qr { width:150px; height:150px; padding:7px; }
+  #intro .go { margin-top:8px; } #intro #btnGo { padding:17px 34px; font-size:12px; }
+  #intro .help { max-width:760px; color:var(--faint); font-size:10px; line-height:1.7; letter-spacing:.04em; }
   #status { min-height:18px; color:#e8b98a; font-size:12px; max-width:560px; line-height:1.6; }
 
   #top { position:fixed; top:18px; right:18px; display:flex; gap:8px; z-index:5; align-items:center; transition:opacity .5s; flex-wrap:wrap; justify-content:flex-end; }
@@ -243,26 +259,66 @@ SKYIMG.moon = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAUDBAQEAw
 <div id="labels"></div>
 
 <div id="intro">
+ <div class="iwrap">
   <h1>Herba Stellaris</h1>
   <p class="sub">Chaque composition fait naître une flore lunaire qui n'existera qu'une fois</p>
-  <div class="row">
-    <button class="primary" id="btnMic">Composer au micro</button>
-    <button id="btnPhone">Composer avec mon téléphone</button>
-    <label class="btn" for="fileLive">Composer depuis un fichier</label>
+  <div class="prep">
+   <section class="card">
+    <h5><b>1</b> Le son</h5>
+    <div class="seg" id="srcSeg"><button data-src="ordi" class="on">Ordinateur · GX-1</button><button data-src="phone">Téléphone</button><button data-src="file">Fichier audio</button></div>
+    <div id="srcOrdi">
+     <label class="xnote">Entrée <select id="inDev"><option value="">Micro par défaut</option></select></label>
+     <label class="xnote">Instrument <select id="instr"><option value="guitare">Guitare</option><option value="tout">Toute source</option></select></label>
+     <div class="brow"><button class="small" id="btnDevs" title="Afficher les noms des entrées (autorise le micro une fois)">Rechercher les entrées</button><button class="small" id="btnTest">Tester le son</button></div>
+    </div>
+    <div id="srcPhone" class="hidden"><div class="xnote">Le micro du téléphone relié (carte 3) sera la source sonore.</div></div>
+    <div id="srcFile" class="hidden"><div class="brow"><label class="btn small" for="fileLive">Choisir un fichier audio</label></div><div class="xnote" id="fileName">Aucun fichier choisi</div></div>
     <input type="file" id="fileLive" accept="audio/*">
-    <button id="btnGal1">Galerie des créations</button>
+    <div class="tmeter"><div class="bar"><i id="tLvl"></i></div><span id="tMsg">Joue quelques notes : la jauge doit bouger</span></div>
+    <div class="brow"><button class="small" id="btnCalib" title="4 s de silence de la salle, puis 4 s de jeu fort">Étalonner la salle</button></div>
+    <div id="calibMsg" class="xnote" style="min-height:16px"></div>
+   </section>
+   <section class="card">
+    <h5><b>2</b> La pédale de zoom</h5>
+    <label class="ctl">Zoom <output id="oZoom">sol</output><input type="range" id="zRange" min="0" max="1" step="0.005" value="0"></label>
+  <button class="small" id="btnMidi">Activer la pédale MIDI</button> <button class="small" id="btnLearn">Apprendre la pédale</button>
+  <label class="chk"><input type="checkbox" id="zInv"> Inverser le sens de la pédale</label>
+  <div id="zMsg" class="xnote" style="font-size:10px;opacity:.75;line-height:1.5">Branche le GX-1 en USB, puis active le MIDI. Molette (caméra auto), touches + / − et 0 pour revenir au sol.</div>
+    <div class="xnote" style="margin-top:6px">Ferme BOSS TONE STUDIO, active la pédale, puis bouge-la : le curseur Zoom doit suivre ton pied.</div>
+   </section>
+   <section class="card">
+    <h5><b>3</b> Scène et image</h5>
+    <div class="brow"><button class="small" id="btnProj" title="Ouvre l’image seule dans une fenêtre à placer sur le projecteur ; cette fenêtre devient la régie">Fenêtre de projection</button><button class="small" id="btnPubH">Graines du public (Q)</button></div>
+    <div class="xnote" style="margin-top:10px"><b style="font-weight:400;color:var(--ink)">Téléphone-capteur</b> : scanne ce code. Le téléphone peut servir de micro, de télécommande, ou des deux ; son bouton « Conclure la composition » fait décoller la conclusion.</div>
+    <div id="phoneHome"></div>
+    <div class="cscroll">
+  <label class="ctl">Sensibilité <output id="oSens">1.20</output><input type="range" id="sens" min="0.3" max="3" step="0.05" value="1.2"></label>
+  <label class="ctl">Accélération du temps <output id="oTime">1.00</output><input type="range" id="tscale" min="0" max="4" step="0.05" value="1"></label>
+  <label class="ctl">Bioluminescence <output id="oBio">1.00</output><input type="range" id="bio" min="0" max="2.5" step="0.05" value="1"></label>
+  <label class="ctl">Profondeur de champ <output id="oDof">0.40</output><input type="range" id="dof" min="0" max="1.5" step="0.05" value="0.4"></label>
+  <label class="ctl">Grain argentique <output id="oGrain">0.050</output><input type="range" id="grain" min="0" max="0.16" step="0.005" value="0.05"></label>
+  <label class="ctl">Seuil de silence <output id="oSil">−50 dB</output><input type="range" id="silence" min="-75" max="-25" step="1" value="-50"></label>
+  <label class="chk"><input type="checkbox" id="annot"> Carte du ciel (noms, constellations)</label>
+  <label class="chk"><input type="checkbox" id="scope" checked> Format cinémascope 2.39</label>
+  <label class="chk"><input type="checkbox" id="autocam" checked> Réalisation automatique</label>
+  <div class="meter" style="display:block;margin-top:10px">Qualité d’affichage</div>
+  <select id="quality"><option value="fluide">Fluide — machine modeste</option><option value="haute" selected>Haute</option><option value="ultra">Ultra — sur-échantillonnage</option></select>
+  <div class="meter" style="display:block;margin-top:10px">Sortie de projection</div>
+  <select id="output"><option value="cinema" selected>Cinéma 2.39</option><option value="plein">Plein cadre — écrans ultra-larges</option><option value="dome">Dôme 180° (fisheye)</option></select>
+  <label class="chk"><input type="checkbox" id="stage"> Mode Scène (touche S) : aucun texte à l’écran</label>
+  <label class="chk"><input type="checkbox" id="cycle"> Cycle jour-nuit complet (sinon : de la nuit à l’aube au climax)</label>
+  <label class="chk"><input type="checkbox" id="adaptive" checked> Résolution adaptative (garder 60 i/s)</label>
+  <label class="ctl">Latence de la chaîne <output id="oLat">100 ms</output><input type="range" id="latency" min="0" max="400" step="5" value="100"></label>
+  <label class="chk"><input type="checkbox" id="lowlat"> Affichage faible latence (au prochain chargement ; peut déchirer l’image)</label>
+  <label class="chk"><input type="checkbox" id="mire"> Mire de synchronisation (touche M) : éclair à chaque attaque</label>
+    <div class="xnote" style="font-size:10px;opacity:.6;margin-top:8px;line-height:1.5">Scène : 1 ensemble · 2 ras du sol · 3 grue · 4 plongée · 5 cime · 6 canopée · 7 ciel · 8 Terre · 9 contre-jour · E final · Q graines du public · S mode Scène · F plein écran · + / − zoom, 0 retour au sol</div>
+    </div>
+   </section>
   </div>
-  <div class="row" style="margin-top:10px;align-items:center">
-    <label class="xnote">Entrée <select id="inDev"><option value="">Micro par défaut</option></select></label>
-    <label class="xnote">Instrument <select id="instr"><option value="guitare">Guitare</option><option value="tout">Toute source</option></select></label>
-    <button id="btnDevs" title="Afficher les noms des entrées (autorise le micro une fois)">Rechercher les entrées</button>
-  </div>
-  <div class="row" style="margin-top:10px">
-    <button id="btnCalib" title="4 s de silence de la salle, puis 4 s de jeu fort">Étalonner la salle</button>
-    <button id="btnProj" title="Ouvre l’image seule dans une fenêtre à placer sur le projecteur ; cette fenêtre devient la régie">Fenêtre de projection</button>
-  </div>
-  <div id="calibMsg" class="xnote" style="margin-top:10px;min-height:18px"></div>
+  <div class="row go"><button class="primary" id="btnGo">Commencer la composition</button><button id="btnGal1">Galerie des créations</button></div>
   <div id="status"></div>
+  <div class="xnote help">Pendant la composition, l’écran reste vide de toute commande. H affiche ou masque les commandes · E lance le final · A lève le Soleil · 1 à 9 changent de plan · le bouton « Conclure » du téléphone-capteur (ou E) fait décoller la conclusion, puis l’œuvre est conservée.</div>
+ </div>
 </div>
 
 <div id="top" class="hidden">
@@ -292,33 +348,6 @@ SKYIMG.moon = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAUDBAQEAw
   <div class="sep"></div>
   <div id="flora"></div>
   <div class="sep"></div>
-  <label class="ctl">Sensibilité <output id="oSens">1.20</output><input type="range" id="sens" min="0.3" max="3" step="0.05" value="1.2"></label>
-  <label class="ctl">Accélération du temps <output id="oTime">1.00</output><input type="range" id="tscale" min="0" max="4" step="0.05" value="1"></label>
-  <label class="ctl">Bioluminescence <output id="oBio">1.00</output><input type="range" id="bio" min="0" max="2.5" step="0.05" value="1"></label>
-  <label class="ctl">Profondeur de champ <output id="oDof">0.40</output><input type="range" id="dof" min="0" max="1.5" step="0.05" value="0.4"></label>
-  <label class="ctl">Grain argentique <output id="oGrain">0.050</output><input type="range" id="grain" min="0" max="0.16" step="0.005" value="0.05"></label>
-  <label class="ctl">Seuil de silence <output id="oSil">−50 dB</output><input type="range" id="silence" min="-75" max="-25" step="1" value="-50"></label>
-  <label class="chk"><input type="checkbox" id="autostop" checked> Fin automatique après 10 s de silence</label>
-  <label class="chk"><input type="checkbox" id="annot"> Carte du ciel (noms, constellations)</label>
-  <label class="chk"><input type="checkbox" id="scope" checked> Format cinémascope 2.39</label>
-  <label class="chk"><input type="checkbox" id="autocam" checked> Réalisation automatique</label>
-  <div class="meter" style="display:block;margin-top:10px">Qualité d’affichage</div>
-  <select id="quality"><option value="fluide">Fluide — machine modeste</option><option value="haute" selected>Haute</option><option value="ultra">Ultra — sur-échantillonnage</option></select>
-  <div class="meter" style="display:block;margin-top:10px">Sortie de projection</div>
-  <select id="output"><option value="cinema" selected>Cinéma 2.39</option><option value="plein">Plein cadre — écrans ultra-larges</option><option value="dome">Dôme 180° (fisheye)</option></select>
-  <label class="chk"><input type="checkbox" id="stage"> Mode Scène (touche S) : aucun texte à l’écran</label>
-  <label class="chk"><input type="checkbox" id="cycle"> Cycle jour-nuit complet (sinon : de la nuit à l’aube au climax)</label>
-  <label class="chk"><input type="checkbox" id="adaptive" checked> Résolution adaptative (garder 60 i/s)</label>
-  <label class="ctl">Latence de la chaîne <output id="oLat">100 ms</output><input type="range" id="latency" min="0" max="400" step="5" value="100"></label>
-  <label class="chk"><input type="checkbox" id="lowlat"> Affichage faible latence (au prochain chargement ; peut déchirer l’image)</label>
-  <div class="meter" style="display:block;margin-top:12px">Zoom sur la Lune — pédale d’expression</div>
-  <label class="ctl">Zoom <output id="oZoom">sol</output><input type="range" id="zRange" min="0" max="1" step="0.005" value="0"></label>
-  <button class="small" id="btnMidi">Activer la pédale MIDI</button> <button class="small" id="btnLearn">Apprendre la pédale</button>
-  <label class="chk"><input type="checkbox" id="zInv"> Inverser le sens de la pédale</label>
-  <div id="zMsg" class="xnote" style="font-size:10px;opacity:.75;line-height:1.5">Branche le GX-1 en USB, puis active le MIDI. Molette (caméra auto), touches + / − et 0 pour revenir au sol.</div>
-  <label class="chk"><input type="checkbox" id="mire"> Mire de synchronisation (touche M) : éclair à chaque attaque</label>
-  <button class="small" id="btnCalib2" style="margin-top:8px">Étalonner la salle</button> <span id="calibMsg2" class="xnote"></span>
-  <div class="xnote" style="font-size:10px;opacity:.6;margin-top:8px;line-height:1.5">Scène : 1 ensemble · 2 ras du sol · 3 grue · 4 plongée · 5 cime · 6 canopée · 7 ciel · 8 Terre · 9 contre-jour · E final · Q graines du public · S mode Scène · F plein écran · + / − zoom, 0 retour au sol</div>
 </div>
 
 <div id="carnet"></div>
@@ -351,7 +380,7 @@ SKYIMG.moon = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAUDBAQEAw
     <div class="pgrid">
       <div id="qr"></div>
       <div>
-        <p class="xnote">1. Sur ton téléphone Android, ouvre l’appareil photo ou Google Lens et scanne ce code.<br>2. Touche « Activer le micro et se connecter ».<br>3. Lance la composition ici ou depuis le téléphone.</p>
+        <p class="xnote">1. Scanne ce code avec l’appareil photo du téléphone.<br>2. Touche « Micro + télécommande » ou « Télécommande seulement ».</p>
         <div id="pState" class="pstate"><span class="dot"></span><span id="pStateTxt">Préparation…</span></div>
         <div class="bar" style="height:3px;margin:12px 0 4px"><i id="pLvl"></i></div>
         <div class="xnote" id="pUrl" style="word-break:break-all;font-size:10.5px"></div>
@@ -2404,10 +2433,13 @@ class Sim {
     if (pub && seedOpen && !this.full && n < MAXP) this.spawnPublic();
     if (this.intro) {                     // final : à 3 min 30, ou dès 3 s de silence ; annulé si la musique reprend avant 3 min 30
       this.silentT = silent || applause ? this.silentT + DT : 0; this.loudT = silent || applause ? 0 : this.loudT + DT;
+      if (this.manualEnd) { if (forcedEnd && !this.finale && t > this.introEnd) { this.finale = true; this.finaleLock = true; this.finaleT0 = t; this.cut('finale'); } }   // la conclusion n'arrive que sur commande du musicien
+      else {
       if (applause && !this.finale && t > this.introEnd + 30) { this.finale = true; this.finaleLock = true; this.finaleT0 = t; this.cut('finale'); }   // la salle applaudit : l'œuvre salue
       if (forcedEnd && !this.finale && t > this.introEnd) { this.finale = true; this.finaleLock = true; this.finaleT0 = t; this.cut('finale'); }
       if (!this.finale && t > this.introEnd && (t >= FINALE_T || this.silentT > 3)) { this.finale = true; this.finaleT0 = t; this.cut('finale'); }
       else if (this.finale && !this.finaleLock && t < FINALE_T && this.loudT > 2) { this.finale = false; this.cut('etab'); }
+      }
     }
     if (this.intro && this.shot.type === 'arrivee' && t > this.introEnd) this.cut('etab');
     // montage musical : plans longs, coupes sur les débuts de phrase et sur les frappes ; fondus enchaînés quand la musique est liée
@@ -2745,24 +2777,25 @@ function startWorld(seed, startMs, intro, dawn) { world = buildWorld(seed, start
 
 async function startLive(kind, file) {
   const seed = (crypto.getRandomValues(new Uint32Array(1))[0]) >>> 0;
-  setTick(LIVE_TICK); startWorld(seed, Date.now(), true, !S.cycle); frames = []; recEvents = []; LIVE_EV.length = 0; PUB.clients.clear(); ZM.sent = 0; ZM.sentT = 0; sim.lat = S.latency / 1000; sim.predict = true;
+  setTick(LIVE_TICK); startWorld(seed, Date.now(), true, !S.cycle); frames = []; recEvents = []; LIVE_EV.length = 0; PUB.clients.clear(); ZM.sent = 0; ZM.sentT = 0; sim.manualEnd = true; sim.lat = S.latency / 1000; sim.predict = true;
   if (kind === 'mic') await AE.useMic(); else if (kind === 'phone') await AE.useRemote(PH.stream); else await AE.useFile(file);
   liveT0 = AE.ctx.currentTime; AE.silentFor = 0; AE.heard = 0; AE.silStart = null; AE.lastNow = 0;
   if (AE.el) AE.el.onended = () => { if (mode === 'live') finishLive(true); };
   mode = 'live'; setUI(); keepAwake(true);
+  if (!uiHidden) toggleUI();                                      // la composition commence : plus aucune commande à l'écran (H pour les revoir)
 }
 function liveTime() { return AE.el ? AE.el.currentTime : AE.ctx.currentTime - liveT0; }
 
 let wantThumb = null;
 async function finishLive(save) {
   if (mode !== 'live') return;
-  mode = 'idle'; setUI(); keepAwake(false);
+  mode = 'idle'; setUI(); keepAwake(false); if (uiHidden && !S.stage) toggleUI();
   const audio = await AE.finishRecording(); AE.stop();
   if (!save) return;
   const thumb = await new Promise(res => wantThumb = res);
   const rec = {
     id: Date.now().toString(36) + '-' + sim.W.seed.toString(36), name: sim.W.name, date: new Date().toISOString(), seed: sim.W.seed, startUTC: sim.W.startMs,
-    stride: FSTRIDE, tick: TICK, events: recEvents.slice(), lat: S.latency / 1000, tscale: sim.tscale, dawn: sim.dawn, publicSeeds: sim.pubN, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), varieties: new Set(sim.plants.map(p => p.var)).size, frames: new Float32Array(frames), audio, thumb,
+    stride: FSTRIDE, tick: TICK, manualEnd: true, events: recEvents.slice(), lat: S.latency / 1000, tscale: sim.tscale, dawn: sim.dawn, publicSeeds: sim.pubN, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), varieties: new Set(sim.plants.map(p => p.var)).size, frames: new Float32Array(frames), audio, thumb,
   };
   try { await DB.put(rec); } catch (e) { memStore.set(rec.id, rec); }
   showEpilogue(rec);
@@ -2772,7 +2805,7 @@ const speciesLine = c => Object.keys(SPECIES).filter(k => c[k]).map(k => c[k] + 
 
 async function startReplay(rec, exportVideo) {
   closeGallery(); AE.ensure(); AE.stop();
-  setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0;
+  setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; sim.manualEnd = !!rec.manualEnd;
   recFrames = rec.frames; recStride = rec.stride || 6; EVIDX = indexEvents(rec.events); current = rec; replayEl = null;
   if (rec.audio) {
     const el = new window.Audio(URL.createObjectURL(rec.audio)); replayEl = el;
@@ -2859,7 +2892,7 @@ bind('sens', 'sens', 'oSens'); bind('bio', 'bio', 'oBio'); bind('dof', 'dof', 'o
 $('tscale').addEventListener('input', () => { if (sim && mode !== 'replay' && mode !== 'export') sim.tscale = S.tscale; });
 $('scope').addEventListener('change', e => S.scope = e.target.checked);
 $('silence').addEventListener('input', e => { S.silenceDb = +e.target.value; $('oSil').textContent = '−' + Math.abs(S.silenceDb) + ' dB'; saveSalle(); });
-$('autostop').addEventListener('change', e => S.autostop = e.target.checked);
+
 $('annot').addEventListener('change', e => { S.annot = e.target.checked; SKY.lines.visible = S.annot; if (!S.annot) $('labels').innerHTML = ''; });
 function applyQuality(qk) {
   S.quality = qk; const q = QUALITY[qk], pr = q.pr();
@@ -2896,7 +2929,7 @@ $('silence').value = S.silenceDb; $('oSil').textContent = '−' + Math.abs(S.sil
 function saveSalle() { try { localStorage.setItem('herba-salle', JSON.stringify({ floorDb: S.floorDb, topDb: S.topDb, silenceDb: S.silenceDb, latency: S.latency })); } catch (e) {} }
 // Étalonnage : le bruit de la salle fixe le seuil de silence, le jeu fort fixe le haut de la dynamique
 async function calibrate() {
-  const say = t => { $('calibMsg').textContent = t; $('calibMsg2').textContent = t; };
+  const say = t => { $('calibMsg').textContent = t; };
   if (mode === 'live') return say('Impossible pendant une composition.');
   try {
     const wasActive = AE.active; AE.ensure();
@@ -2912,7 +2945,7 @@ async function calibrate() {
     say(`Salle : bruit ${S.floorDb.toFixed(0)} dB, jeu fort ${S.topDb.toFixed(0)} dB, seuil de silence ${S.silenceDb} dB.`);
   } catch (e) { say('Étalonnage impossible : ' + e.message); }
 }
-$('btnCalib').addEventListener('click', calibrate); $('btnCalib2').addEventListener('click', calibrate);
+$('btnCalib').addEventListener('click', async () => { testStop(); await calibrate(); });
 try { const o = localStorage.getItem('herba-sortie'); if (o) { $('output').value = o; setOutput(o); } } catch (e) {}
 function setStage(on) {
   S.stage = on; $('stage').checked = on;
@@ -3070,17 +3103,71 @@ function setUI() {
   show('btnFinish', mode === 'live'); show('btnDiscard', mode === 'live');
   show('btnStop', mode === 'replay' || mode === 'export');
   show('btnNew', mode === 'idle'); show('btnGal2', mode === 'idle'); show('btnPhoto', mode !== 'hd');
-  $('sens').disabled = mode !== 'live'; $('tscale').disabled = mode === 'replay' || mode === 'export';
+  $('tscale').disabled = mode === 'replay' || mode === 'export';
 }
 function status(m) { $('status').textContent = m; }
 
-$('btnMic').addEventListener('click', async () => {
+/* ---- Accueil : préparer le son, la pédale et la scène avant la composition ---- */
+S.src = 'ordi'; S.file = null;
+try { const v = localStorage.getItem('herba-source'); if (v === 'ordi' || v === 'phone') S.src = v; } catch (e) {}
+function setSrc(v) {
+  S.src = v; try { if (v !== 'file') localStorage.setItem('herba-source', v); } catch (e) {}
+  for (const b of $('srcSeg').children) b.classList.toggle('on', b.dataset.src === v);
+  $('srcOrdi').classList.toggle('hidden', v !== 'ordi'); $('srcPhone').classList.toggle('hidden', v !== 'phone'); $('srcFile').classList.toggle('hidden', v !== 'file');
+  if (v !== 'ordi') testStop();
+  $('tMsg').textContent = v === 'ordi' ? 'Touche « Tester le son » et joue quelques notes : la jauge doit bouger' : v === 'phone' ? 'Scanne le code avec le téléphone, active son micro : la jauge doit bouger' : 'Le fichier sera joué dès le début de la composition';
   status('');
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { status('Micro inaccessible ici : ouvre ce fichier directement dans Chrome, Edge ou Firefox, ou compose depuis un fichier audio.'); return; }
-  try { await startLive('mic'); }
-  catch (e) { mode = 'intro'; setUI(); status(e.name === 'NotAllowedError' ? 'Accès au micro refusé. Autorise-le via l’icône à gauche de l’adresse, puis réessaie.' : 'Impossible d’ouvrir le micro (' + e.name + ').'); }
+}
+for (const b of $('srcSeg').children) b.addEventListener('click', () => setSrc(b.dataset.src));
+{ const box = $('phoneBox'), g = box.querySelector('.pgrid'); $('phoneHome').append(g, $('pBase')); }
+setTimeout(() => { try { openPhone(); } catch (e) {} }, 400);
+// test du son : la même entrée que la composition, sans rien enregistrer
+const TST = { st: null, ctx: null, an: null, buf: null, peak: -99, raf: 0 };
+async function testStart() {
+  testStop();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { status('Micro inaccessible ici : ouvre la page dans Chrome ou Edge.'); return; }
+  const a = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+  if (S.inDev) a.deviceId = { exact: S.inDev };
+  try { TST.st = await navigator.mediaDevices.getUserMedia({ audio: a }); }
+  catch (e) { status(e.name === 'NotAllowedError' ? 'Accès au micro refusé : autorise-le via l’icône à gauche de l’adresse.' : 'Entrée inaccessible : ' + e.message); return; }
+  if (!$('inDev').options[1]) listDevs(false);
+  TST.ctx = new AudioContext(); TST.an = TST.ctx.createAnalyser(); TST.an.fftSize = 2048; TST.buf = new Float32Array(2048);
+  TST.ctx.createMediaStreamSource(TST.st).connect(TST.an); TST.name = (TST.st.getAudioTracks()[0] || {}).label || 'entrée';
+  $('btnTest').textContent = 'Arrêter le test';
+}
+function testStop() {
+  if (TST.st) TST.st.getTracks().forEach(t => t.stop()); if (TST.ctx) TST.ctx.close().catch(() => {});
+  TST.st = TST.ctx = TST.an = null; $('btnTest').textContent = 'Tester le son'; $('tLvl').style.width = '0%';
+}
+$('btnTest').addEventListener('click', () => TST.st ? testStop() : testStart());
+$('inDev').addEventListener('change', () => { if (TST.st) testStart(); });
+(function testLoop() {
+  requestAnimationFrame(testLoop);
+  if (mode !== 'intro') return;
+  if (S.src === 'ordi' && TST.an) {
+    TST.an.getFloatTimeDomainData(TST.buf); let p = 0, q = 0; for (const x of TST.buf) { q += x * x; p = Math.max(p, Math.abs(x)); }
+    const db = 10 * Math.log10(q / TST.buf.length + 1e-12), pk = 20 * Math.log10(p + 1e-9); TST.peak = Math.max(pk, TST.peak - .4);
+    $('tLvl').style.width = clamp((db + 60) / 60 * 100, 0, 100) + '%';
+    $('tMsg').textContent = TST.name.slice(0, 40) + ' · ' + (TST.peak > -1 ? 'sature : baisse le volume du GX-1' : db < -55 ? 'aucun signal : vérifie l’entrée choisie' : db < -42 ? 'signal faible' : 'signal correct') + ' (' + Math.round(db) + ' dB)';
+  } else if (S.src === 'phone') {
+    $('tLvl').style.width = $('pLvl').style.width || '0%';
+    $('tMsg').textContent = PH.stream ? 'Téléphone relié : joue quelques notes, la jauge doit bouger' : 'En attente du téléphone…';
+  }
+})();
+$('fileLive').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; S.file = f; $('fileName').textContent = f.name; status(''); });
+$('btnPubH').addEventListener('click', () => togglePublic());
+$('btnGo').addEventListener('click', async () => {
+  status(''); testStop();
+  try {
+    if (S.src === 'phone') { if (!PH.stream) { status('Relie d’abord le téléphone (étape 1) : son micro doit être actif.'); return; } await startLive('phone'); }
+    else if (S.src === 'file') { if (!S.file) { status('Choisis d’abord un fichier audio (étape 1).'); return; } await startLive('file', S.file); }
+    else {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { status('Micro inaccessible ici : ouvre la page dans Chrome, Edge ou Firefox, ou compose depuis un fichier audio.'); return; }
+      await startLive('mic');
+    }
+  } catch (e) { mode = 'intro'; setUI(); status(e.name === 'NotAllowedError' ? 'Accès au micro refusé. Autorise-le via l’icône à gauche de l’adresse, puis réessaie.' : 'Impossible de démarrer (' + (e.message || e.name) + ').'); }
 });
-$('fileLive').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { await startLive('file', f); } catch (err) { status('Lecture impossible : ' + err.message); } });
+setTimeout(() => setSrc(S.src), 0);
 $('btnFinish').addEventListener('click', () => finishLive(true));
 $('btnDiscard').addEventListener('click', () => finishLive(false));
 $('btnStop').addEventListener('click', () => stopReplay());
@@ -3236,7 +3323,7 @@ function drawQR() {
   else $('qr').textContent = 'Générateur de QR indisponible : ouvre l’adresse ci-contre sur le téléphone.';
 }
 function openPhone() {
-  $('phoneBox').classList.remove('hidden'); $('pMsg').textContent = '';
+  $('pMsg').textContent = '';
   if (!/^https?:/.test(location.protocol)) { $('pBaseIn').value = capteurBase(); }
   if (!window.Peer) { pState('Bibliothèque de liaison non chargée : cet ordinateur doit être connecté à internet.', 'err'); return; }
   if (PH.peer && !PH.peer.destroyed && PH.id) { drawQR(); pState(PH.stream ? 'Téléphone connecté.' : 'En attente du téléphone…', PH.stream ? 'ok' : 'wait'); return; }
@@ -3263,7 +3350,7 @@ function ensurePeer(onOpen) {
     if (PH.conn) { try { PH.conn.close(); } catch (e) {} }
     PH.conn = c;
     c.on('data', d => { if (d && d.cmd === 'zoom') { setZoom(+d.v, 'téléphone'); return; } phoneCommand(d && d.cmd); });
-    c.on('open', sendStatus);
+    c.on('open', () => { sendStatus(); if (!PH.stream) pState('Téléphone relié comme télécommande.', 'ok'); });
   });
   PH.peer.on('disconnected', () => { if (!PH.peer.destroyed) setTimeout(() => PH.peer.reconnect(), 1500); });
   PH.peer.on('error', e => {
@@ -3360,12 +3447,12 @@ function phoneMeter() {
 phoneMeter();
 function sendStatus() {
   if (!PH.conn || !PH.conn.open) return;
-  try { PH.conn.send({ mode, t: mode === 'live' ? liveTime() : 0, site: world ? world.name : '', plants: sim ? sim.plants.length : 0, epi: !!epiShownAt, sil: mode === 'live' && AE.heard > 3 && AE.silentFor > 2 ? Math.max(0, Math.ceil(10 - AE.silentFor)) : 0 }); } catch (e) {}
+  try { PH.conn.send({ mode, t: mode === 'live' ? liveTime() : 0, site: world ? world.name : '', plants: sim ? sim.plants.length : 0, epi: !!epiShownAt, fin: mode !== 'live' ? 'none' : !sim.introDone ? 'wait' : sim.finale ? 'on' : 'ready', finLeft: mode === 'live' && sim.finale ? Math.max(0, Math.ceil(FINALE_LEN + 8 - (sim.t - sim.finaleT0))) : 0 }); } catch (e) {}
 }
 async function phoneCommand(cmd) {
-  if (cmd === 'start' && PH.stream && (mode === 'intro' || mode === 'idle')) { $('phoneBox').classList.add('hidden'); closeGallery(); await startLive('phone'); }
+  if (cmd === 'start' && (mode === 'intro' || mode === 'idle')) { closeGallery(); if (mode === 'idle') { mode = 'intro'; setUI(); } $('btnGo').click(); }
   else if (cmd === 'finish' && mode === 'live') finishLive(true);
-  else if (cmd === 'finale' && mode === 'live') PEND.end = true;
+  else if ((cmd === 'finale' || cmd === 'conclure') && mode === 'live') PEND.end = true;     // la conclusion décolle
   else if (cmd === 'aube' && mode === 'live') PEND.dawn = true;
   else if (cmd === 'stage') setStage(!S.stage);
   else if (cmd === 'public') togglePublic();
@@ -3373,7 +3460,6 @@ async function phoneCommand(cmd) {
   else if (cmd === 'discard' && mode === 'live') finishLive(false);
   sendStatus();
 }
-$('btnPhone').addEventListener('click', openPhone);
 $('pClose').addEventListener('click', () => $('phoneBox').classList.add('hidden'));
 $('pGo').addEventListener('click', async () => { if (!PH.stream) return; $('phoneBox').classList.add('hidden'); try { await startLive('phone'); } catch (e) { $('pMsg').textContent = 'Impossible de démarrer : ' + e.message; } });
 $('pBaseIn').addEventListener('change', e => { try { localStorage.setItem('herba-capteur', e.target.value.trim()); } catch (er) {} drawQR(); });
@@ -3724,10 +3810,9 @@ function advance(dt) {
       if (sim.notes.length) for (const n of sim.notes.splice(0)) notifySeed(n);
     }
     renderT = Math.max(sim.t, T);
-    const finLeft = sim.finale ? Math.max(0, FINALE_LEN - (sim.t - sim.finaleT0)) : 0, left = Math.max(10 - AE.silentFor, finLeft);
-    const sil = AE.heard > 3 && AE.silentFor > 2 ? ` · silence, fin dans ${Math.max(0, Math.ceil(left))} s` : '';
-    $('rec').innerHTML = `<span class="dot"></span>Composition ${mmss(T)}${S.autostop ? sil : ''}`;
-    if (S.autostop && AE.heard > 3 && AE.silentFor >= 10 && finLeft <= 0) finishLive(true);      // l'œuvre s'arrête après sa montée en orbite
+    const finEl2 = sim.finale ? sim.t - sim.finaleT0 : -1;
+    $('rec').innerHTML = `<span class="dot"></span>Composition ${mmss(T)}${finEl2 >= 0 ? ' · conclusion' : ''}`;
+    if (finEl2 >= FINALE_LEN + 8) finishLive(true);      // la conclusion décolle, monte en orbite, puis l'œuvre est conservée
   } else if (mode === 'replay' || mode === 'export') {
     const T = replayTime();
     stepRecorded(T);
@@ -3996,7 +4081,7 @@ async function runExport() {
   const duration = abuf ? abuf.duration : rec.duration, total = Math.ceil(duration * fps);
   $('xForm').classList.add('hidden'); $('xRun').classList.remove('hidden');
   hdJob.cancel = false; mode = 'hd'; setUI(); closeGallery();
-  AE.stop(); setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; recFrames = rec.frames; recStride = rec.stride || 6; EVIDX = indexEvents(rec.events); current = rec;
+  AE.stop(); setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; sim.manualEnd = !!rec.manualEnd; recFrames = rec.frames; recStride = rec.stride || 6; EVIDX = indexEvents(rec.events); current = rec;
   offline = true; hdQuality(true); setRenderSize(w, h);
   const t0 = performance.now();
   try {

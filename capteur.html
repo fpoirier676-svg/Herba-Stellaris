@@ -41,6 +41,11 @@
   .epi { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:21px; line-height:1.4; text-align:center; margin:14px 4px 4px; }
   .note { color:var(--faint); font-size:12px; line-height:1.65; }
   .hidden { display:none !important; }
+  button.conclude { margin-top:12px; padding:30px 10px; font-size:15px; letter-spacing:.2em; border-color:#e8c98a; color:#fff3dc;
+    background:radial-gradient(ellipse at 50% 0%, rgba(232,201,138,.28), rgba(232,201,138,.04) 70%); box-shadow:0 0 30px rgba(232,201,138,.18); }
+  button.conclude:disabled { opacity:.35; box-shadow:none; }
+  button.conclude.on { animation:pulse 1.6s infinite; }
+  @keyframes pulse { 50% { box-shadow:0 0 50px rgba(232,201,138,.55); } }
   .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; } .row3 button { font-size:10px; letter-spacing:.1em; padding:14px 4px; }
   .shots { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; } .shots button { margin-top:0; padding:12px 4px; font-size:10px; letter-spacing:.08em; }
@@ -58,7 +63,8 @@
   <div class="card" id="setup">
     <div class="lbl">Entrée audio du téléphone</div>
     <select id="device"><option value="">Micro par défaut</option></select>
-    <button class="big" id="go">Activer le micro et se connecter</button>
+    <button class="big" id="go">Micro + télécommande</button>
+    <button id="goRemote" style="width:100%;margin-top:10px">Télécommande seulement (sans micro)</button>
     <p class="note">Le son est transmis tel quel, sans réduction de bruit ni réglage automatique du volume, pour garder la dynamique de ta musique. Un micro USB‑C branché au téléphone apparaîtra dans la liste.</p>
   </div>
 
@@ -74,10 +80,12 @@
     <div class="site" id="rSite"></div>
     <p class="epi hidden" id="epi">Cette œuvre fait maintenant partie de votre présent passé sur&nbsp;la&nbsp;Lune</p>
     <button class="big" id="rStart">Lancer la composition</button>
-    <div class="row2"><button class="rec" id="rFinish">Terminer et conserver</button><button id="rDiscard">Abandonner</button></div>
+    <button class="big conclude" id="rConclude" disabled>Conclure la composition</button>
+    <div class="note" id="rCon" style="text-align:center;margin-top:6px"></div>
+    <div class="row2" style="margin-top:14px"><button id="rFinish">Arrêter et conserver</button><button id="rDiscard">Abandonner</button></div>
     <div class="lbl" style="margin-top:20px">Réalisation en direct</div>
     <div class="shots" id="shots"></div>
-    <div class="row3"><button id="rAube">Aube</button><button id="rFinale">Final</button><button id="rStage">Mode Scène</button></div><div class="row3" style="margin-top:8px"><button id="rPublic">Graines du public</button></div>
+    <div class="row3"><button id="rAube">Aube</button><button id="rStage">Mode Scène</button><button id="rPublic">Graines du public</button></div>
     <label style="display:block;margin-top:14px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;opacity:.7">Zoom sur la Lune <span id="rZv">sol</span>
       <input type="range" id="rZoom" min="0" max="1" step="0.005" value="0" style="width:100%;margin-top:8px"></label>
   </div>
@@ -139,7 +147,7 @@ vuLoop();
 async function keepAwake() {
   try { if ('wakeLock' in navigator) { wake = await navigator.wakeLock.request('screen'); } } catch (e) {}
 }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && wantOn) { keepAwake(); if (!call) connect(); } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && wantOn) { keepAwake(); if (remoteOnly ? !(conn && conn.open) : !call) connect(); } });
 
 function connect() {
   if (!window.Peer) { state('Bibliothèque de liaison introuvable : vérifie la connexion internet du téléphone.', 'err'); return; }
@@ -148,16 +156,25 @@ function connect() {
     peer.on('open', () => { retry = 0; dial(); });
     peer.on('disconnected', () => { if (!peer.destroyed) setTimeout(() => peer.reconnect(), 1000); });
     peer.on('error', e => {
-      if (e.type === 'peer-unavailable') state('Herba Stellaris ne répond pas : vérifie que la fenêtre « Composer avec mon téléphone » est ouverte, puis rescanne le QR code.', 'err');
+      if (e.type === 'peer-unavailable') state('Herba Stellaris ne répond pas : vérifie que la page d’accueil d’Herba Stellaris est ouverte sur l’ordinateur, puis rescanne le QR code.', 'err');
       else if (e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error') state('Serveur de liaison injoignable. Nouvelle tentative…', 'wait');
       else state('Erreur de liaison (' + e.type + ').', 'err');
       scheduleRetry();
     });
   } else if (peer.open) dial();
 }
-function scheduleRetry() { if (!wantOn) return; const d = Math.min(15000, 1500 * Math.pow(1.6, retry++)); setTimeout(() => { if (wantOn && !call) connect(); }, d); }
+function scheduleRetry() { if (!wantOn) return; const d = Math.min(15000, 1500 * Math.pow(1.6, retry++)); setTimeout(() => { if (wantOn && !(remoteOnly ? conn && conn.open : call)) connect(); }, d); }
+let remoteOnly = false;
 function dial() {
   state('Connexion à Herba Stellaris…', 'wait');
+  if (remoteOnly) {
+    if (conn) { try { conn.close(); } catch (e) {} }
+    conn = peer.connect(target, { reliable: true, metadata: { role: 'capteur' } });
+    conn.on('open', () => { state('Connecté — télécommande active.', 'ok'); $('remote').classList.remove('hidden'); });
+    conn.on('data', onStatus);
+    conn.on('close', () => { $('remote').classList.add('hidden'); state('Liaison interrompue. Reconnexion…', 'wait'); scheduleRetry(); });
+    return;
+  }
   call = peer.call(target, stream, { sdpTransform: sdpMusic, metadata: { role: 'capteur', ua: navigator.userAgent } });
   if (!call) { scheduleRetry(); return; }
   call.on('close', () => { call = null; state('Liaison interrompue. Reconnexion…', 'wait'); $('remote').classList.add('hidden'); scheduleRetry(); });
@@ -183,25 +200,38 @@ const mmss = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(Mat
 function onStatus(m) {
   if (!m || typeof m !== 'object') return;
   const live = m.mode === 'live';
-  $('rTime').textContent = live ? '● ' + mmss(m.t || 0) + (m.sil ? ' · fin dans ' + m.sil + ' s' : '') : m.mode === 'replay' ? '▶ relecture' : m.mode === 'hd' ? 'Rendu HD en cours' : 'Prêt';
+  $('rTime').textContent = live ? '● ' + mmss(m.t || 0) : m.mode === 'replay' ? '▶ relecture' : m.mode === 'hd' ? 'Rendu HD en cours' : 'Prêt';
   $('epi').classList.toggle('hidden', !m.epi);
   $('rTime').style.color = live ? 'var(--rec)' : '';
   $('rSite').textContent = m.site ? m.site + (m.plants ? ' · ' + m.plants + ' spécimens' : '') : '';
   $('rStart').disabled = !(m.mode === 'intro' || m.mode === 'idle');
   $('rFinish').disabled = $('rDiscard').disabled = !live;
+  const cb = $('rConclude'); cb.classList.toggle('hidden', !live); $('rStart').classList.toggle('hidden', live);
+  cb.disabled = m.fin !== 'ready'; cb.classList.toggle('on', m.fin === 'on');
+  cb.textContent = m.fin === 'on' ? 'La conclusion décolle…' : 'Conclure la composition';
+  $('rCon').textContent = !live ? '' : m.fin === 'wait' ? 'Disponible dès l’arrivée sur la Lune' : m.fin === 'on' ? 'Montée en orbite · œuvre conservée dans ' + (m.finLeft || 0) + ' s' : 'Un toucher : la conclusion décolle, puis l’œuvre est conservée';
 }
 const send = cmd => { if (conn && conn.open) conn.send({ cmd }); };
 ['Ensemble', 'Ras du sol', 'Grue', 'Plongée', 'Cime', 'Canopée', 'Ciel', 'Terre', 'Contre-jour'].forEach((n, i) => { const b = document.createElement('button'); b.textContent = n; b.onclick = () => send('shot' + (i + 1)); $('shots').appendChild(b); });
-$('rFinale').onclick = () => send('finale'); $('rAube').onclick = () => send('aube'); $('rStage').onclick = () => send('stage'); $('rPublic').onclick = () => send('public');
+$('rAube').onclick = () => send('aube'); $('rStage').onclick = () => send('stage'); $('rPublic').onclick = () => send('public');
 let zLast = 0; $('rZoom').addEventListener('input', e => { const v = +e.target.value, now = performance.now(); $('rZv').textContent = v < .01 ? 'sol' : v < .72 ? 'au-dessus du jardin' : 'orbite'; if (now - zLast > 40 || v === 0 || v === 1) { zLast = now; if (conn && conn.open) conn.send({ cmd: 'zoom', v }); } });
 $('rZoom').addEventListener('change', e => { if (conn && conn.open) conn.send({ cmd: 'zoom', v: +e.target.value }); });
 $('rStart').onclick = () => send('start');
 $('rFinish').onclick = () => send('finish');
+$('rConclude').onclick = () => { send('conclure'); $('rConclude').disabled = true; $('rConclude').textContent = 'La conclusion décolle…'; try { navigator.vibrate && navigator.vibrate(60); } catch (e) {} };
 $('rDiscard').onclick = () => { if (confirmTap($('rDiscard'))) send('discard'); };
 function confirmTap(b) { if (b.dataset.armed) { b.dataset.armed = ''; b.textContent = 'Abandonner'; return true; } b.dataset.armed = 1; b.textContent = 'Confirmer'; setTimeout(() => { b.dataset.armed = ''; b.textContent = 'Abandonner'; }, 3000); return false; }
 
+$('goRemote').onclick = () => {
+  if (!target) return;
+  remoteOnly = true; wantOn = true; keepAwake();
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  if (call) { try { call.close(); } catch (e) {} call = null; }
+  $('levels').classList.add('hidden'); connect();
+};
 $('go').onclick = async () => {
   if (!target) return;
+  remoteOnly = false;
   try {
     await openMic();
     wantOn = true; keepAwake();
