@@ -6,26 +6,42 @@ Application web audio-réactive : la musique (micro de l'ordinateur, fichier aud
 
 ## La flore
 
-Quinze familles, choisies par la musique (graves, médiums, aigus, brillance, intensité) avec une préférence pour la diversité.
-Chacune est associée à un minéral ou à un gaz réellement présent sur la Lune :
+**100 variétés** réparties en quinze familles (architectures). Chaque variété porte une chimie lunaire réelle — minéraux des
+échantillons Apollo (anorthite, armalcolite, tranquillityite, pyroxferroïte…), gaz de l'exosphère (⁴⁰Ar, ⁴He, ²⁰Ne, Na, K),
+volatils piégés dans les cratères froids (H₂O, CO₂, NH₃, CH₃OH, Hg…) — et une morphologie propre : élancement, torsion,
+retombée, inclinaison, ornements (rosée, épines, anneaux, lanternes, spores, couronnes) et palette.
 
-| Famille | Chimie |
-|---|---|
-| Cristaux d'anorthosite | CaAl₂Si₂O₈ (plagioclase des hautes terres) |
-| Géodes d'améthyste | SiO₂ : Fe³⁺ (quartz coloré par le fer irradié) |
-| Gemmes de spinelle | MgAl₂O₄ |
-| Rosettes de quartz | SiO₂ |
-| Rhizomes et champignons d'argon | ⁴⁰Ar · Na · Ne — flux lumineux sous le régolithe reliant les plantes |
-| Arbres‑lanternes | ⁴He |
-| Saules de pyroxène | (Ca,Mg,Fe)SiO₃ |
-| Fougères arborescentes d'olivine | (Mg,Fe)₂SiO₄ |
-| Fougères d'ilménite | FeTiO₃ |
-| Fougères‑éventails de troïlite | FeS |
-| Arbustes à baies de sodium | Na |
-| Filaments de verre volcanique | verre · TiO₂ |
-| Herbes stellaires au néon | ²⁰Ne |
-| Lys de KREEP | K · REE · P |
-| Corolles hydroxylées | OH · H₂O |
+| Famille | Variétés | Exemple |
+|---|---|---|
+| Cristaux | 8 | Torsades d'armalcolite — (Mg,Fe)Ti₂O₅ |
+| Géodes | 6 | Géodes d'améthyste — SiO₂ : Fe³⁺ |
+| Gemmes | 7 | Larmes de verre orange — verre · Ti · Zn · S |
+| Rosettes | 7 | Rosettes d'hélium‑3 — ³He |
+| Rhizomes et champignons | 7 | Rhizomes de mercure — Hg |
+| Arbres | 8 | Candélabres de KREEP — K · REE · P |
+| Saules | 6 | Saules pleureurs de sodium — Na |
+| Fougères arborescentes | 6 | Fougères arborescentes d'olivine — (Mg,Fe)₂SiO₄ |
+| Fougères | 7 | Fougères d'ilménite — FeTiO₃ |
+| Fougères‑éventails | 6 | Éventails de troïlite — FeS |
+| Arbustes | 7 | Buissons de pérovskite — CaTiO₃ |
+| Filaments | 6 | Antennes d'hélium‑3 — ³He |
+| Herbes | 7 | Herbes stellaires au néon — ²⁰Ne |
+| Lys | 6 | Lys de KREEP — K · REE · P |
+| Corolles | 6 | Corolles hydroxylées — OH · H₂O |
+
+### Comment la musique érige la flore
+
+Chaque variété a une signature musicale : **registre** (graves ↔ aigus), **dynamique** (crescendo ↔ decrescendo) et **rythme**
+(legato ↔ percussif). La musique est écoutée en continu et la variété qui naît est celle dont la signature ressemble le plus au moment :
+
+- **Graves** → minéraux massifs, géodes, gemmes, troncs épais ; **aigus** → filaments, herbes, lys, formes fines.
+- **Crescendo** → les formes s'élèvent : arbres, fougères géantes, antennes. Les jeunes plantes poussent plus vite et les naissances s'accélèrent.
+- **Decrescendo** → saules pleureurs, éventails couchés, rosettes, rhizomes et champignons. La lueur s'apaise.
+- **Rythme percussif** → formes torsadées, segmentées, en grappes ; **legato** → courbes longues et lisses.
+- La forme de chaque plante garde la trace de l'instant de sa naissance : plus élancée en crescendo, plus retombante en decrescendo, plus torsadée sur un rythme serré.
+- **Cohérence** : quand la musique change durablement de caractère, une nouvelle **phrase** commence et fait pousser un nouveau **bosquet**
+  ailleurs sur le site. Dans une même phrase, les plantes partagent une famille dominante tout en restant variées. Le jardin final garde ainsi
+  la forme de la pièce, section par section.
 
 ## Déroulé d'une composition
 
@@ -33,7 +49,7 @@ Chacune est associée à un minéral ou à un gaz réellement présent sur la Lu
    À l'écran : les formules des gaz traversés (atmosphère terrestre, géocouronne, vent solaire, exosphère lunaire) et le message
    « Le temps d'une musique, la Lune apprend à fleurir ».
 2. **Ensemencement** — la graine posée luit au cœur du site ; la première plante en sort.
-3. **Création** — plans variés, dont des vues plongeantes sur l'ensemble de l'œuvre.
+3. **Création** — plans variés : vues plongeantes sur l'ensemble de l'œuvre, travellings au‑dessus de la canopée, rotations autour des cimes.
 4. **Final** — à 3 min 30, dézoom lent sur l'œuvre entière ; après 10 s de silence, la création s'arrête d'elle‑même.
 
 Sources des valeurs de l'exosphère lunaire et du vent solaire : NASA (mission LADEE).

@@ -990,6 +990,120 @@ const SPECIES = {
   fleur:        { label: 'Lys de KREEP', court: 'lys', chem: 'K · REE · P', band: 'cent', dur: 14, r: 2.4 },
   corolle:      { label: 'Corolles hydroxylées', court: 'corolles', chem: 'OH · H₂O', band: 'cent', dur: 18, r: 3.5 },
 };
+// ---- Les 100 variétés : une famille (architecture), une chimie lunaire, une signature musicale et une morphologie propre.
+// Signature : b = registre (0 aigus → 1 graves), r = dynamique (−1 decrescendo → +1 crescendo), p = rythme (0 legato → 1 percussif).
+// Morphologie : S taille, H élancement, sp étalement, tw torsion, ln inclinaison, dr retombée, rd épaisseur, gl lueur,
+// orn ornement (rosee, epines, couronne, spores, anneaux, lanternes), hue rotation de teinte, pal/j/q/bk/gas palettes imposées.
+const VAR_DEF = [
+  ['cristal', 'Cristaux d’anorthosite', 'CaAl₂Si₂O₈', .9, .3, .6, { q: 0 }],
+  ['cristal', 'Flèches de cristobalite', 'SiO₂', .8, .9, .5, { H: 1.7, rd: .6, sp: .6, q: 0, orn: 'spores' }],
+  ['cristal', 'Colonnes de tridymite', 'SiO₂', 1, -.3, .4, { S: 1.25, H: .65, rd: 1.5, q: 5 }],
+  ['cristal', 'Torsades d’armalcolite', '(Mg,Fe)Ti₂O₅', .85, .5, .9, { tw: 1.6, q: 1, gl: 1.3 }],
+  ['cristal', 'Gerbes de plagioclase', '(Na,Ca)Al(Si,Al)₃O₈', .9, .7, .3, { sp: 1.8, H: 1.1, q: 2 }],
+  ['cristal', 'Aiguilles de rutile', 'TiO₂', .7, .8, .8, { rd: .45, H: 1.4, q: 4, orn: 'rosee' }],
+  ['cristal', 'Prismes de zircon', 'ZrSiO₄', .95, 0, .7, { S: .8, q: 3, orn: 'couronne', j: 5 }],
+  ['cristal', 'Couronnes de baddeleyite', 'ZrO₂', .9, -.5, .6, { sp: 2.2, H: .6, dr: .3, q: 1 }],
+  ['amethyste', 'Géodes d’améthyste', 'SiO₂ : Fe³⁺', .85, .2, .5, {}],
+  ['amethyste', 'Géodes de citrine lunaire', 'SiO₂ : Fe³⁺', .8, .5, .4, { hue: 2.6 }],
+  ['amethyste', 'Druses d’apatite', 'Ca₅(PO₄)₃(F,Cl)', .75, -.2, .6, { hue: 3.6 }],
+  ['amethyste', 'Nids de merrillite', 'Ca₉NaMg(PO₄)₇', .9, -.6, .3, { S: 1.3, H: .6, hue: 1.2 }],
+  ['amethyste', 'Géodes à sceptres', 'SiO₂ : Fe³⁺ · Ti', .7, .9, .5, { H: 1.6, tw: .4 }],
+  ['amethyste', 'Géodes de chromite', 'FeCr₂O₄', 1, 0, .8, { hue: -1.9, gl: 1.2 }],
+  ['gemme', 'Gemmes de spinelle', 'MgAl₂O₄', .8, -.2, .9, { j: 2 }],
+  ['gemme', 'Saphirs d’ulvöspinelle', 'Fe₂TiO₄', .85, 0, .8, { j: 3 }],
+  ['gemme', 'Péridots de forstérite', 'Mg₂SiO₄', .75, .3, .8, { j: 7, S: 1.2 }],
+  ['gemme', 'Larmes de verre orange', 'verre · Ti · Zn · S', .6, -.5, .7, { j: 5, dr: .4, orn: 'rosee' }],
+  ['gemme', 'Perles de verre vert', 'verre picritique · Mg', .65, -.3, .6, { j: 1 }],
+  ['gemme', 'Diamants d’impact', 'C', .95, .4, 1, { j: 9, gl: 1.4 }],
+  ['gemme', 'Rubis de pyroxferroïte', 'CaFe₆(SiO₃)₇', .9, .1, .7, { j: 2, S: .8, orn: 'couronne' }],
+  ['succulente', 'Rosettes de quartz', 'SiO₂', .7, -.4, .3, { pal: 0 }],
+  ['succulente', 'Rosettes d’hélium-3', '³He', .6, -.6, .2, { pal: 6, gl: 1.5 }],
+  ['succulente', 'Rosaces de kamacite', 'Fe-Ni (α)', .85, -.2, .5, { pal: 2, S: 1.3 }],
+  ['succulente', 'Coussins d’agglutinat', 'verre · Fe⁰', .75, -.8, .2, { H: .5, sp: 1.6, pal: 7 }],
+  ['succulente', 'Spirales d’enstatite', 'MgSiO₃', .65, .2, .6, { tw: 2.2, pal: 5 }],
+  ['succulente', 'Rosettes de glace de cratère', 'H₂O', .55, -.5, .1, { pal: 9, orn: 'rosee' }],
+  ['succulente', 'Étoiles de schreibersite', '(Fe,Ni)₃P', .8, .3, .8, { sp: 1.5, pal: 4, orn: 'epines' }],
+  ['mycelium', 'Rhizomes d’argon', '⁴⁰Ar', .75, -.7, .4, { gas: 0 }],
+  ['mycelium', 'Rhizomes de sodium', 'Na', .7, -.5, .6, { gas: 1 }],
+  ['mycelium', 'Rhizomes de néon', '²⁰Ne', .6, -.3, .7, { gas: 2 }],
+  ['mycelium', 'Rhizomes de potassium', 'K', .8, -.8, .3, { gas: 3 }],
+  ['mycelium', 'Mycènes d’hydrogène', 'H₂', .55, -.6, .5, { gas: 4, H: 1.8 }],
+  ['mycelium', 'Vesses d’hélium', '⁴He', .85, -.9, .2, { gas: 5, S: 1.5, H: .7 }],
+  ['mycelium', 'Rhizomes de mercure', 'Hg', .9, -.4, .8, { gas: 6 }],
+  ['arbre', 'Arbres-lanternes à hélium', '⁴He', .55, .8, .3, { pal: 2 }],
+  ['arbre', 'Chênes de kamacite', 'Fe-Ni', .7, .6, .4, { S: 1.3, H: .85, sp: 1.3, bk: 1, pal: 5 }],
+  ['arbre', 'Cyprès de pyroxène', '(Ca,Mg,Fe)SiO₃', .45, 1, .2, { H: 1.6, sp: .45, pal: 0 }],
+  ['arbre', 'Arbres spirales de titane', 'TiO₂', .5, .7, .8, { tw: 1.4, bk: 2, pal: 3 }],
+  ['arbre', 'Baobabs de basalte', 'CaMgSi₂O₆', .8, .4, .3, { S: 1.4, H: .7, rd: 1.6, bk: 5, pal: 7 }],
+  ['arbre', 'Arbres-parasols d’ilménite', 'FeTiO₃', .6, .3, .2, { sp: 1.9, H: .8, dr: .25, bk: 0, pal: 9 }],
+  ['arbre', 'Arbres penchés au vent solaire', 'H⁺ · He²⁺', .4, .6, .5, { ln: .6, pal: 6 }],
+  ['arbre', 'Candélabres de KREEP', 'K · REE · P', .5, .9, .6, { sp: .8, H: 1.3, orn: 'lanternes', pal: 8 }],
+  ['saule', 'Saules de pyroxène', '(Ca,Mg,Fe)SiO₃', .5, -.8, .2, {}],
+  ['saule', 'Saules pleureurs de sodium', 'Na', .45, -1, .1, { dr: .5, pal: 2 }],
+  ['saule', 'Saules de fer natif', 'Fe⁰', .6, -.7, .3, { bk: 2, pal: 6 }],
+  ['saule', 'Saules-fontaines de néon', '²⁰Ne', .35, -.4, .4, { H: 1.3, pal: 4, orn: 'rosee' }],
+  ['saule', 'Saules torsadés de troïlite', 'FeS', .55, -.6, .6, { tw: 1.2, bk: 1, pal: 5 }],
+  ['saule', 'Saules nains d’agglutinat', 'verre · Fe⁰', .65, -.9, .3, { S: .7, sp: 1.4, pal: 1 }],
+  ['arborescente', 'Fougères arborescentes d’olivine', '(Mg,Fe)₂SiO₄', .45, .5, .2, {}],
+  ['arborescente', 'Fougères arborescentes de fayalite', 'Fe₂SiO₄', .55, .4, .3, { hue: -1.4, S: 1.15, orn: 'lanternes' }],
+  ['arborescente', 'Fougères géantes de forstérite', 'Mg₂SiO₄', .4, .9, .2, { H: 1.5, hue: .5 }],
+  ['arborescente', 'Fougères spiralées de spinelle', 'MgAl₂O₄', .45, .3, .7, { tw: 1.3, hue: 2.8, orn: 'spores' }],
+  ['arborescente', 'Fougères-palmiers d’ammoniac', 'NH₃', .35, .6, .4, { sp: 1.4, hue: 3.6 }],
+  ['arborescente', 'Fougères pleureuses de méthane', 'CH₄', .5, -.4, .2, { dr: .7, hue: 4.4 }],
+  ['fougere', 'Fougères d’ilménite', 'FeTiO₃', .4, .1, .3, {}],
+  ['fougere', 'Fougères de cohénite', 'Fe₃C', .45, 0, .5, { bk: 0, pal: 7 }],
+  ['fougere', 'Fougères-crosses d’ulvöspinelle', 'Fe₂TiO₄', .35, .4, .6, { tw: .9, pal: 3 }],
+  ['fougere', 'Fougères rampantes de pigeonite', '(Mg,Fe,Ca)SiO₃', .5, -.6, .3, { H: .55, sp: 1.6, pal: 0 }],
+  ['fougere', 'Fougères de glace carbonique', 'CO₂', .3, -.2, .2, { pal: 6, orn: 'rosee' }],
+  ['fougere', 'Fougères épineuses de chromite', 'FeCr₂O₄', .55, .3, .8, { orn: 'epines', pal: 4 }],
+  ['fougere', 'Fougères d’éthylène', 'C₂H₄', .3, .5, .4, { H: 1.3, pal: 5 }],
+  ['eventail', 'Fougères-éventails de troïlite', 'FeS', .35, -.3, .5, {}],
+  ['eventail', 'Éventails de schreibersite', '(Fe,Ni)₃P', .4, -.1, .7, { hue: -.6, S: 1.2 }],
+  ['eventail', 'Éventails de chalcopyrite', 'CuFeS₂', .3, 0, .6, { hue: .3 }],
+  ['eventail', 'Éventails dressés de sulfure d’hydrogène', 'H₂S', .25, .6, .5, { H: 1.5, sp: .6, hue: 1.4 }],
+  ['eventail', 'Éventails tournoyants de soufre', 'SO₂', .3, .2, .9, { tw: 1.8, hue: 2.4 }],
+  ['eventail', 'Éventails couchés de taénite', 'Fe-Ni (γ)', .45, -.8, .3, { dr: .45, H: .6, hue: 3.3 }],
+  ['arbuste', 'Arbustes à baies de sodium', 'Na', .5, 0, .6, { pal: 2, j: 4 }],
+  ['arbuste', 'Buissons de pérovskite', 'CaTiO₃', .55, .2, .7, { pal: 4, j: 2 }],
+  ['arbuste', 'Buissons ronds d’augite', '(Ca,Na)(Mg,Fe,Al)Si₂O₆', .6, -.3, .5, { S: 1.2, H: .75, sp: 1.2, pal: 0, j: 1 }],
+  ['arbuste', 'Arbustes-fuseaux d’apatite', 'Ca₅(PO₄)₃(F,Cl)', .45, .6, .6, { H: 1.5, sp: .6, pal: 3, j: 6 }],
+  ['arbuste', 'Buissons à grelots de feldspath', 'KAlSi₃O₈', .5, .1, .9, { pal: 1, j: 0, orn: 'lanternes' }],
+  ['arbuste', 'Arbustes torsadés de magnésium', 'Mg', .55, .3, .8, { tw: 1.5, pal: 5, j: 7 }],
+  ['arbuste', 'Buissons givrés de méthanol', 'CH₃OH', .4, -.5, .4, { pal: 6, j: 9, orn: 'rosee' }],
+  ['filament', 'Filaments de verre volcanique', 'verre · TiO₂', .1, .7, .4, {}],
+  ['filament', 'Antennes d’hélium-3', '³He', .05, 1, .3, { H: 1.4, rd: .7, pal: 6, gl: 1.4, orn: 'spores' }],
+  ['filament', 'Lianes spiralées de silice', 'SiO₂', .15, .5, .7, { tw: 3.2, pal: 9 }],
+  ['filament', 'Plumets de vent solaire', 'H⁺ · He²⁺ · e⁻', .1, .8, .8, { ln: .7, pal: 3, orn: 'spores' }],
+  ['filament', 'Fils retombants de sodium', 'Na', .2, -.4, .4, { dr: .75, pal: 2, orn: 'rosee' }],
+  ['filament', 'Cierges de néon', '²⁰Ne', .2, .9, .9, { orn: 'anneaux', pal: 4, rd: 1.3 }],
+  ['herbe', 'Herbes stellaires au néon', '²⁰Ne', .1, -.1, .8, {}],
+  ['herbe', 'Herbes d’argon', '⁴⁰Ar', .15, 0, .6, { pal: 1 }],
+  ['herbe', 'Prairies de potassium', 'K', .2, -.3, .9, { sp: 1.6, H: .7, pal: 8 }],
+  ['herbe', 'Joncs d’hydrogène', 'H₂', .05, .6, .7, { H: 1.8, sp: .5, pal: 0 }],
+  ['herbe', 'Herbes spiralées de monoxyde de carbone', 'CO', .1, .3, 1, { tw: 2.5, pal: 5 }],
+  ['herbe', 'Herbes couchées de mercure', 'Hg', .25, -.8, .6, { dr: .5, H: .7, pal: 6 }],
+  ['herbe', 'Herbes à épis de calcium', 'Ca', .2, .2, .8, { orn: 'rosee', pal: 2 }],
+  ['fleur', 'Lys de KREEP', 'K · REE · P', .25, .3, .2, {}],
+  ['fleur', 'Tulipes d’eau lunaire', 'H₂O · OH', .2, .5, .1, { H: 1.3, sp: .7 }],
+  ['fleur', 'Lys pleureurs de terres rares', 'Ce · La · Nd', .3, -.5, .3, { dr: .45 }],
+  ['fleur', 'Lys spiralés de phosphore', 'P', .2, .4, .6, { tw: 1.4 }],
+  ['fleur', 'Grands lys de thorium', 'Th', .35, .9, .3, { S: 1.4, H: 1.3, gl: 1.3 }],
+  ['fleur', 'Lys nains d’uranium', 'U', .15, -.2, .7, { S: .7, orn: 'spores' }],
+  ['corolle', 'Corolles hydroxylées', 'OH · H₂O', .3, -.5, .2, {}],
+  ['corolle', 'Corolles d’ammoniac', 'NH₃', .25, -.3, .3, { hue: 1.2, sp: 1.5, H: .7 }],
+  ['corolle', 'Corolles géantes de calcium', 'Ca', .4, .3, .3, { S: 1.5, H: 1.2 }],
+  ['corolle', 'Corolles retombantes de soufre', 'SO₂', .3, -.9, .2, { dr: .5, hue: 2.2 }],
+  ['corolle', 'Corolles tournesols d’aluminium', 'Al', .35, .6, .5, { tw: 2, hue: .6 }],
+  ['corolle', 'Corolles de chrome', 'Cr', .3, -.1, .8, { hue: 3.2, orn: 'couronne' }],
+];
+const VARIETIES = VAR_DEF.map(([fam, nom, chem, b, r, p, m], id) => ({ id, fam, nom, chem, b, r, p, m }));
+const GASES = [{ g: [.72, .5, 1], b: [.8, .62, 1] }, { g: [1, .62, .12], b: [1, .72, .3] }, { g: [1, .35, .12], b: [1, .5, .3] }, { g: [.62, .3, 1], b: [.75, .5, 1] },
+  { g: [1, .3, .62], b: [1, .5, .75] }, { g: [1, .9, .72], b: [1, .95, .85] }, { g: [.35, .75, 1], b: [.6, .88, 1] }];
+const hueRot = (c, a) => {   // rotation de teinte (espace YIQ), luminance conservée
+  if (!a) return c; const y = .299 * c[0] + .587 * c[1] + .114 * c[2], i = .596 * c[0] - .274 * c[1] - .322 * c[2], q = .211 * c[0] - .523 * c[1] + .312 * c[2];
+  const ca = Math.cos(a), sa = Math.sin(a), i2 = i * ca - q * sa, q2 = i * sa + q * ca;
+  return [Math.max(0, y + .956 * i2 + .621 * q2), Math.max(0, y - .272 * i2 - .647 * q2), Math.max(0, y - 1.106 * i2 + 1.703 * q2)];
+};
 // Familles de couleurs : a = base (ombre), b = pointe (lumière), g = lueur
 const FOLIAGE = [
   { a: [.01, .16, .1], b: [.12, .86, .5], g: [.1, 1, .6] },          // jade
@@ -1267,12 +1381,14 @@ function genPlant(pl, rng, sunDir, W) {
   const tilted = (az, tilt) => V(Math.sin(tilt) * Math.cos(az), Math.cos(tilt), Math.sin(tilt) * Math.sin(az));
   const base = V(pl.x, pl.y, pl.z);
   let top = 0; const seeTop = y => { top = Math.max(top, y - pl.y); };
-  const F = fam(), B = pick(BARK);
+  const VM = (pl.v && pl.v.m) || {};
+  const pickJ = () => VM.j != null ? JEWELS[VM.j] : pick(JEWELS), pickQ = () => VM.q != null ? QUARTZ[VM.q] : pick(QUARTZ);
+  const F = VM.pal != null ? FOLIAGE[VM.pal] : fam(), B = VM.bk != null ? BARK[VM.bk] : pick(BARK);
   pl.col = F.g.slice();
 
   switch (pl.sp) {
   case 'cristal': {                            // grappes de quartz : de roche, fumé, rose, améthyste, citrine
-    const Q = pick(QUARTZ), m = M(Q.a, Q.b, .05, 0, .35); pl.col = mixC(Q.b, W.palette.a, .4);
+    const Q = pickQ(), m = M(Q.a, Q.b, .05, 0, .35); pl.col = mixC(Q.b, W.palette.a, .4);
     const n = 4 + Math.floor(rng() * 6);
     for (let i = 0; i < n; i++) {
       const az = rng() * 6.283, tilt = i === 0 ? rng() * .1 : .15 + rng() * .55, d = tilted(az, tilt);
@@ -1282,7 +1398,7 @@ function genPlant(pl, rng, sunDir, W) {
     }
     break; }
   case 'gemme': {                              // pierres taillées posées, enchâssées dans le régolithe
-    const j1 = pick(JEWELS), j2 = rng() < .5 ? j1 : pick(JEWELS); pl.col = j1.b.slice();
+    const j1 = pickJ(), j2 = rng() < .5 ? j1 : pick(JEWELS); pl.col = j1.b.slice();
     const n = 5 + Math.floor(rng() * 9);
     for (let i = 0; i < n; i++) {
       const J1 = rng() < .7 ? j1 : j2, big = i === 0, s = big ? .6 + rng() * .6 : .12 + Math.pow(rng(), 1.5) * .45;
@@ -1306,12 +1422,12 @@ function genPlant(pl, rng, sunDir, W) {
           pearl(c0.clone().addScaledVector(d, len * .9), d, len * .55, 2.1, (3 - ring) * .12 + i * .004, .25, m, null, new THREE.Vector3().crossVectors(d, side), .45);
         }
       }
-      const J1 = pick(JEWELS); gem(c0.clone().add(V(0, .12 * sc, 0)), V(0, 1, 0), .12 * sc, .14 * sc, .12 * sc, 0, .5, 1, M(J1.a, J1.b, .02, .05, .5));
+      const J1 = pickJ(); gem(c0.clone().add(V(0, .12 * sc, 0)), V(0, 1, 0), .12 * sc, .14 * sc, .12 * sc, 0, .5, 1, M(J1.a, J1.b, .02, .05, .5));
     }
     break; }
   case 'arbre': {                              // arbres-lanternes : tronc métallique, couronne de feuilles, fruits lumineux
     const tr = stroke(base, V((rng() - .5) * .15, 1, (rng() - .5) * .15), 3.5 + rng() * 3.5, .42 + rng() * .18, .22, 5, 0, .25, randH(), (rng() - .5) * .08, M(B.col, mixC(B.col, F.a, .5), B.rough, B.metal), .03);
-    const leafM = M(F.a, F.b, .35, 0, .75), fruitJ = pick(JEWELS);
+    const leafM = M(F.a, F.b, .35, 0, .75), fruitJ = pickJ();
     const branch = (p, d, len, r, depth, t0, t1) => {
       const end = stroke(p, d, len, r, r * .6, 3, t0, t1, randH(), .08 + rng() * .1, M(mixC(B.col, F.a, .3 + (3 - depth) * .15), mixC(B.col, F.a, .45 + (3 - depth) * .15), B.rough, B.metal * .8), .04);
       if (depth > 0) {
@@ -1367,7 +1483,7 @@ function genPlant(pl, rng, sunDir, W) {
     for (let i = 0; i < nf; i++) frond(tr.pos, tilted(a0 + i / nf * 6.283, .45 + rng() * .65), 2.2 + rng() * 2.8, .09, 2, .3 + rng() * .05, .72 + rng() * .1);
     break; }
   case 'arbuste': {                            // buissons denses : rameaux, feuilles et grappes de baies-gemmes
-    const ns = 7 + Math.floor(rng() * 8), leafM = M(F.a, F.b, .35, 0, .7), berry = pick(JEWELS);
+    const ns = 7 + Math.floor(rng() * 8), leafM = M(F.a, F.b, .35, 0, .7), berry = pickJ();
     const stemM = M(mixC(B.col, F.a, .2), mixC(B.col, F.a, .55), B.rough, B.metal * .7);
     for (let i = 0; i < ns; i++) {
       const az = rng() * 6.283, d = tilted(az, .25 + rng() * .7);
@@ -1485,7 +1601,7 @@ function genPlant(pl, rng, sunDir, W) {
     const perp = V(-(Bp.z - A.z), 0, Bp.x - A.x).normalize(), amp = (rng() - .5) * dist * .35, ph = rng() * 6;
     const nodes = [];
     for (let i = 0; i <= N; i++) { const t = i / N, p = A.clone().lerp(Bp, t).addScaledVector(perp, Math.sin(Math.PI * t) * amp + Math.sin(t * 9 + ph) * .25); p.y = W.h(p.x, p.z) + .035; nodes.push(p); }
-    const GAS = pick([{ g: [.72, .5, 1], b: [.8, .62, 1] }, { g: [1, .62, .12], b: [1, .72, .3] }, { g: [1, .35, .12], b: [1, .5, .3] }]);   // argon, sodium, néon
+    const GAS = VM.gas != null ? GASES[VM.gas] : pick(GASES.slice(0, 3));   // couleur d'émission du gaz
     const veinM = M(mixC([.1, .08, .12], GAS.g, .35), GAS.b, .3, .2, .3);
     const tan = i => (i === 0 ? nodes[1].clone().sub(nodes[0]) : i === N ? nodes[N].clone().sub(nodes[N - 1]) : nodes[i + 1].clone().sub(nodes[i - 1])).normalize();
     for (let i = 0; i < N; i++) {
@@ -1502,7 +1618,7 @@ function genPlant(pl, rng, sunDir, W) {
       const kind = rng(), cnt = 2 + Math.floor(rng() * 5), t0 = i / N * .8 + .05;
       for (let k = 0; k < cnt; k++) {
         const off = randH().multiplyScalar(.15 + rng() * .5), p = nodes[i].clone().add(off); p.y = W.h(p.x, p.z) - .02;
-        const tall = kind < .45, h = tall ? .35 + rng() * .7 : .12 + rng() * .3, R = tall ? .06 + rng() * .07 : .12 + rng() * .25;
+        const tall = kind < .45, h = (tall ? .35 + rng() * .7 : .12 + rng() * .3) * (VM.H || 1) * (VM.S || 1), R = (tall ? .06 + rng() * .07 : .12 + rng() * .25) * (VM.S || 1);
         const st = stroke(p, tilted(rng() * 6.283, rng() * .25), h, R * (tall ? .25 : .35), R * (tall ? .18 : .28), 2, t0, t0 + .12, randH(), .1, M([.75, .72, .7], mixC([.8, .78, .75], GAS.b, .4), .5, 0, .6), .2);
         pearl(st.pos.clone().addScaledVector(st.dir, -R * .1), V(0, 1, 0), R, 1, st.t, .9, capM, null, V(0, 1, 0), tall ? .55 : .3);
       }
@@ -1526,7 +1642,66 @@ function genPlant(pl, rng, sunDir, W) {
       pearl(st.pos, sunDir, .26, .7, st.t + .05, 1.2, M([.7, .75, .8], F.b, .05, 0, .5), piv);
     }
   } }
-  return { T, P, K, J, height: top };
+  // ---- Variété et musique de naissance : ornements, puis déformation de toute la plante (torsion, inclinaison, retombée, échelle)
+  const vm = (pl.v && pl.v.m) || {}, mo = pl.mod || {};
+  const D = { S: (vm.S || 1) * (mo.S || 1), H: (vm.H || 1) * (mo.H || 1), sp: vm.sp || 1, tw: (vm.tw || 0) + (mo.tw || 0), ln: (vm.ln || 0) + (mo.ln || 0),
+    dr: (vm.dr || 0) + (mo.dr || 0), rd: (vm.rd || 1) * (mo.rd || 1), gl: (vm.gl || 1) * (mo.gl || 1), hue: vm.hue || 0 };
+  const orn = vm.orn, nT = T.length, topY = pl.y + top;
+  const glowM = M(F.b, F.g, .15, 0, .6);
+  if (orn === 'rosee') for (let i = 0; i < nT; i++) { const s = T[i]; if (s[13] < .09 && rng() < .3) pearl(V(s[3], s[4], s[5]), V(s[9], s[10], s[11]), Math.max(s[13] * 1.8, .028), 1.15, s[17], 1, glowM); }
+  if (orn === 'epines') for (let i = 0; i < nT; i++) { const s = T[i]; if (s[12] > .03 && rng() < .5) { const ta = V(s[6], s[7], s[8]), pd = new THREE.Vector3().crossVectors(ta, randH()).normalize().addScaledVector(ta, .4).normalize(); crystal(V((s[0] + s[3]) / 2, (s[1] + s[4]) / 2, (s[2] + s[5]) / 2), pd, s[12] * 4 + .12, s[12] * .4 + .015, s[16], s[17], .8, rng() * 6, M(F.a, F.b, .1, 0, .4)); } }
+  if (orn === 'anneaux') for (let i = 0; i < nT; i += 2) { const s = T[i]; if (s[12] > .025) { const ta = V(s[6], s[7], s[8]); pearl(V(s[0], s[1], s[2]), ta, s[12] * 2.3, 1, s[16], 1, glowM, null, ta, .16); } }
+  if (orn === 'lanternes') for (let i = 0; i < nT; i++) { const s = T[i]; if (Math.abs(s[10]) < .45 && s[4] > pl.y + .6 && rng() < .3) { const h = stroke(V(s[3], s[4], s[5]), V(0, -1, 0), .25 + rng() * .35, .008, .006, 2, s[17], Math.min(1, s[17] + .1), null, 0, M([.5, .5, .5], F.b, .3, .6), .2); pearl(h.pos, V(0, -1, 0), .07 + rng() * .05, 1.25, h.t, 1.3, glowM); } }
+  if (orn === 'couronne') { const ends = T.map(s => s).sort((a, b) => b[4] - a[4]).slice(0, 4); const J0 = pickJ(); for (const s of ends) gem(V(s[3], s[4] + .06, s[5]), V(s[9], s[10], s[11]), .09, .1, .09, rng() * 6, s[17], 1, M(J0.a, J0.b, .02, .05, .6)); if (!ends.length) { const s = K.slice().sort((a, b) => (b[1] + b[4] * b[6]) - (a[1] + a[4] * a[6]))[0]; if (s) gem(V(s[0] + s[3] * s[6], s[1] + s[4] * s[6] + .1, s[2] + s[5] * s[6]), V(s[3], s[4], s[5]), .14, .16, .14, 0, s[11], 1, M(J0.a, J0.b, .02, .05, .6)); } }
+  if (orn === 'spores') { const n = 10 + Math.floor(rng() * 10), tp = top; for (let i = 0; i < n; i++) { const a = rng() * 6.283, rr = Math.sqrt(rng()) * (.4 + tp * .25); pearl(base.clone().add(V(Math.cos(a) * rr, tp * (1.02 + rng() * .3), Math.sin(a) * rr)), V(0, 1, 0), .03 + rng() * .04, 1, .8 + rng() * .15, 1.4, glowM, null, null, 1, 1); } }
+  if (pl.sp !== 'mycelium') {
+    const Hn = Math.max(2, top), lnAz = rng() * 6.283, lx = Math.cos(lnAz), lz = Math.sin(lnAz), q = new THREE.Vector3(), o = new THREE.Vector3();
+    const def = (x, y, z) => {
+      q.set(x - base.x, y - base.y, z - base.z); const h = Math.max(q.y, 0), u = h / Hn;
+      if (D.tw) { const a = D.tw * u, c = Math.cos(a), s = Math.sin(a), qx = q.x * c - q.z * s; q.z = q.x * s + q.z * c; q.x = qx; }
+      q.x *= D.sp; q.z *= D.sp;
+      if (D.dr) { const rho = Math.hypot(q.x, q.z); q.y -= D.dr * rho * rho / Math.max(1, Hn * .45) * smoothstep(.1, .6, u); }
+      q.x *= D.S; q.z *= D.S; q.y *= D.S * D.H;
+      if (D.ln) { const k = D.ln * u * u * Hn * D.S * D.H * .45; q.x += lx * k; q.z += lz * k; }
+      o.set(base.x + q.x, base.y + q.y, base.z + q.z);
+      if (y - base.y > .12) o.y = Math.max(o.y, W.h(o.x, o.z) + .03);
+      return o;
+    };
+    const P3 = (x, y, z) => def(x, y, z).clone();
+    const dirT = (p, d, e) => { const a = P3(p.x, p.y, p.z), b = def(p.x + d.x * e, p.y + d.y * e, p.z + d.z * e); return { a, d: b.sub(a), }; };
+    const rS = D.S * D.rd;
+    for (const s of T) {
+      const A = V(s[0], s[1], s[2]), B2 = V(s[3], s[4], s[5]), ta = V(s[6], s[7], s[8]), tb = V(s[9], s[10], s[11]);
+      const ea = dirT(A, ta, .05), eb = dirT(B2, tb, .05), na = ea.d.normalize(), nb = eb.d.normalize();
+      s[0] = ea.a.x; s[1] = ea.a.y; s[2] = ea.a.z; s[3] = eb.a.x; s[4] = eb.a.y; s[5] = eb.a.z; s[6] = na.x; s[7] = na.y; s[8] = na.z; s[9] = nb.x; s[10] = nb.y; s[11] = nb.z;
+      s[12] *= rS; s[13] *= rS;
+      if (s[21][3] > .5) { const pv = P3(s[21][0], s[21][1], s[21][2]); s[21] = [pv.x, pv.y, pv.z, 1]; }
+    }
+    for (const s of P) {
+      const c = V(s[0], s[1], s[2]), d = V(s[3], s[4], s[5]), R = s[11], e = dirT(c, d, R), nd = e.d.clone(), L = nd.length() / Math.max(R, 1e-4);
+      s[0] = e.a.x; s[1] = e.a.y; s[2] = e.a.z; nd.normalize(); s[3] = nd.x; s[4] = nd.y; s[5] = nd.z;
+      s[6] *= clamp(L / Math.max(D.S, .01), .6, 1.8);
+      if (s[7] || s[8] || s[9]) { const f2 = dirT(c, V(s[7], s[8], s[9]), R).d.normalize(); s[7] = f2.x; s[8] = f2.y; s[9] = f2.z; }
+      s[11] *= D.S * Math.sqrt(D.rd);
+      if (s[17][3] > .5) { const pv = P3(s[17][0], s[17][1], s[17][2]); s[17] = [pv.x, pv.y, pv.z, 1]; }
+    }
+    for (const s of K) { const b = V(s[0], s[1], s[2]), e = dirT(b, V(s[3], s[4], s[5]), s[6]); s[0] = e.a.x; s[1] = e.a.y; s[2] = e.a.z; s[6] = e.d.length(); e.d.normalize(); s[3] = e.d.x; s[4] = e.d.y; s[5] = e.d.z; s[7] *= rS; }
+    for (const s of J) { const c = V(s[0], s[1], s[2]), e = dirT(c, V(s[3], s[4], s[5]), .2); s[0] = e.a.x; s[1] = e.a.y; s[2] = e.a.z; e.d.normalize(); s[3] = e.d.x; s[4] = e.d.y; s[5] = e.d.z; s[7] *= D.S; s[8] *= D.S * Math.sqrt(D.H); s[9] *= D.S; }
+  }
+  // teinte et lueur propres à la variété
+  const mm = new Map(), remat = m => { if (!mm.has(m)) mm.set(m, { col: hueRot(m.col, D.hue), col2: hueRot(m.col2, D.hue), rough: m.rough, metal: m.metal, trans: m.trans }); return mm.get(m); };
+  for (const s of T) { s[14] *= D.gl; if (D.hue) { s[18] = hueRot(s[18], D.hue); s[19] = hueRot(s[19], D.hue); } }
+  for (const s of P) { s[12] *= D.gl; if (D.hue) s[16] = remat(s[16]); }
+  for (const s of K) { s[8] *= D.gl; if (D.hue) s[12] = remat(s[12]); }
+  for (const s of J) { s[10] *= D.gl; if (D.hue) s[13] = remat(s[13]); }
+  if (D.hue) pl.col = hueRot(pl.col, D.hue);
+  // hauteur et rayon de la couronne (pour les plans de canopée)
+  top = 0; let crown = 0;
+  const seeP = (x, y, z) => { top = Math.max(top, y - pl.y); };
+  for (const s of T) { seeP(0, s[4]); } for (const s of P) seeP(0, s[1] + s[11]); for (const s of K) seeP(0, s[1] + s[4] * s[6]); for (const s of J) seeP(0, s[1] + s[8] * .4);
+  for (const s of T) if (s[4] - pl.y > top * .55) crown = Math.max(crown, Math.hypot(s[3] - pl.x, s[5] - pl.z));
+  for (const s of P) if (s[1] - pl.y > top * .55) crown = Math.max(crown, Math.hypot(s[0] - pl.x, s[2] - pl.z));
+  return { T, P, K, J, height: top, crown };
 }
 function writePlant(G, idx) {
   if (TUBES.n + G.T.length > TUBES.cap || PEARLS.n + G.P.length > PEARLS.cap || CRYST.n + G.K.length > CRYST.cap || GEMS.n + G.J.length > GEMS.cap) return false;
@@ -1597,7 +1772,11 @@ class Sim {
     this.introTv = 0; this.introTvPrev = 0; this.introDone = !intro; this.introDoneAt = 0; this.introEnd = intro ? Infinity : 0;
     this.W = W; this.t = 0; this.tick = 0; this.lunarT = 0; this.rate = TIME_BASE; this.beatEnv = 0; this.tscale = 1;
     this.rL = mulberry32(seed ^ 0xA341316C); this.rC = mulberry32(seed ^ 0xC8013EA4); this.rD = mulberry32(seed ^ 0xAD90777D);
-    this.f = { bass: 0, mid: 0, high: 0, vol: 0, cent: 0 }; this.plants = []; this.lastSpawn = -99; this.shot = null; this.full = false;
+    this.f = { bass: 0, mid: 0, high: 0, vol: 0, cent: 0 }; this.plants = [];
+    // lecture musicale : registre (graves/aigus), dynamique (crescendo/decrescendo), densité rythmique ; phrases et bosquets
+    this.mu = { vM: 0, vP: 0, dv: 0, vL: 0, vLL: 0, tilt: 0, tiltAvg: 0, ons: 0, b: .5, r: 0, p: 0, e: 0 };
+    this.phrase = { id: 0, t0: 0, s: [.5, .5, 0], off: 0, fam: null, cx: 0, cz: 0 }; this.groves = [[0, 0]];
+ this.lastSpawn = -99; this.shot = null; this.full = false;
     resetFlora(); resetDust();
     this.cut(this.intro ? 'arrivee' : 'large');
   }
@@ -1607,6 +1786,7 @@ class Sim {
     const [bass, mid, high, vol, cent, flag] = fr, f = this.f, onset = flag === 1 || flag === 3, silent = flag >= 2;
     const sm = (k, x) => { f[k] += (x - f[k]) * (x > f[k] ? .55 : .14); };
     sm('bass', bass); sm('mid', mid); sm('high', high); sm('vol', vol); sm('cent', cent);
+    this.listen(onset);
     // le temps lunaire s'écoule : lentement au repos, à toute allure quand la musique s'emporte
     if (onset) this.beatEnv = 1; this.beatEnv *= Math.exp(-DT * 2.2);
     this.rate = TIME_BASE * this.tscale * (1 + 30 * f.vol * f.vol + 14 * this.beatEnv + 6 * f.bass * f.bass);   // ~×15 sur une musique moyenne : un jour lunaire complet en 4-5 min
@@ -1620,12 +1800,13 @@ class Sim {
     }
     // ensemencement : seulement une fois le site révélé à l'écran
     const seedOpen = !this.intro || (this.introDone && t > this.introDoneAt + 1.2);
-    const sustained = vol > .3 && t - this.lastSpawn > 6;
-    if (seedOpen && !this.full && n < MAXP && ((onset && vol > .08 && t - this.lastSpawn > 1.6) || sustained || (n === 0 && vol > .04))) this.spawn(bass, mid, high, cent);
+    const cre = Math.max(this.mu.r, 0), sustained = vol > .3 && t - this.lastSpawn > 6 * (1 - .45 * cre);
+    if (seedOpen && !this.full && n < MAXP && ((onset && vol > .08 && t - this.lastSpawn > 1.6 * (1 - .4 * cre)) || sustained || (n === 0 && vol > .04))) this.spawn(bass, mid, high, cent);
     for (const p of this.plants) {
       const bk = SPECIES[p.sp].band, band = bk === 'cent' ? (f.mid + f.cent) * .5 : f[bk];
-      p.growth = Math.min(1, p.growth + DT / SPECIES[p.sp].dur * (.18 + 1.7 * band));
-      p.glow += (band - p.glow) * .12;
+      const young = t - p.born < 25 ? 1 : .3;
+      p.growth = Math.min(1, p.growth + DT / SPECIES[p.sp].dur * (.18 + 1.7 * band) * (1 + 1.4 * cre * young));
+      p.glow += (band * (1 + .5 * this.mu.r) - p.glow) * .12;
       p.pulse *= Math.exp(-DT * 1.6);
     }
     if (onset) {
@@ -1642,17 +1823,57 @@ class Sim {
     const free = !this.finale && t > this.introEnd;
     if (free && ((onset && t - this.shot.t0 > 7) || t - this.shot.t0 > 15)) this.cut();
   }
+  listen(onset) {
+    const m = this.mu, f = this.f, k = x => 1 - Math.exp(-DT / x);
+    m.vP = m.vM; m.vM += (f.vol - m.vM) * k(1.2);
+    m.dv += ((m.vM - m.vP) / DT - m.dv) * k(1.5);
+    m.vL += (f.vol - m.vL) * k(8); m.vLL += (f.vol - m.vLL) * k(25);
+    m.r = Math.tanh(m.dv * 6 + (m.vL - m.vLL) * 3.2);                                 // > 0 crescendo, < 0 decrescendo (gestes courts et longues montées)
+    const tl = (f.bass - f.high) / (f.bass + f.high + .08);
+    m.tilt += (tl - m.tilt) * k(2); m.tiltAvg += (m.tilt - m.tiltAvg) * k(30);
+    m.b = clamp(.5 + .5 * Math.tanh((m.tilt - m.tiltAvg) * 2.6 + m.tilt * .6), 0, 1);  // registre relatif à la pièce elle-même
+    if (onset) m.ons += 1; m.ons *= Math.exp(-DT / 3);
+    m.p = 1 - Math.exp(-m.ons / 3.5); m.e = m.vM;
+    // phrases : quand la musique change durablement de caractère, un nouveau bosquet commence ailleurs
+    const P = this.phrase, st = [m.b, (m.r + 1) / 2, m.p], d = Math.hypot(st[0] - P.s[0], st[1] - P.s[1], st[2] - P.s[2]);
+    for (let i = 0; i < 3; i++) P.s[i] += (st[i] - P.s[i]) * k(6);
+    P.off = d > .3 ? P.off + DT : 0;
+    if (P.off > 1.2 && this.t - P.t0 > 8 && this.plants.length) {
+      const r = this.rL; let best = null, bd = -1;
+      for (let i = 0; i < 6; i++) { const a = r() * 6.283, R = 10 + Math.sqrt(r()) * 30, x = Math.cos(a) * R, z = Math.sin(a) * R; let md = 1e9; for (const g of this.groves) md = Math.min(md, Math.hypot(g[0] - x, g[1] - z)); if (md > bd) { bd = md; best = [x, z]; } }
+      this.groves.push(best); Object.assign(P, { id: P.id + 1, t0: this.t, s: st.slice(), off: 0, fam: null, cx: best[0], cz: best[1] });
+    }
+  }
+  pickVariety(fams) {
+    const m = this.mu, P = this.phrase, cv = {}, cf = {};
+    for (const p of this.plants) { cv[p.var] = (cv[p.var] || 0) + 1; cf[p.sp] = (cf[p.sp] || 0) + 1; }
+    let tot = 0; const w = [];
+    for (const v of VARIETIES) {
+      if (!fams(v.fam)) { w.push(0); continue; }
+      const d2 = ((v.b - m.b) / .26) ** 2 + ((v.r - m.r) / .55) ** 2 + ((v.p - m.p) / .38) ** 2;
+      let x = Math.exp(-d2 / 2) + .004;
+      x /= 1 + .7 * (cv[v.id] || 0); x /= 1 + .12 * (cf[v.fam] || 0);                 // diversité
+      if (P.fam === v.fam) x *= 2.2;                                                       // cohérence de la phrase
+      if ((v.fam === 'arbre' || v.fam === 'arborescente' || v.fam === 'saule') && m.e < .25) x *= .3;
+      w.push(x); tot += x;
+    }
+    let x = this.rL() * tot; for (let i = 0; i < w.length; i++) { x -= w[i]; if (x <= 0 && w[i] > 0) return VARIETIES[i]; }
+    return VARIETIES.find(v => fams(v.fam));
+  }
+  birthMod() {    // la forme garde la trace de l'instant musical de la naissance
+    const m = this.mu;
+    return { H: clamp(1 + .42 * m.r + .15 * (m.e - .4), .7, 1.5), dr: Math.max(-m.r, 0) * .35, tw: (m.p - .5) * .5, S: .85 + .3 * m.b, rd: .8 + .4 * m.b, gl: .75 + .6 * this.f.cent };
+  }
   spawn(bass, mid, high, cent) {
     const r = this.rL, W = this.W;
-    const br = cent > .35 ? mid * .5 + cent * .8 : .04, cnt = countSpecies();
-    const sc = { cristal: bass * 1.05, gemme: bass * .95, succulente: bass * .75 + mid * .2, arbre: this.f.vol > .4 ? this.f.vol * 1.1 : .02, saule: mid * .8 + bass * .2, amethyste: bass * .9 + high * .15,
-      arborescente: mid * .85 + bass * .15, eventail: mid * .6 + high * .45, fougere: mid * .9, arbuste: mid * .85, filament: high * 1.25, herbe: high * 1.1, fleur: br * .95, corolle: br * .85 };
-    let tot = 0; for (const k in sc) { sc[k] = Math.pow(sc[k] + .02, 3) / (1 + .45 * cnt[k]); tot += sc[k]; }   // la diversité est encouragée
-    let x = r() * tot, sp = 'fougere'; for (const k in sc) { x -= sc[k]; if (x <= 0) { sp = k; break; } }
+    const v = this.pickVariety(f => f !== 'mycelium'), sp = v.fam, P = this.phrase;
+    if (!P.fam) P.fam = sp;
     let px, pz;
     if (!this.plants.length) { px = (r() - .5) * 4; pz = (r() - .5) * 4; }
-    else if (r() < .55) { const o = this.plants[Math.floor(r() * this.plants.length)]; const a = r() * 6.283, d = 6 + r() * 9; px = o.x + Math.cos(a) * d; pz = o.z + Math.sin(a) * d; }
-    else { const a = r() * 6.283, d = 8 + Math.sqrt(r()) * 40; px = Math.cos(a) * d; pz = Math.sin(a) * d; }
+    else if (r() < .72) {                       // dans le bosquet de la phrase en cours, en gardant de l'espace
+      let bd = -1; for (let i = 0; i < 6; i++) { const a = r() * 6.283, d = 2.5 + Math.sqrt(r()) * 11, x = P.cx + Math.cos(a) * d, z = P.cz + Math.sin(a) * d; let md = 1e9; for (const q of this.plants) md = Math.min(md, Math.hypot(q.x - x, q.z - z) - SPECIES[q.sp].r * .5); if (md > bd) { bd = md; px = x; pz = z; } }
+    }
+    else { const o = this.plants[Math.floor(r() * this.plants.length)]; const a = r() * 6.283, d = 6 + r() * 9; px = o.x + Math.cos(a) * d; pz = o.z + Math.sin(a) * d; }
     if (Math.hypot(px, pz) > 52) { px *= .7; pz *= .7; }
     const idx = this.plants.length;
     const pal = W.palette, mixc = (u, v, k) => u.map((c, i) => c + (v[i] - c) * k);
@@ -1660,13 +1881,13 @@ class Sim {
     const col = baseCol.map(c => clamp(c * (.85 + r() * .3), 0, 1.2));
     // direction du Soleil à l'instant (déterministe) de la naissance, relevée au-dessus de l'horizon
     const C = celestial(W, this.skyMs()); const sun0 = new THREE.Vector3(C.sunL.x, Math.max(C.sunL.y, .1), C.sunL.z).normalize();
-    const pl = { idx, sp, x: px, z: pz, y: W.h(px, pz) - .15, growth: 0, glow: 0, pulse: 1, col, phase: r(), height: 0, sun0 };
+    const pl = { idx, sp, var: v.id, v, mod: this.birthMod(), mus: [this.mu.b, this.mu.r, this.mu.p], phraseId: P.id, born: this.t, x: px, z: pz, y: W.h(px, pz) - .15, growth: 0, glow: 0, pulse: 1, col, phase: r(), height: 0, crown: 0, sun0 };
     const G = genPlant(pl, mulberry32(Math.floor(r() * 4294967296)), sun0, W);
     if (!writePlant(G, idx)) { this.full = true; return; }
-    pl.height = Math.max(1, G.height);
+    pl.height = Math.max(1, G.height); pl.crown = G.crown;
     this.plants.push(pl); this.lastSpawn = this.t;
     if (idx === 0 && !this.intro) this.cut('ras', pl);
-    if (r() < .32 && this.plants.length < MAXP - 12) this.spawnRhizome(pl);
+    if (r() < .2 + .3 * Math.max(-this.mu.r, 0) && this.plants.length < MAXP - 12) this.spawnRhizome(pl);
   }
   // Rhizome énergétique : un flux de gaz piégés court sous le régolithe d'une plante à sa voisine, des champignons y percent
   spawnRhizome(a) {
@@ -1674,7 +1895,8 @@ class Sim {
     for (const q of this.plants) { if (q === a || q.sp === 'mycelium') continue; const d = Math.hypot(q.x - a.x, q.z - a.z); if (d > 3.5 && d < 28 && d < bd) { bd = d; best = q; } }
     if (!best || this.plants.length >= MAXP) return;
     const idx = this.plants.length, mx = (a.x + best.x) / 2, mz = (a.z + best.z) / 2;
-    const pl = { idx, sp: 'mycelium', x: mx, z: mz, y: W.h(mx, mz) - .15, growth: 0, glow: 0, pulse: 1, col: a.col.slice(), phase: r(), height: 0, sun0: a.sun0, ax: a.x, az: a.z, bx: best.x, bz: best.z };
+    const v = this.pickVariety(f => f === 'mycelium');
+    const pl = { idx, sp: 'mycelium', var: v.id, v, mod: this.birthMod(), phraseId: this.phrase.id, born: this.t, x: mx, z: mz, y: W.h(mx, mz) - .15, growth: 0, glow: 0, pulse: 1, col: a.col.slice(), phase: r(), height: 0, crown: 0, sun0: a.sun0, ax: a.x, az: a.z, bx: best.x, bz: best.z };
     const G = genPlant(pl, mulberry32(Math.floor(r() * 4294967296)), a.sun0, W);
     if (!writePlant(G, idx)) { this.full = true; return; }
     pl.height = Math.max(.6, G.height); this.plants.push(pl);
@@ -1682,9 +1904,10 @@ class Sim {
   cut(force, plant) {
     const r = this.rC, n = this.plants.length, prev = this.shot && this.shot.type;
     let type = force;
-    if (!type) { const types = n ? ['large', 'ras', 'grue', 'contre', 'terre', 'ras', 'ciel', 'plongee', ...(n >= 6 ? ['plongee', 'plongee'] : [])] : ['large', 'terre', 'ciel']; do { type = types[Math.floor(r() * types.length)]; } while (type === prev && n); }
+    const tall = this.plants.filter(p => p.height * p.growth > 4 && p.crown > 1.2 && p.sp !== 'mycelium' && p.sp !== 'filament');
+    if (!type) { const types = n ? ['large', 'ras', 'grue', 'contre', 'terre', 'ras', 'ciel', 'plongee', ...(n >= 6 ? ['plongee', 'plongee'] : []), ...(tall.length ? ['cime', 'cime', 'canopee'] : []), ...(tall.length >= 3 ? ['canopee', 'cime'] : [])] : ['large', 'terre', 'ciel']; do { type = types[Math.floor(r() * types.length)]; } while (type === prev && n); }
     let cx = 0, cz = 0; if (n) { for (const p of this.plants) { cx += p.x; cz += p.z; } cx /= n; cz /= n; }
-    const pl = plant || (n ? this.plants[Math.floor(r() * n)] : null);
+    const pl = plant || ((type === 'cime' || type === 'canopee') && tall.length ? tall[Math.floor(r() * tall.length)] : n ? this.plants[Math.floor(r() * n)] : null);
     let ext = 12; for (const p of this.plants) ext = Math.max(ext, Math.hypot(p.x - cx, p.z - cz) + p.height * .5);   // étendue de l'œuvre
     this.shot = { type, t0: this.t, a: r(), b: r(), c: r(), pl: pl ? pl.idx : -1, cx, cz, ext };
   }
@@ -1730,6 +1953,16 @@ function shotCamera(sim, T, out) {
     const R = E * .9 + (E * 3 + 60) * e, alt = 10 + (E * 2.4 + 70) * (e * e * .55 + e * .45);
     pos.set(gc.x + Math.cos(az) * R, 0, gc.z + Math.sin(az) * R); pos.y = h(pos.x, pos.z) + alt;
     tgt.copy(gc).add(_v.set(0, 1.5, 0)); fov = 36;
+  } else if (s.type === 'cime') {           // autour d'une cime : on tourne à hauteur de couronne, au ras des feuillages
+    const top = P.height * Math.max(P.growth, .3), R = Math.max((P.crown || 2) * Math.max(P.growth, .4) * 1.1, 2) + 1.6 + s.a * 3.5;
+    const az = s.b * 6.283 + el * .045 * (s.c > .5 ? 1 : -1);
+    pos.set(C.x + Math.cos(az) * R, 0, C.z + Math.sin(az) * R); pos.y = h(pos.x, pos.z) + top * (.72 + .3 * s.c) + Math.sin(el * .25) * .4;
+    tgt.copy(C).add(_v.set(0, top * .82, 0)); fov = 40;
+  } else if (s.type === 'canopee') {        // travelling au-dessus de la canopée, en frôlant les cimes
+    let tm = Math.max(3, P.height * P.growth); for (const q of sim.plants) if (q.crown > 1.2 && q.sp !== 'filament' && Math.hypot(q.x - C.x, q.z - C.z) < 16) tm = Math.max(tm, Math.min(q.height * q.growth, tm * 1.4));
+    const a = s.b * 6.283, dx = Math.cos(a), dz = Math.sin(a), u = -16 + el * (.7 + s.a * .5);
+    pos.set(C.x + dx * u + (s.c - .5) * 4 * -dz, 0, C.z + dz * u + (s.c - .5) * 4 * dx); pos.y = Math.max(h(pos.x, pos.z) + tm + 1 + s.c * 2.2, P.y + tm + 1);
+    tgt.set(pos.x + dx * 18, 0, pos.z + dz * 18); tgt.y = Math.max(h(tgt.x, tgt.z), P.y) + tm * .7; fov = 46;
   } else if (s.type === 'ciel') {            // panoramique lent vers le ciel : la flore en silhouette, les astres au-dessus
     const az = s.b * 6.283 + el * .012, dist = 10 + s.a * 14;
     pos.set(gc.x + Math.cos(az) * dist, 0, gc.z + Math.sin(az) * dist); pos.y = h(pos.x, pos.z) + .5;
@@ -1743,7 +1976,7 @@ function shotCamera(sim, T, out) {
     tgt.copy(pos).add(toPlant.lerp(W.earthDir, .72).normalize().multiplyScalar(30)); fov = 38;
     out.focus = C.distanceTo(pos);
   }
-  if (s.type !== 'arrivee' && s.type !== 'plongee' && s.type !== 'finale') for (let it = 0; it < 3; it++) for (const q of sim.plants) {
+  if (s.type !== 'arrivee' && s.type !== 'plongee' && s.type !== 'finale' && s.type !== 'canopee' && s.type !== 'cime') for (let it = 0; it < 3; it++) for (const q of sim.plants) {
     const rq = SPECIES[q.sp].r * Math.max(q.growth, .3);
     const dx = pos.x - q.x, dz = pos.z - q.z, d = Math.hypot(dx, dz);
     if (d < rq && (q !== P || s.type !== 'terre')) { const k = (rq + .01) / Math.max(d, .01); pos.x = q.x + dx * k; pos.z = q.z + dz * k; }
@@ -1779,7 +2012,7 @@ async function finishLive(save) {
   const thumb = await new Promise(res => wantThumb = res);
   const rec = {
     id: Date.now().toString(36) + '-' + sim.W.seed.toString(36), name: sim.W.name, date: new Date().toISOString(), seed: sim.W.seed, startUTC: sim.W.startMs,
-    tscale: sim.tscale, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), frames: new Float32Array(frames), audio, thumb,
+    tscale: sim.tscale, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), varieties: new Set(sim.plants.map(p => p.var)).size, frames: new Float32Array(frames), audio, thumb,
   };
   try { await DB.put(rec); } catch (e) { memStore.set(rec.id, rec); }
   showEpilogue(rec);
@@ -1912,7 +2145,7 @@ async function renderGallery() {
     const sky = rec.startUTC || Date.parse(rec.date);
     c.innerHTML = `<div class="th" style="background-image:url('${rec.thumb || ''}')"></div>
       <div class="meta"><div class="nm"></div><div class="dt">Ciel du ${dateFR(sky)} · ${mmss(rec.duration)}${rec.lunarT ? ' · ' + durLunaire(rec.lunarT) + ' lunaires' : ''}<br>
-      ${rec.plants} spécimens — ${speciesLine(sp)}</div></div>
+      ${rec.plants} spécimens${rec.varieties ? ' · ' + rec.varieties + ' variétés' : ''} — ${speciesLine(sp)}</div></div>
       <div class="acts"><button class="small" data-a="play">Rejouer</button><button class="small" data-a="hd">Vidéo 8K</button><button class="small" data-a="video">Vidéo écran</button><button class="small" data-a="json">Sauvegarde</button><button class="small" data-a="del">Supprimer</button></div>`;
     c.querySelector('.nm').textContent = rec.name;
     c.querySelector('[data-a=play]').onclick = () => startReplay(rec, false);
@@ -2428,7 +2661,9 @@ function updateVisuals(dt, withUI) {
     if (++hudTick % 3 === 0) {
       [f.bass, f.mid, f.high, f.vol, f.cent].forEach((v, i) => meters[i].style.width = Math.min(100, v * 100) + '%');
       const c = countSpecies();
-      $('flora').innerHTML = `<b>${sim.plants.length}</b> spécimens${sim.full ? ' — jardin complet' : ''}` + Object.keys(SPECIES).filter(k => c[k]).map(k => `<br>${SPECIES[k].label} <i style="opacity:.6">${SPECIES[k].chem}</i> <b>${c[k]}</b>`).join('');
+      const seen = new Map(); for (const p of sim.plants) seen.set(p.var, (seen.get(p.var) || 0) + 1);
+      const recent = [...new Set(sim.plants.slice().reverse().map(p => p.var))].slice(0, 9);
+      $('flora').innerHTML = `<b>${sim.plants.length}</b> spécimens · <b>${seen.size}</b> variétés sur ${VARIETIES.length}${sim.full ? ' — jardin complet' : ''}` + recent.map(i => `<br>${VARIETIES[i].nom} <i style="opacity:.6">${VARIETIES[i].chem}</i>${seen.get(i) > 1 ? ' <b>' + seen.get(i) + '</b>' : ''}`).join('') + (seen.size > 9 ? `<br><i style="opacity:.55">… et ${seen.size - 9} autres</i>` : '');
       if (mode !== 'intro') updateCarnet();
     }
     if (S.annot && !inSpace) updateLabels(C); else if (inSpace) $('labels').innerHTML = '';
