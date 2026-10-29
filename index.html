@@ -4106,7 +4106,7 @@ try { const v = localStorage.getItem('herba-instruments'); if (v !== null) INS.o
 {
   const mk = (w, h) => { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.minFilter = THREE.LinearFilter;
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).translate(.5, .5, 0), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false, toneMapped: false })); INS.scene.add(m); return { cv, cx: cv.getContext('2d'), t, m }; };
-  INS.eq = mk(1536, 160); INS.st = mk(640, 220);
+  INS.eq = mk(1536, 160); INS.st = mk(640, 840);
   // matrice 3D : un cube de verre, la grille du sol, et chaque plante en point lumineux à sa place (hauteur = croissance)
   const M = INS.m3 = { scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(34, 1, .1, 50), grp: new THREE.Group() };
   M.scene.add(M.grp); M.cam.position.set(0, .55, 4.1); M.cam.lookAt(0, .15, 0);
@@ -4132,29 +4132,59 @@ function gardenStage() {
   const g = live.reduce((a, p) => a + p.growth, 0) / n;
   return sim.full ? 'Canopée' : sim.D > .55 ? 'Floraison' : g < .35 || n < 6 ? 'Germination' : g < .7 ? 'Croissance' : 'Maturité';
 }
+function fitCanvas(o, w, h) {                                  // le dessin suit la définition réelle de l'écran : texte et barres nets
+  w = Math.max(64, Math.round(w)); h = Math.max(32, Math.round(h));
+  if (Math.abs(o.cv.width - w) < 6 && Math.abs(o.cv.height - h) < 6) return;
+  o.cv.width = w; o.cv.height = h; o.t.dispose(); o.t = new THREE.CanvasTexture(o.cv); o.t.colorSpace = THREE.SRGBColorSpace; o.t.minFilter = THREE.LinearFilter; o.t.generateMipmaps = false; o.m.material.map = o.t; o.m.material.needsUpdate = true;
+}
+function rrect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 function drawInstruments(dt) {
-  const { cx, cv } = INS.eq, W = cv.width, H = cv.height, NB = 48; cx.clearRect(0, 0, W, H);
-  const f = AE.freq, sr = AE.ctx ? AE.ctx.sampleRate : 48000, nb = f ? f.length : 0, pal = world ? world.palette : null;
+  const { cx, cv } = INS.eq, W = cv.width, H = cv.height, NB = 48, u = H / 160; cx.clearRect(0, 0, W, H);
+  const f = AE.freq, sr = AE.ctx ? AE.ctx.sampleRate : 48000, nb = f ? f.length : 0, raw = new Float32Array(NB); let mx = 0;
   for (let i = 0; i < NB; i++) {                               // 48 bandes logarithmiques, de 40 Hz à 16 kHz
     const f0 = 40 * Math.pow(400, i / NB), f1 = 40 * Math.pow(400, (i + 1) / NB); let v = 0;
-    if (f && nb && mode === 'live') { const a = Math.max(1, Math.floor(f0 / (sr / 2) * nb)), b = Math.max(a + 1, Math.ceil(f1 / (sr / 2) * nb)); let m = 0; for (let k = a; k < b && k < nb; k++) m = Math.max(m, f[k]); v = Math.pow(m / 255, 1.6); }
+    if (f && nb && mode === 'live') { const a = Math.max(1, Math.floor(f0 / (sr / 2) * nb)), b = Math.max(a + 1, Math.ceil(f1 / (sr / 2) * nb)); let m = 0; for (let k = a; k < b && k < nb; k++) m = Math.max(m, f[k]); v = Math.pow(m / 255, 2.2) * (1 + i / NB * .9); }
     else { const fr = sim ? sim.f : { bass: 0, mid: 0, high: 0 }, x = i / NB; v = clamp((fr.bass || 0) * Math.max(0, 1 - x * 3) + (fr.mid || 0) * Math.max(0, 1 - Math.abs(x - .45) * 3.2) + (fr.high || 0) * Math.max(0, (x - .45) * 1.9), 0, 1) * (.75 + .25 * Math.sin(i * 1.7 + renderT * 6)); }
-    INS.lv[i] += (v - INS.lv[i]) * (v > INS.lv[i] ? .6 : .18); INS.peaks[i] = Math.max(INS.lv[i], INS.peaks[i] - dt * .5);
-    const bw = W / NB, x = i * bw + bw * .14, w = bw * .72, h = INS.lv[i] * (H - 18), hue = (.08 + .62 * i / NB) % 1;
-    const g = cx.createLinearGradient(0, H, 0, H - h - 1);
-    g.addColorStop(0, `hsla(${hue * 360},85%,55%,.95)`); g.addColorStop(1, `hsla(${hue * 360},90%,78%,.95)`);
-    cx.fillStyle = g; cx.shadowColor = `hsl(${hue * 360},90%,60%)`; cx.shadowBlur = 14;
-    const segs = Math.max(1, Math.round(h / 9)); for (let k = 0; k < segs; k++) cx.fillRect(x, H - 4 - k * 9 - 6, w, 6);
-    cx.shadowBlur = 0; cx.fillStyle = 'rgba(255,248,235,.9)'; cx.fillRect(x, H - 6 - INS.peaks[i] * (H - 18) - 3, w, 2.5);
+    raw[i] = v; mx = Math.max(mx, v);
   }
+  INS.gain = Math.max(mx, (INS.gain || .3) * Math.exp(-dt / 4), .18);    // gain automatique : les barres utilisent toute la hauteur, piano comme forte
+  const kick = sim ? clamp(sim.kick || 0, 0, 1) : 0, bw = W / NB, base = H - 6 * u;
+  // ligne de base de verre
+  cx.globalCompositeOperation = 'source-over'; const lg = cx.createLinearGradient(0, 0, W, 0); lg.addColorStop(0, 'rgba(120,230,255,0)'); lg.addColorStop(.5, 'rgba(225,245,255,.55)'); lg.addColorStop(1, 'rgba(200,150,255,0)');
+  cx.fillStyle = lg; cx.fillRect(0, base + 1.5 * u, W, 1.2 * u);
+  cx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < NB; i++) {
+    const v = Math.pow(clamp(raw[i] / INS.gain, 0, 1), .8) * (1 + .35 * kick);
+    INS.lv[i] = v > INS.lv[i] ? v : INS.lv[i] + (v - INS.lv[i]) * Math.min(1, dt * 9);          // attaque immédiate, retombée rapide : du punch
+    if (INS.lv[i] >= INS.peaks[i]) { INS.peaks[i] = INS.lv[i]; INS.pt = INS.pt || new Float32Array(NB); INS.pt[i] = renderT; } else INS.peaks[i] = Math.max(INS.lv[i], INS.peaks[i] - dt * .45);
+    const x = i * bw + bw * .16, w = bw * .68, h = clamp(INS.lv[i], 0, 1.1) * (base - 10 * u), t = i / (NB - 1);
+    const hue = 188 + 92 * t, hue2 = hue + 18;                                                   // prisme glacé : cyan, azur, indigo, violet
+    const g = cx.createLinearGradient(0, base, 0, base - h);
+    g.addColorStop(0, `hsla(${hue},100%,48%,.85)`); g.addColorStop(.55, `hsla(${hue2},100%,66%,.9)`); g.addColorStop(1, `hsla(${hue2},100%,93%,1)`);
+    cx.shadowColor = `hsla(${hue},100%,62%,.95)`; cx.shadowBlur = 16 * u; cx.fillStyle = g;
+    const seg = 7 * u, gap = 1.6 * u, n = Math.max(1, Math.floor(h / seg));
+    for (let k = 0; k < n; k++) cx.fillRect(x, base - (k + 1) * seg + gap, w, seg - gap);   // facettes de cristal
+    cx.shadowBlur = 0; cx.fillStyle = 'rgba(255,255,255,.55)'; cx.fillRect(x, base - n * seg + gap, w * .22, n * seg - gap);   // arête lumineuse
+    const py = base - INS.peaks[i] * (base - 10 * u) - 3 * u, fresh = clamp(1 - (renderT - ((INS.pt && INS.pt[i]) || -9)) / .5, 0, 1);
+    cx.shadowColor = '#e8fbff'; cx.shadowBlur = (8 + 16 * fresh) * u; cx.fillStyle = `rgba(245,253,255,${.85 + .15 * fresh})`; cx.fillRect(x - .5 * u * fresh, py, w + u * fresh, 2.2 * u);
+    if (fresh > .6 && INS.peaks[i] > .6) { cx.fillStyle = `rgba(255,255,255,${fresh})`; cx.fillRect(x + w / 2 - .6 * u, py - 7 * u, 1.2 * u, 16 * u); cx.fillRect(x + w / 2 - 6 * u, py + .5 * u, 12 * u, 1.2 * u); }   // éclat
+    cx.shadowBlur = 0;
+  }
+  cx.globalCompositeOperation = 'source-over';
   INS.eq.t.needsUpdate = true;
-  // compteur
-  const S2 = INS.st, c2 = S2.cx; c2.clearRect(0, 0, S2.cv.width, S2.cv.height);
+  // compteur : panneau de verre fumé, texte blanc contrasté (lisible aussi sur un sol lunaire éclatant)
+  const S2 = INS.st, c2 = S2.cx, SW = S2.cv.width, SH = S2.cv.height, q = SW / 640; c2.clearRect(0, 0, SW, SH);
   const live = sim ? sim.plants.filter(p => !p.dead && !p.dying) : [], sp = new Set(live.map(p => p.sp)).size, pub = sim ? sim.pubN : 0;
-  c2.textAlign = 'right'; c2.fillStyle = 'rgba(233,228,218,.62)'; c2.font = '500 22px Inter, sans-serif'; c2.fillText('V É G É T A U X', 620, 34);
-  c2.fillStyle = '#f1ece2'; c2.font = '300 96px "Cormorant Garamond", serif'; c2.shadowColor = 'rgba(255,240,210,.5)'; c2.shadowBlur = 18; c2.fillText(String(live.length), 620, 124); c2.shadowBlur = 0;
-  c2.fillStyle = 'rgba(233,228,218,.7)'; c2.font = '400 21px Inter, sans-serif'; c2.fillText(`${sp} espèces · ${pub} graines du public`, 620, 164);
-  c2.fillStyle = 'rgba(233,228,218,.9)'; c2.font = 'italic 300 30px "Cormorant Garamond", serif'; c2.fillText('stade : ' + gardenStage(), 620, 206);
+  rrect(c2, 2 * q, 2 * q, SW - 4 * q, SH - 4 * q, 18 * q); const bg = c2.createLinearGradient(0, 0, 0, SH); bg.addColorStop(0, 'rgba(6,9,16,.72)'); bg.addColorStop(1, 'rgba(6,9,16,.5)');
+  c2.fillStyle = bg; c2.fill(); c2.strokeStyle = 'rgba(200,235,255,.22)'; c2.lineWidth = 1.5 * q; c2.stroke();
+  const R = SW - 28 * q; c2.textAlign = 'right'; c2.textBaseline = 'alphabetic';
+  const txt = (t, font, col, y, glow) => { c2.font = font; c2.lineJoin = 'round'; c2.strokeStyle = 'rgba(0,0,0,.55)'; c2.lineWidth = 4 * q; c2.strokeText(t, R, y); if (glow) { c2.shadowColor = glow; c2.shadowBlur = 16 * q; } c2.fillStyle = col; c2.fillText(t, R, y); c2.shadowBlur = 0; };
+  c2.letterSpacing = 6 * q + 'px'; txt('VÉGÉTAUX', `600 ${22 * q}px Inter, sans-serif`, 'rgba(210,240,255,.9)', 42 * q); c2.letterSpacing = '0px';
+  txt(String(live.length), `500 ${104 * q}px "Cormorant Garamond", Georgia, serif`, '#ffffff', 140 * q, 'rgba(160,230,255,.75)');
+  txt(`${sp} espèces · ${pub} graines du public`, `500 ${23 * q}px Inter, sans-serif`, 'rgba(240,246,255,.95)', 182 * q);
+  txt('Stade : ' + gardenStage(), `italic 500 ${32 * q}px "Cormorant Garamond", Georgia, serif`, '#eaf8ff', 222 * q, 'rgba(160,230,255,.5)');
+  c2.strokeStyle = 'rgba(200,235,255,.16)'; c2.lineWidth = q; c2.beginPath(); c2.moveTo(28 * q, 244 * q); c2.lineTo(SW - 28 * q, 244 * q); c2.stroke();
+  c2.textAlign = 'left'; c2.letterSpacing = 4 * q + 'px'; c2.font = `600 ${15 * q}px Inter, sans-serif`; c2.fillStyle = 'rgba(210,240,255,.6)'; c2.fillText('MATRICE DU JARDIN', 28 * q, 270 * q); c2.letterSpacing = '0px';
   S2.t.needsUpdate = true;
   // matrice
   const M = INS.m3; let n = 0, ext = 12; for (const p of live) ext = Math.max(ext, Math.abs(p.x) * 1.08, Math.abs(p.z) * 1.08); INS.ext = (INS.ext || ext) + (ext - (INS.ext || ext)) * .05;
@@ -4167,16 +4197,17 @@ function drawInstruments(dt) {
 function renderInstruments(dt) {
   const want = INS.on && (mode === 'live' || mode === 'replay') && sim && sim.introDone && !(sim.finale && sim.t - sim.finaleT0 > 11.5) && S.output !== 'dome' && !(sim.zoom > .7);
   INS.a += ((want ? 1 : 0) - INS.a) * Math.min(1, dt * 2.5); if (INS.a < .01) return;
-  drawInstruments(dt);
-  const sz = renderer.getSize(new THREE.Vector2()), W = sz.x, H = sz.y, bars = S.scope && S.output === 'cinema', vis = bars ? Math.min(1, (W / H) / 2.39) : 1, e = (1 - vis) * .5 * H;
+  const sz = renderer.getSize(new THREE.Vector2()), W = sz.x, H = sz.y, dpr = renderer.getPixelRatio(), bars = S.scope && S.output === 'cinema', vis = bars ? Math.min(1, (W / H) / 2.39) : 1, e = (1 - vis) * .5 * H;
   INS.cam.left = 0; INS.cam.right = W; INS.cam.top = H; INS.cam.bottom = 0; INS.cam.updateProjectionMatrix();
-  const eqH = Math.max(e > 50 ? e * .78 : 0, H * .075), eqW = W * .74, eqY = e > 50 ? (e - eqH) * .5 : H * .015 + e;
-  INS.eq.m.position.set((W - eqW) / 2, eqY, 0); INS.eq.m.scale.set(eqW, eqH, 1); INS.eq.m.material.opacity = INS.a * .92;
-  const stW = Math.min(W * .2, H * .36), stH = stW * 220 / 640, top = H - e - H * .02;
-  INS.st.m.position.set(W - stW - W * .015, top - stH, 0); INS.st.m.scale.set(stW, stH, 1); INS.st.m.material.opacity = INS.a;
+  const eqH = Math.max(e > 50 ? e * .86 : 0, H * .085), eqW = W * .78, eqY = e > 50 ? (e - eqH) * .5 : H * .012 + e;
+  const stW = Math.min(W * .19, H * .36), ms = Math.round(stW * .8), stH = stW * 280 / 640 + ms + stW * .03, top = H - e - H * .018;
+  fitCanvas(INS.eq, eqW * dpr, eqH * dpr); fitCanvas(INS.st, stW * dpr, stH * dpr);
+  drawInstruments(dt);
+  INS.eq.m.position.set((W - eqW) / 2, eqY, 0); INS.eq.m.scale.set(eqW, eqH, 1); INS.eq.m.material.opacity = INS.a;
+  INS.st.m.position.set(W - stW - W * .014, top - stH, 0); INS.st.m.scale.set(stW, stH, 1); INS.st.m.material.opacity = INS.a;
   const ac = renderer.autoClear; renderer.autoClear = false; renderer.setRenderTarget(null);
   renderer.render(INS.scene, INS.cam);
-  const ms = Math.round(stW * .82), mx = Math.round(W - ms - W * .018), my = Math.round(top - stH - ms - H * .005);
+  const mx = Math.round(W - W * .014 - stW + (stW - ms) / 2), my = Math.round(top - stH + stW * .03);
   INS.m3.cam.aspect = 1; INS.m3.cam.updateProjectionMatrix(); INS.m3.pts.material.uniforms.uPx.value = renderer.getPixelRatio() * ms / 260;
   for (const m of INS.m3.grp.children) if (m.material) m.material.opacity = (m === INS.m3.pts ? 1 : m.material.vertexColors ? .7 : .32) * INS.a;
   renderer.setScissorTest(true); renderer.setViewport(mx, my, ms, ms); renderer.setScissor(mx, my, ms, ms); renderer.clearDepth();
