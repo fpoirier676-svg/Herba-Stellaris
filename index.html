@@ -478,7 +478,8 @@ const AE = {
       a.fftSize = 4096; a.smoothingTimeConstant = .55; a.minDecibels = -88; a.maxDecibels = -18;
       this.analyser = a; this.freq = new Uint8Array(a.frequencyBinCount); this.prev = new Uint8Array(a.frequencyBinCount); this.time = new Float32Array(a.fftSize);
       this.ffl = new Float32Array(a.frequencyBinCount);
-      if (this.ctx.audioWorklet) this.ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }))).then(() => {
+      const wl = this.ctx.audioWorklet, blobU = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
+      if (wl) wl.addModule(blobU).catch(() => wl.addModule('data:application/javascript;base64,' + btoa(unescape(encodeURIComponent(WORKLET_SRC))))).then(() => {   // fichier ouvert depuis le disque : repli en data:
         const n = new AudioWorkletNode(this.ctx, 'herba-onsets', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 2, channelCountMode: 'explicit' });
         n.port.onmessage = ev => { const d = ev.data; if (d.on) for (const k of d.on) this.onBits |= [1, 1024, 2048][k]; else { this.lvDb = 20 * Math.log10(Math.max(d.lv, 1e-6)); this.pan += (d.pan - this.pan) * .2; } };
         this.wk = n; this.wkReady = true; if (this.source) this.source.connect(n);
