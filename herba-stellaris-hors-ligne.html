@@ -135,6 +135,13 @@
   select { width:100%; font:inherit; font-size:11px; color:var(--ink); background:rgba(0,0,0,.4); border:1px solid var(--line); padding:6px; margin-top:4px; text-transform:none; letter-spacing:0; }
   .empty { color:var(--dim); font-family:'Cormorant Garamond',serif; font-style:italic; font-size:20px; padding:40px 0; }
 </style>
+<script>
+// diagnostic : toute erreur s'affiche discrètement sur l'accueil (pour la repérer sans console)
+window.__errs = [];
+function __showErr(m) { try { window.__errs.push(m); let d = document.getElementById('errBox'); if (!d) { d = document.createElement('div'); d.id = 'errBox'; d.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:99;max-width:640px;font:11px/1.5 monospace;color:#ffb38a;background:rgba(0,0,0,.85);border:1px solid #ffb38a55;padding:8px 10px;white-space:pre-wrap;pointer-events:none'; (document.body || document.documentElement).appendChild(d); } d.textContent = 'Erreur : ' + window.__errs.slice(-4).join('\n'); } catch (e) {} }
+addEventListener('error', e => __showErr((e.message || 'ressource') + (e.filename ? ' @' + String(e.lineno) + ':' + e.colno : e.target && e.target.src ? ' ' + e.target.src : '')), true);
+addEventListener('unhandledrejection', e => __showErr('promesse : ' + (e.reason && (e.reason.message || e.reason))));
+</script>
 <script>/* =====================================================================
    ASTRONOMIE — éphémérides embarquées (aucun réseau requis)
    Lune : théorie de Meeus (ch. 47, termes principaux, ~0,01°)
@@ -5448,7 +5455,7 @@ function setSrc(v) {
 }
 for (const b of $('srcSeg').children) b.addEventListener('click', () => setSrc(b.dataset.src));
 { const box = $('phoneBox'), g = box.querySelector('.pgrid'); $('phoneHome').append(g, $('pBase')); }
-setTimeout(() => { try { openPhone(); } catch (e) {} }, 400);
+setTimeout(() => { try { openPhone(); } catch (e) { __showErr('liaison : ' + e.message); pState('Liaison impossible : ' + e.message, 'err'); } }, 400);
 // test du son : la même entrée que la composition, sans rien enregistrer
 const TST = { st: null, ctx: null, an: null, buf: null, peak: -99, raf: 0 };
 async function testStart() {
@@ -5498,7 +5505,7 @@ $('btnGo').addEventListener('click', async () => {
 setTimeout(() => setSrc(S.src), 0);
 setTimeout(() => { $('instru').checked = INS.on; $('instru').addEventListener('change', e => { INS.on = e.target.checked; try { localStorage.setItem('herba-instruments', INS.on ? '1' : '0'); } catch (er) {} }); }, 0);
 // lieu du spectacle : point de départ et d'arrivée du voyage astral
-S.venue = { ...VENUE_DEF }; try { const v = JSON.parse(localStorage.getItem('herba-lieu') || 'null'); if (v && isFinite(v.lat) && isFinite(v.lon)) S.venue = v; } catch (e) {}
+try { S.venue = { ...VENUE_DEF }; try { const v = JSON.parse(localStorage.getItem('herba-lieu') || 'null'); if (v && isFinite(v.lat) && isFinite(v.lon)) S.venue = v; } catch (e) {}
 function showVenue() { $('vName').value = S.venue.name || ''; $('vLat').value = (+S.venue.lat).toFixed(4); $('vLon').value = (+S.venue.lon).toFixed(4); }
 function saveVenue() {
   const la = parseFloat(String($('vLat').value).replace(',', '.')), lo = parseFloat(String($('vLon').value).replace(',', '.'));
@@ -5507,7 +5514,7 @@ function saveVenue() {
 }
 for (const id of ['vName', 'vLat', 'vLon']) $(id).addEventListener('change', saveVenue);
 $('vReset').addEventListener('click', () => { S.venue = { ...VENUE_DEF }; showVenue(); saveVenue(); });
-showVenue();
+showVenue(); } catch (e) { __showErr('lieu : ' + e.message); }
 $('btnFinish').addEventListener('click', () => finishLive(true));
 $('btnDiscard').addEventListener('click', () => finishLive(false));
 $('btnStop').addEventListener('click', () => stopReplay());
