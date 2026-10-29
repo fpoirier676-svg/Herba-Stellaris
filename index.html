@@ -2961,7 +2961,7 @@ function flushZoom() {           // en direct : le zoom devient un événement e
 const zoomLabel = v => v < .01 ? 'sol' : v < ZOOM_SPLIT ? 'altitude ' + Math.round(8 * Math.pow(450 / 8, v / ZOOM_SPLIT)) + ' m' : 'orbite ' + Math.round(40 * Math.pow(90, (v - ZOOM_SPLIT) / (1 - ZOOM_SPLIT))) + ' km';
 function updZoomUI() {
   $('oZoom').textContent = zoomLabel(ZM.v); if (document.activeElement !== $('zRange')) $('zRange').value = ZM.v; if (document.activeElement !== $('rgZoom')) $('rgZoom').value = ZM.v;
-  const b = ZM.bind ? `Pédale : CC ${ZM.bind.cc}, canal ${ZM.bind.ch + 1}${ZM.bind.name ? ' (' + ZM.bind.name + ')' : ''}` : 'Pédale non apprise';
+  const b = !ZM.bind ? 'Pédale non apprise' : ZM.bind.sx ? `Pédale : GX-1 (adresse ${ZM.bind.sx}, ${ZM.bind.lo}–${ZM.bind.hi})` : `Pédale : CC ${ZM.bind.cc}, canal ${ZM.bind.ch + 1}${ZM.bind.name ? ' (' + ZM.bind.name + ')' : ''}`;
   $('zMsg').textContent = [ZM.status, ZM.learn ? 'Écoute… bouge la pédale d’expression de haut en bas' : b, ZM.last ? 'Dernier message : ' + ZM.last : ''].filter(Boolean).join(' · ');
   $('btnLearn').textContent = ZM.learn ? 'Annuler' : 'Apprendre la pédale';
 }
@@ -2973,11 +2973,53 @@ async function initMidi() {
     const names = []; for (const inp of ZM.midi.inputs.values()) { inp.onmidimessage = onMidi; names.push(inp.name); }
     ZM.status = names.length ? 'MIDI : ' + names.join(', ') : 'Aucune entrée MIDI : branche le GX-1 en USB (pilote Boss installé)'; updZoomUI();
   };
-  ZM.midi.onstatechange = hook; hook(); return true;
+  ZM.midi.onstatechange = hook; hook(); if (ZM.sysex) bossHello(); return true;
+}
+/* ---- Traducteur Boss : le GX-1 ne joue pas sa pédale en MIDI standard, mais il la décrit à son éditeur
+   (BOSS TONE STUDIO) en messages exclusifs Roland. La page se présente comme l'éditeur et lit ces messages. ---- */
+const BOSS = { dev: 0x10, fam: null, model: null, cand: [], tries: 0, on: false, n: 0, timer: 0 };
+const rolSum = a => (128 - (a.reduce((x, y) => x + y, 0) % 128)) % 128;
+function bossOuts() { const o = [...ZM.midi.outputs.values()], g = o.filter(p => /gx|boss|roland/i.test(p.name)); return g.length ? g : o; }
+function bossSend(bytes) { for (const o of bossOuts()) try { o.send(bytes); } catch (e) {} }
+function bossHello() { BOSS.n = 0; bossSend([0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7]); clearTimeout(BOSS.timer); BOSS.timer = setTimeout(() => { if (!BOSS.fam) { ZM.status = (ZM.status || '') + ' · aucune réponse Boss à l’identification'; updZoomUI(); } }, 2500); }
+function bossEditor(onOff) {                                                    // « mode éditeur » : adresse 7F 00 00 01 (convention Roland/Boss)
+  const m = BOSS.model; if (!m) return; const body = [0x7F, 0x00, 0x00, 0x01, onOff ? 1 : 0];
+  bossSend([0xF0, 0x41, BOSS.dev, ...m, 0x12, ...body, rolSum(body), 0xF7]);
+}
+function bossTryNext() {                                                        // identifiant de modèle déduit de la famille ; plusieurs formes essayées
+  if (BOSS.on) return; if (BOSS.tries >= BOSS.cand.length) { ZM.status = `Boss : GX-1 identifié (famille ${hx(BOSS.fam)}) mais muet en mode éditeur`; updZoomUI(); return; }
+  BOSS.model = BOSS.cand[BOSS.tries++]; bossEditor(true); ZM.status = `Boss : identifié, essai du modèle ${BOSS.model.map(hx).join(' ')}…`; updZoomUI();
+  clearTimeout(BOSS.timer); BOSS.timer = setTimeout(bossTryNext, 1600);
+}
+const hx = b => b.toString(16).padStart(2, '0');
+addEventListener('pagehide', () => { if (BOSS.on) bossEditor(false); });
+function bossMsg(d) {
+  if (d[1] === 0x7E && d[3] === 0x06 && d[4] === 0x02 && d[5] === 0x41) {        // réponse d'identité Roland
+    BOSS.dev = d[2]; BOSS.fam = d[6]; const f1 = d[6], f2 = d[7];
+    BOSS.cand = [[0, 0, 0, f1], [0, 0, f1], [0, 0, 0, f1, f2], [0, f1]]; BOSS.tries = 0; BOSS.on = false; bossTryNext(); return;
+  }
+  if (d[1] !== 0x41 || !BOSS.model) return;
+  const L = BOSS.model.length, i = 3 + L; if (d[i] !== 0x12 && d[i] !== 0x11) return;
+  for (let k = 0; k < L; k++) if (d[3 + k] !== BOSS.model[k]) return;
+  if (!BOSS.on) { BOSS.on = true; clearTimeout(BOSS.timer); }
+  BOSS.n++; ZM.status = `Boss : mode éditeur actif (modèle ${BOSS.model.map(hx).join(' ')}) · ${BOSS.n} messages`;
+  const addr = d.slice(i + 1, i + 5), p = d.slice(i + 5, d.length - 2); if (!p.length) return;
+  const val = p.length >= 3 ? p.reduce((a, b) => a * 16 + (b & 15), 0) : p.length === 2 ? p[0] * 128 + p[1] : p[0];
+  const key = addr.map(hx).join(' '), now = performance.now();
+  ZM.last = 'adresse ' + key + ' = ' + val;
+  let q = ZM.streams.get(key); if (!q || now - q.t0 > 2500) { q = { t0: now, vals: new Set(), lo: val, hi: val }; ZM.streams.set(key, q); }
+  q.vals.add(val); q.lo = Math.min(q.lo, val); q.hi = Math.max(q.hi, val);
+  if ((ZM.learn || !ZM.bind) && q.vals.size >= 6 && q.hi - q.lo >= 10) { ZM.bind = { sx: key, lo: q.lo, hi: q.hi, name: 'GX-1' }; ZM.learn = false; saveZM(); }
+  const b = ZM.bind; if (b && b.sx === key && !ZM.learn) {
+    if (val < b.lo || val > b.hi) { b.lo = Math.min(b.lo, val); b.hi = Math.max(b.hi, val); saveZM(); }
+    const v = (val - b.lo) / Math.max(1, b.hi - b.lo); setZoom(ZM.inv ? 1 - v : v, 'pédale GX-1'); return;
+  }
+  updZoomUI();
 }
 function onMidi(e) {
   const st = e.data[0]; if (st >= 0xF8) return;                                           // horloge et « active sensing » ignorés
   ZM.count = (ZM.count || 0) + 1;
+  if (st === 0xF0) { const d = [...e.data]; try { (window.__mlog = window.__mlog || []).push(d); if (window.__mlog.length > 400) window.__mlog.shift(); } catch (er) {} bossMsg(d); if (BOSS.on || d[1] === 0x7E) return; }
   if ((st & 0xF0) !== 0xB0 || e.data[2] == null) {                                        // diagnostic : tout autre message est affiché tel quel
     ZM.last = [...e.data.slice(0, 14)].map(b => b.toString(16).padStart(2, '0')).join(' ') + (e.data.length > 14 ? ' … (' + e.data.length + ' octets)' : '') + ' · ' + ZM.count + ' reçus';
     try { (window.__mlog = window.__mlog || []).push([...e.data]); if (window.__mlog.length > 400) window.__mlog.shift(); } catch (er) {}
@@ -2993,11 +3035,11 @@ function onMidi(e) {
   else updZoomUI();
 }
 $('btnMidi').onclick = () => initMidi();
-$('btnLearn').onclick = async () => { if (!(await initMidi())) return; ZM.learn = !ZM.learn; ZM.streams.clear(); updZoomUI(); };
+$('btnLearn').onclick = async () => { if (!(await initMidi())) return; ZM.learn = !ZM.learn; ZM.streams.clear(); if (ZM.learn && ZM.sysex && !BOSS.on) bossHello(); updZoomUI(); };
 $('zInv').checked = ZM.inv; $('zInv').addEventListener('change', e => { ZM.inv = e.target.checked; saveZM(); updZoomUI(); });
 $('zRange').addEventListener('input', e => setZoom(+e.target.value, 'curseur')); $('rgZoom').addEventListener('input', e => setZoom(+e.target.value, 'régie'));
 canvas.addEventListener('wheel', e => { if (!S.autocam || !sim || !sim.introDone) return; e.preventDefault(); setZoom(ZM.v + clamp(e.deltaY, -100, 100) * .0012, 'molette'); }, { passive: false });
-if (ZM.bind && navigator.permissions) navigator.permissions.query({ name: 'midi' }).then(p => { if (p.state === 'granted') initMidi(); }).catch(() => {});
+if (ZM.bind && navigator.permissions) navigator.permissions.query({ name: 'midi', sysex: true }).then(p => { if (p.state === 'granted') initMidi(); }).catch(() => {});
 updZoomUI();
 function applyPending(fr) {
   if (PEND.shot) { fr[5] += 8 * PEND.shot; PEND.shot = 0; }
@@ -3135,7 +3177,7 @@ function updateRegie() {
   const items = [['Temps', mode === 'live' ? mmss(liveTime()) : mmss(sim.t)], ['Phrase', ph], ['Plantes', sim.plants.length + (sim.full ? ' (plein)' : '')], ['Soleil', el + (sim.dawn ? (sim.D < 1 ? ' · avant l’' + (world.term === 'crepuscule' ? 'ombre' : 'aube') : '') : '')],
     ['Niveau', Math.round((sim.loud || 0) * 100) + ' %'], ['Dynamique', (sim.mu.r > .15 ? 'crescendo' : sim.mu.r < -.15 ? 'decrescendo' : 'stable')], ['Plan', sim.shot.type], ['Image', fps + ' i/s · ' + Math.round(resScale * 100) + ' %'],
     ['Note', GT.note ? NOTE_NAMES[((GT.note.m0 % 12) + 12) % 12] + (Math.floor(GT.note.m0 / 12) - 1) : '—'], ['Accord', GT.chordName || '—'], ['Tonalité', GT.keyName || '—'], ['Tension', Math.round(GT.tension * 100) + ' %'],
-    ['Source', lien], ['Public', PUB.on ? PUB.queue.length + ' en attente · ' + sim.pubN + ' semées' : 'fermé'], ['Silence', AE.silentFor > 1 ? AE.silentFor.toFixed(0) + ' s' : '—'], ['Applaudis.', AE.applause ? 'oui' : '—'], ['Zoom', zoomLabel(ZM.v) + (ZM.src ? ' · ' + ZM.src : '')], ['Pédale', ZM.bind ? 'CC ' + ZM.bind.cc : ZM.midi ? 'à apprendre' : 'MIDI inactif'],
+    ['Source', lien], ['Public', PUB.on ? PUB.queue.length + ' en attente · ' + sim.pubN + ' semées' : 'fermé'], ['Silence', AE.silentFor > 1 ? AE.silentFor.toFixed(0) + ' s' : '—'], ['Applaudis.', AE.applause ? 'oui' : '—'], ['Zoom', zoomLabel(ZM.v) + (ZM.src ? ' · ' + ZM.src : '')], ['Pédale', ZM.bind ? (ZM.bind.sx ? 'GX-1 ' + ZM.bind.sx : 'CC ' + ZM.bind.cc) : ZM.midi ? 'à apprendre' : 'MIDI inactif'],
     ['Spectateurs', pubSummary()]];
   $('rgStat').innerHTML = items.map(([k, v]) => `<div><span>${k}</span>${v}</div>`).join('');
 }
