@@ -4503,13 +4503,18 @@ let frameN = 0, lastFrameT = 0, frameDur = 16;
 
 /* ---- Public : filtre des noms, validation par la régie, élan collectif, souvenir ---- */
 // filtre simple : insultes et termes crus courants (français et anglais), contournements usuels compris (accents, chiffres, lettres doublées)
-const BAD_ROOTS = ['connard', 'connasse', 'salope', 'salaud', 'encule', 'enculer', 'batard', 'putain', 'pute', 'merde', 'bordel', 'niquer', 'nique', 'couille', 'bite', 'pénis', 'penis', 'vagin', 'chatte', 'branle', 'branleur', 'pouffiasse', 'pédé', 'pede', 'tapette', 'gouine', 'negre', 'bougnoul', 'youpin', 'nazi', 'hitler', 'fuck', 'shit', 'bitch', 'cunt', 'dick', 'pussy', 'whore', 'slut', 'nigger', 'nigga', 'faggot', 'retard', 'asshole', 'porn', 'porno', 'sexe', 'tabarnak', 'tabarnac', 'calisse', 'crisse', 'osti', 'esti', 'ciboire', 'viol', 'violer', 'suicide', 'cocaine'];
-const BAD_WORDS = ['con', 'conne', 'cul', 'pd', 'fdp', 'ntm', 'tg', 'ass', 'sex', 'kkk', 'wtf', 'stfu'];
-function normName(s) { return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/0/g, 'o').replace(/[1!|]/g, 'i').replace(/3/g, 'e').replace(/[4@]/g, 'a').replace(/[5$]/g, 's').replace(/7/g, 't').replace(/(.)\1+/g, '$1'); }
+const BAD_ROOTS = ['connard', 'connasse', 'salope', 'salaud', 'encule', 'batard', 'putain', 'merde', 'bordel', 'niquer', 'couille', 'penis', 'vagin', 'branleur', 'branlette', 'pouffiasse', 'tapette', 'gouine', 'bougnoul', 'youpin', 'hitler', 'fuck', 'bitch', 'cunt', 'pussy', 'whore', 'slut', 'nigger', 'nigga', 'faggot', 'asshole', 'porno', 'tabarnak', 'tabarnac', 'calisse', 'ciboire', 'suicide', 'cocaine'];
+// mots courts ou ambigus : refusés seulement en mot entier (Violette, Monique, Célestine, Nazim restent permis)
+const BAD_WORDS = ['con', 'conne', 'cons', 'cul', 'pd', 'fdp', 'ntm', 'tg', 'ass', 'sex', 'sexe', 'kkk', 'wtf', 'stfu', 'viol', 'violer', 'violeur', 'pute', 'putes', 'nique', 'bite', 'bites', 'nazi', 'nazis', 'pede', 'pedes', 'osti', 'esti', 'ostie', 'estie', 'hostie', 'crisse', 'caliss', 'calice', 'shit', 'dick', 'porn', 'negre', 'chatte', 'branle', 'merdeux'];
+function normName(s, leet = true) { let n = String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); if (leet) n = n.replace(/0/g, 'o').replace(/[1!|]/g, 'i').replace(/3/g, 'e').replace(/[4@]/g, 'a').replace(/[5$]/g, 's').replace(/7/g, 't'); return n.replace(/(.)\1+/g, '$1'); }
+const BAD_R = BAD_ROOTS.map(r => normName(r)), BAD_W = new Set(BAD_WORDS.map(w => normName(w)));
 function badName(s) {
-  const n = normName(s), flat = n.replace(/[^a-z]/g, ''), words = n.split(/[^a-z]+/).filter(Boolean);
-  if (BAD_ROOTS.some(r => flat.includes(normName(r).replace(/[^a-z]/g, '')))) return true;
-  return words.some(w => BAD_WORDS.includes(w));
+  for (const n of [normName(s), normName(s, false)]) {
+    const flat = n.replace(/[^a-z]/g, '');
+    if (BAD_R.some(r => flat.includes(r))) return true;
+    if (n.split(/[^a-z]+/).some(w => BAD_W.has(w))) return true;
+  }
+  return false;
 }
 const MOD = { pending: [] };
 try { S.modNames = localStorage.getItem('herba-moderation') === '1'; } catch (e) { S.modNames = false; }

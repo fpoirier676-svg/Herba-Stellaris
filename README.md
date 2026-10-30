@@ -211,7 +211,7 @@ Tout est inscrit dans l'empreinte : la relecture rejoue chaque graine, chaque en
 - **Semer dès l'entrée** : le QR de l'écran d'attente permet de composer sa graine avant le début. Une graine envoyée trop tôt
   attend sur le téléphone (« elle sera semée d'elle-même dès l'ouverture du semis ») et part seule à l'ouverture.
 - **Noms filtrés** : les insultes et termes crus courants, en français, en anglais et en sacres québécois, sont écartés, y compris les variantes
-  avec des chiffres ou des accents. La plante prend alors un nom de couleur (« Violette 2 ») et le spectateur en est informé.
+  avec des chiffres ou des accents. Les mots courts ne sont refusés qu'en mot entier : Violette, Monique ou Célestine passent. La plante prend alors un nom de couleur (« Violette 2 ») et le spectateur en est informé.
 - **Validation des noms (facultative)** : la case *Valider chaque nom du public avant affichage* (accueil ou régie) garde chaque nom
   en attente. Il s'affiche après un toucher sur *Afficher*, dans la régie ou sur ton téléphone ; *Refuser* garde le nom de couleur.
 - **Élan collectif** : **L** au clavier, *Inviter à lever* dans la régie ou *Inviter le public à lever* sur ton téléphone affiche
