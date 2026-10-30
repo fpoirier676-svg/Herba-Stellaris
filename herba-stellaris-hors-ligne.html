@@ -2601,6 +2601,8 @@ var qrcode = function() {
     <h5><b>3</b> Scène et image</h5>
     <div class="brow"><button class="small" id="btnProj" title="Ouvre l’image seule dans une fenêtre à placer sur le projecteur ; cette fenêtre devient la régie">Fenêtre de projection</button><button class="small" id="btnPubH">Graines du public (Q)</button></div>
     <div class="xnote" id="hdMsg" style="color:var(--faint)"></div>
+    <div class="brow" style="margin-top:6px"><button class="small" id="btnBench" title="16 s : un jardin dense est rejoué ; ouvre d’abord la fenêtre de projection pour mesurer à la résolution du projecteur">Diagnostic de performance</button></div>
+    <div class="xnote" id="benchMsg" style="min-height:14px"></div>
     <div class="xnote" style="margin-top:10px"><b style="font-weight:400;color:var(--ink)">Lieu du spectacle</b> : le voyage part d’ici vers la Lune et y revient à la conclusion.</div>
     <input id="vName" class="vin" style="width:100%">
     <div style="display:flex;gap:6px;margin-top:6px"><input id="vLat" class="vin" style="flex:1" title="Latitude (nord +)"><input id="vLon" class="vin" style="flex:1" title="Longitude (est +, ouest −)"><button class="small" id="vReset" title="Bar à Pitons, Chicoutimi">↺</button></div>
@@ -5269,6 +5271,7 @@ function updReady() {
   it.push(['Ton téléphone', ...(PH.conn && PH.conn.open ? ['ok', 'relié'] : ['warn', 'non relié'])]);
   if (LUX.user) it.push(['Lumières', ...(LUX.err ? ['bad', 'pont injoignable'] : LUX.on && LUX.lights.length ? ['ok', LUX.lights.length + ' ampoule' + (LUX.lights.length > 1 ? 's' : '')] : ['warn', 'ambiances coupées'])]);
   it.push(['Public', ...(PUB.on ? ['ok', 'semis ouvert'] : ['warn', 'semis fermé (Q)'])]);
+  it.push(['Navigateur', ...(COMPAT.miss.length ? ['warn', COMPAT.name + ' : sans ' + COMPAT.miss.join(', ')] : ['ok', COMPAT.name])]);
   if (RDY.store != null) it.push(['Stockage', ...(RDY.store > 300 ? ['ok', Math.round(RDY.store / 1000) + ' Go libres'] : ['bad', Math.round(RDY.store) + ' Mo libres'])]);
   const okN = it.filter(x => x[1] === 'ok').length;
   $('ready').innerHTML = `<span><b>Prêt pour le spectacle</b>${okN}/${it.length}</span>` + it.map(([k, c, v]) => `<span class="${c}"><i></i>${k} : ${v}</span>`).join('');
@@ -7254,6 +7257,46 @@ async function takePhoto() {
 }
 function alert8k(m) { $('xMsg').textContent = m; $('exportBox').classList.remove('hidden'); $('xForm').classList.add('hidden'); $('xRun').classList.add('hidden'); }
 
+
+
+/* ---- Fondations : navigateur et performance de l'ordinateur du spectacle ---- */
+const COMPAT = (() => {
+  const ua = navigator.userAgent, edge = /Edg\//.test(ua), ff = /Firefox\//.test(ua), saf = /Safari\//.test(ua) && !/Chrome\/|Chromium|Edg\//.test(ua), chr = /Chrome\//.test(ua) && !edge;
+  const miss = [];
+  if (!navigator.requestMIDIAccess) miss.push('pédale MIDI'); else if (ff) miss.push('pédale MIDI sans module de permission Firefox');
+  if (!(window.VideoEncoder && window.AudioEncoder)) miss.push('export vidéo HD');
+  if (!('getScreenDetails' in window)) miss.push('placement automatique sur le projecteur');
+  return { name: edge ? 'Edge' : chr ? 'Chrome' : ff ? 'Firefox' : saf ? 'Safari' : 'Navigateur inconnu', miss };
+})();
+async function perfBench() {
+  if (mode !== 'intro') return;
+  const B = $('btnBench'), msg = t => { $('benchMsg').textContent = t; }; B.disabled = true;
+  msg('Diagnostic en cours : 16 secondes, ne touche à rien…');
+  // une œuvre synthétique exigeante : jardin dense, 50 graines du public, musique soutenue
+  const T0 = 100, N = 60 * (T0 + 30), st = 16, fr = new Float32Array(N * st), ev = [], fams = ['arbre', 'saule', 'arborescente', 'fougere', 'fleur', 'corolle', 'cristal', 'amethyste', 'herbe', 'filament', 'arbuste', 'succulente'];
+  for (let i = 0; i < N; i++) { const o = i * st, g = Math.min(1, i / 3600); fr[o] = .4 + .3 * g + .2 * Math.sin(i / 37); fr[o + 1] = .35 + .3 * g; fr[o + 2] = .35 + .3 * g; fr[o + 3] = .35 + .25 * g; fr[o + 4] = .45; fr[o + 6] = .4 + .35 * g; fr[o + 9] = .9; if (i % 24 === 0) fr[o + 5] += 1; if (i % 40 === 0) { fr[o + 5] += 4096; for (let j = 0; j < 20 && i + j < N; j++) fr[(i + j) * st + 8] = 52 + (i / 40 % 19); } }
+  for (let j = 1; j <= 50; j++) ev.push({ k: Math.round((35 + j * 1.1) * 60), type: 'seed', id: j, spec: { fam: fams[j % 12], col: j % 9, size: j % 3, form: j % 4, x: Math.sin(j * 2.4) * 40, z: Math.cos(j * 2.4) * 40, auto: 1, name: 'Graine ' + j } });
+  const rec = { seed: 777, startUTC: Date.parse('2026-11-14T15:30:00Z'), tick: 60, stride: st, frames: fr, events: ev, lat: 0, tscale: 1, dawn: false, manualEnd: true, fx: FX_LEVEL, fiche: { ...S.fiche, card: false, acts: false, cred: false } };
+  const scope0 = mode; mode = 'replay';
+  AE.stop(); setTick(rec.tick); startWorld(rec.seed, rec.startUTC, true, false); sim.tscale = 1; sim.lat = 0; sim.manualEnd = true; world.venue = { ...S.venue }; world.fiche = rec.fiche; sim.fx = rec.fx; recFrames = rec.frames; recStride = st; EVIDX = indexEvents(rec.events); current = null;
+  offline = true; stepRecorded(T0);
+  const win = PROJ && !PROJ.closed ? PROJ : window, dts = []; let nAll = 0;
+  await new Promise(done => { let T = T0, last = 0, t0 = 0;
+    const loop = ts => { if (!last) { last = ts; t0 = ts; } const dt = Math.min(.1, (ts - last) / 1000); last = ts; T += dt;
+      try { stepRecorded(T); renderT = T; updateVisuals(dt, false); composer.render(dt); renderNames(); renderInstruments(dt); renderOverlay(dt); } catch (e) {}
+      nAll++; if (ts - t0 > 4000) dts.push(dt * 1000);
+      if (ts - t0 < 16000) win.requestAnimationFrame(loop); else done(); };
+    win.requestAnimationFrame(loop); });
+  offline = false; setTick(30); startWorld(20261028, Date.now()); mode = 'intro'; setUI(); B.disabled = false; schedule();
+  if (dts.length < 10) return msg(nAll >= 3 ? `Insuffisant : seulement ${nAll} images en 16 s. La carte graphique n’est pas utilisée par le navigateur (vérifie l’accélération matérielle dans les paramètres de Chrome) ou elle est trop faible.` : 'Diagnostic impossible : la fenêtre était cachée. Garde-la visible et recommence.');
+  dts.sort((a, b) => a - b); const avg = 1000 / (dts.reduce((a, b) => a + b, 0) / dts.length), p95 = dts[Math.floor(dts.length * .95)], slow = dts.filter(x => x > 22).length / dts.length;
+  const sz = renderer.getSize(new THREE.Vector2()), px = Math.round(sz.x * renderer.getPixelRatio()) + ' × ' + Math.round(sz.y * renderer.getPixelRatio());
+  const q = { fluide: 'Fluide', haute: 'Haute', ultra: 'Ultra' }[S.quality] || S.quality;
+  const verdict = avg >= 55 && p95 < 24 ? `Prêt : la qualité ${q} tient le rythme.` : avg >= 40 ? (S.quality === 'fluide' ? 'Juste : garde la résolution adaptative cochée ; ferme les autres applications.' : `Juste : passe en qualité ${S.quality === 'ultra' ? 'Haute' : 'Fluide'}, ou garde la résolution adaptative cochée.`) : 'Insuffisant : qualité Fluide, résolution adaptative, et branche l’ordinateur sur secteur.';
+  msg(`${verdict} ${Math.round(avg)} images/s en moyenne, ${Math.round(p95)} ms au 95e centile, ${Math.round(slow * 100)} % d’images lentes, à ${px} (${PROJ && !PROJ.closed ? 'fenêtre de projection' : 'cette fenêtre'}).`);
+  RDY.bench = { avg, p95 };
+}
+$('btnBench').onclick = () => perfBench().catch(e => { offline = false; mode = 'intro'; setUI(); $('btnBench').disabled = false; $('benchMsg').textContent = 'Diagnostic interrompu : ' + e.message; });
 
 /* ---- Après le spectacle : carnet de composition, fichier MIDI des notes jouées, affiche ---- */
 // lecture de l'empreinte : notes, accords, tonalités, techniques, repères, graines du public

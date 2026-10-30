@@ -129,6 +129,13 @@ Si le micro ou l'interface audio se débranche, l'application tente de le retrou
 
 Testé avec **50 spectateurs** simultanés qui sèment et lèvent leur téléphone : le jardin reste fluide et lisible.
 
+### L'ordinateur du spectacle : navigateur et performance
+- **Navigateur** : Chrome ou Edge récents. Le voyant *Navigateur* du panneau « Prêt » signale ce qui manque ailleurs. Sur Firefox,
+  la pédale MIDI demande un module de permission et l'export vidéo HD est indisponible ; sur Safari, ni la pédale ni l'export.
+- **Diagnostic de performance** (carte 3) : 16 secondes où un jardin dense, avec 50 graines du public, est rejoué à la qualité choisie.
+  Ouvre d'abord la fenêtre de projection : la mesure se fait alors à la résolution du projecteur. Le verdict donne les images
+  par seconde, le 95e centile et la part d'images lentes, avec une recommandation de qualité. À faire une fois par salle et par ordinateur.
+
 ### Sorties et robustesse
 - **Sortie de projection** : *Cinéma 2.39*, *Plein cadre* (écrans ultra-larges), *Dôme 180°* (fisheye domemaster, centre relevé de 20°).
 - **Sans réseau** : après une première visite, la page se relance depuis le cache. La **version hors ligne** (`herba-stellaris-hors-ligne.html`)
