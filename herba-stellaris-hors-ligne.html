@@ -2606,6 +2606,12 @@ var qrcode = function() {
     <div style="display:flex;gap:6px;margin-top:6px"><input id="vLat" class="vin" style="flex:1" title="Latitude (nord +)"><input id="vLon" class="vin" style="flex:1" title="Longitude (est +, ouest −)"><button class="small" id="vReset" title="Bar à Pitons, Chicoutimi">↺</button></div>
     <div class="xnote" style="margin-top:10px"><b style="font-weight:400;color:var(--ink)">Téléphone-capteur</b> : scanne ce code. Le téléphone peut servir de micro, de télécommande, ou des deux ; son bouton « Conclure la composition » fait décoller la conclusion.</div>
     <div id="phoneHome"></div>
+    <div class="xnote" style="margin-top:12px"><b style="font-weight:400;color:var(--ink)">Lumières de salle (Philips Hue)</b> : les ampoules suivent l’image et la musique, en fondus lents.</div>
+    <div style="display:flex;gap:6px;margin-top:6px"><input id="hueIp" class="vin" style="flex:1" placeholder="Adresse du pont (ex. 192.168.1.20)"><button class="small" id="hueFind" title="Cherche le pont sur ce réseau">Trouver</button><button class="small" id="huePair" title="Appuie d’abord sur le bouton rond du pont">Associer</button></div>
+    <div id="hueLights" class="xnote" style="display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px"></div>
+    <label class="ctl">Intensité maximale <output id="oHue">60 %</output><input type="range" id="hueMax" min="0.05" max="1" step="0.05" value="0.6"></label>
+    <div class="brow"><label class="chk" style="margin:0"><input type="checkbox" id="hueOn"> Ambiances pendant la composition</label><button class="small" id="hueTest">Tester</button></div>
+    <div id="hueMsg" class="xnote" style="min-height:14px"></div>
     <div class="cscroll">
   <label class="ctl">Sensibilité <output id="oSens">1.20</output><input type="range" id="sens" min="0.3" max="3" step="0.05" value="1.2"></label>
   <label class="ctl">Accélération du temps <output id="oTime">1.00</output><input type="range" id="tscale" min="0" max="4" step="0.05" value="1"></label>
@@ -5183,7 +5189,7 @@ async function finishLive(save) {
   if (!save) return;
   const thumb = await new Promise(res => wantThumb = res);
   const rec = makeRec(audio, thumb);
-  sendSouvenirs(PUB.gardenImg || thumb); PUB.gardenImg = null; PUB.gardenAsked = false;
+  sendSouvenirs(PUB.gardenImg || thumb); luxEnd(); PUB.gardenImg = null; PUB.gardenAsked = false;
   secoursClear();
 
   try { await DB.put(rec); } catch (e) { memStore.set(rec.id, rec); }
@@ -5255,6 +5261,7 @@ function updReady() {
   it.push(['Liaison', ...(PH.id && PH.peer && !PH.peer.disconnected ? ['ok', 'serveur joint'] : PH.peer ? ['warn', 'en cours'] : ['bad', 'hors ligne'])]);
   it.push(['Réseau public', ...(NET.st === 'relay' ? ['ok', 'relais joignable'] : NET.st === 'srflx' ? ['warn', 'relais bloqué : données cellulaires incertaines'] : NET.st === 'host' ? ['bad', 'internet bloqué'] : NET.st === 'off' ? ['bad', 'hors ligne'] : ['warn', 'essai en cours'])]);
   it.push(['Ton téléphone', ...(PH.conn && PH.conn.open ? ['ok', 'relié'] : ['warn', 'non relié'])]);
+  if (LUX.user) it.push(['Lumières', ...(LUX.err ? ['bad', 'pont injoignable'] : LUX.on && LUX.lights.length ? ['ok', LUX.lights.length + ' ampoule' + (LUX.lights.length > 1 ? 's' : '')] : ['warn', 'ambiances coupées'])]);
   it.push(['Public', ...(PUB.on ? ['ok', 'semis ouvert'] : ['warn', 'semis fermé (Q)'])]);
   if (RDY.store != null) it.push(['Stockage', ...(RDY.store > 300 ? ['ok', Math.round(RDY.store / 1000) + ' Go libres'] : ['bad', Math.round(RDY.store) + ' Mo libres'])]);
   const okN = it.filter(x => x[1] === 'ok').length;
@@ -6794,6 +6801,77 @@ let frameN = 0, lastFrameT = 0, frameDur = 16;
 
 
 
+
+/* ---- Lumières de salle : Philips Hue, par le pont local (API REST). Les ampoules suivent l'image, en fondus lents ---- */
+const LUX = (() => { let v = {}; try { v = JSON.parse(localStorage.getItem('herba-hue') || '{}'); } catch (e) {} return { ip: v.ip || '', user: v.user || '', lights: v.lights || [], on: v.on !== false, max: v.max || .6, all: [], last: 0, busy: false, err: '', cols: null, smooth: null }; })();
+function luxSave() { try { localStorage.setItem('herba-hue', JSON.stringify({ ip: LUX.ip, user: LUX.user, lights: LUX.lights, on: LUX.on, max: LUX.max })); } catch (e) {} }
+const luxMsg = t => { $('hueMsg').textContent = t; };
+async function hue(path, method = 'GET', body) {
+  const r = await fetch(`http://${LUX.ip}/api${path}`, { method, body: body ? JSON.stringify(body) : undefined });   // adresse IP privée : Chrome reconnaît seul le réseau local et demande la permission une fois
+  const j = await r.json(); if (Array.isArray(j) && j[0] && j[0].error) throw new Error(j[0].error.description); return j;
+}
+// couleur sRGB → espace xy des ampoules Hue (gamut large, D65), d'après la documentation du pont
+function rgb2xy([r, g, b]) {
+  const lin = c => c > .04045 ? Math.pow((c + .055) / 1.055, 2.4) : c / 12.92; r = lin(r); g = lin(g); b = lin(b);
+  const X = r * .664511 + g * .154324 + b * .162028, Y = r * .283881 + g * .668433 + b * .047685, Z = r * .000088 + g * .07231 + b * .986039, s = X + Y + Z || 1;
+  return [Math.round(X / s * 1e4) / 1e4, Math.round(Y / s * 1e4) / 1e4];
+}
+async function luxList() {
+  try { const L = await hue('/' + LUX.user + '/lights'); LUX.all = Object.entries(L).filter(([, v]) => v.state && 'xy' in v.state).map(([id, v]) => ({ id, name: v.name })); LUX.err = '';
+    if (!LUX.lights.length) LUX.lights = LUX.all.map(x => x.id);
+    $('hueLights').innerHTML = LUX.all.map(x => `<label class="chk" style="margin:0"><input type="checkbox" data-l="${x.id}" ${LUX.lights.includes(x.id) ? 'checked' : ''}> ${x.name.replace(/[<>&]/g, '')}</label>`).join('') || 'Aucune ampoule couleur trouvée sur ce pont.';
+    luxMsg(LUX.all.length + ' ampoule' + (LUX.all.length > 1 ? 's' : '') + ' couleur sur le pont.'); luxSave();
+  } catch (e) { LUX.err = e.message; luxMsg('Pont injoignable (' + e.message + '). Vérifie l’adresse et que cet ordinateur est sur le même réseau ; autorise l’accès au réseau local si Chrome le demande.'); }
+}
+$('hueIp').value = LUX.ip; $('hueMax').value = LUX.max; $('oHue').textContent = Math.round(LUX.max * 100) + ' %'; $('hueOn').checked = LUX.on;
+$('hueIp').addEventListener('change', e => { LUX.ip = e.target.value.trim(); luxSave(); if (LUX.user) luxList(); });
+$('hueMax').addEventListener('input', e => { LUX.max = +e.target.value; $('oHue').textContent = Math.round(LUX.max * 100) + ' %'; luxSave(); });
+$('hueOn').addEventListener('change', e => { LUX.on = e.target.checked; luxSave(); });
+$('hueLights').addEventListener('change', e => { const id = e.target.dataset.l; if (!id) return; LUX.lights = LUX.lights.filter(x => x !== id); if (e.target.checked) LUX.lights.push(id); luxSave(); });
+$('hueFind').onclick = async () => {
+  luxMsg('Recherche du pont…');
+  try { const r = await (await fetch('https://discovery.meethue.com/')).json(); if (r && r[0]) { LUX.ip = r[0].internalipaddress; $('hueIp').value = LUX.ip; luxSave(); luxMsg('Pont trouvé : ' + LUX.ip + (LUX.user ? '' : '. Appuie sur son bouton rond, puis sur Associer.')); if (LUX.user) luxList(); } else luxMsg('Aucun pont trouvé : entre son adresse (visible dans l’application Hue, Paramètres › Ponts).'); }
+  catch (e) { luxMsg('Recherche impossible : entre l’adresse du pont (application Hue, Paramètres › Ponts).'); }
+};
+$('huePair').onclick = async () => {
+  LUX.ip = $('hueIp').value.trim(); if (!LUX.ip) return luxMsg('Entre d’abord l’adresse du pont.');
+  luxMsg('Association… (le bouton rond du pont doit avoir été pressé il y a moins de 30 s)');
+  try { const j = await hue('', 'POST', { devicetype: 'herba_stellaris#scene' }); LUX.user = j[0].success.username; luxSave(); luxMsg('Pont associé.'); luxList(); }
+  catch (e) { luxMsg(/link button/i.test(e.message) ? 'Appuie sur le bouton rond du pont, puis reclique sur Associer dans les 30 s.' : 'Association impossible : ' + e.message); }
+};
+$('hueTest').onclick = async () => {
+  if (!LUX.user) return luxMsg('Associe d’abord le pont.');
+  const seq = [[1, .55, .2], [.25, .5, 1], [.7, .35, 1], [1, .85, .6]];
+  for (const c of seq) { await luxSend(LUX.lights.map(() => c), 1, 4); await new Promise(r => setTimeout(r, 700)); }
+  luxMsg('Test envoyé : les ampoules ont dû passer de l’ambre au bleu, au violet, puis au blanc chaud.');
+};
+if (LUX.ip && LUX.user) setTimeout(luxList, 1500);
+async function luxSend(cols, k, tt) {
+  if (LUX.busy || !LUX.ip || !LUX.user) return; LUX.busy = true;
+  try {
+    for (let i = 0; i < LUX.lights.length; i++) {
+      const c = cols[i % cols.length], bri = Math.round(clamp(k * LUX.max, 0, 1) * 253) + 1;
+      await hue(`/${LUX.user}/lights/${LUX.lights[i]}/state`, 'PUT', bri <= 2 ? { on: false, transitiontime: tt } : { on: true, xy: rgb2xy(c), bri, transitiontime: tt });
+    }
+    LUX.err = '';
+  } catch (e) { LUX.err = e.message; }
+  LUX.busy = false;
+}
+// toutes les 1,5 s : couleurs de trois zones de l'image (gauche, centre, droite), saturées et éclairées selon la musique
+function luxSample() {
+  const now = performance.now();
+  if (!LUX.on || !LUX.user || !LUX.lights.length || mode !== 'live' || now - LUX.last < 1500 || LUX.busy) return; LUX.last = now;
+  const c = LUX.cv || (LUX.cv = document.createElement('canvas')); c.width = 12; c.height = 5; const g = c.getContext('2d', { willReadFrequently: true });
+  try { g.drawImage(canvas, 0, canvas.height * .2, canvas.width, canvas.height * .6, 0, 0, 12, 5); } catch (e) { return; }
+  const d = g.getImageData(0, 0, 12, 5).data, zones = [[0, 4], [4, 8], [8, 12]].map(([a, b]) => { let r = 0, gg = 0, bb = 0, n = 0; for (let y = 0; y < 5; y++) for (let x = a; x < b; x++) { const i = (y * 12 + x) * 4; r += d[i]; gg += d[i + 1]; bb += d[i + 2]; n++; } return [r / n / 255, gg / n / 255, bb / n / 255]; });
+  const cols = zones.map(z => { const h = rgb2hsv(z); return hsv2rgb([h[0], clamp(h[1] * 1.6 + .15, .25, 1), 1]); });   // la teinte de l'image, plus vive ; la lumière vient de la musique
+  const space = sim && (!sim.introDone || (sim.finale && sim.t - sim.finaleT0 > 13));
+  const k = space ? .25 : clamp(.18 + (sim ? (sim.arc || 0) * .9 + (sim.loud || 0) * .5 : 0), .12, 1);
+  luxSend(LUX.lights.length >= 3 ? [cols[0], cols[1], cols[2]] : LUX.lights.length === 2 ? [cols[0], cols[2]] : [cols[1]], k, 14);
+}
+// fin de l'œuvre : un fondu lent vers un bleu de nuit très doux
+function luxEnd() { if (!LUX.on || !LUX.user || !LUX.lights.length) return; let n = 0; const go = () => { if (LUX.busy && n++ < 20) return setTimeout(go, 300); luxSend([[.25, .35, 1]], .12, 50); }; setTimeout(go, 1600); }
+
 /* ---- Signatures du fingerstyle : tapping, slap, retour des motifs ----
    Calculées par la simulation à partir de l'empreinte (attaques, notes, hauteur) : rejouées à l'identique.
    Les seuils seront affinés pendant la séance d'écoute avec le musicien. */
@@ -7059,6 +7137,7 @@ function frame() {
       cv.getContext('2d').drawImage(canvas, 0, (canvas.height - sh) / 2, sw, sh, 0, 0, tw, th);
       const r = wantThumb; wantThumb = null; r(cv.toDataURL('image/jpeg', .85));
     }
+    if (!ctxLost) luxSample();
     if (wantGarden && !ctxLost) {        // image du jardin pour le souvenir des spectateurs : prise avant les noms et les instruments
       wantGarden = false; const tw = 1080, th = Math.round(tw / 2.39), cv = document.createElement('canvas'); cv.width = tw; cv.height = th;
       const sw = canvas.width, sh = Math.min(canvas.height, sw / 2.39); cv.getContext('2d').drawImage(canvas, 0, (canvas.height - sh) / 2, sw, sh, 0, 0, tw, th); PUB.gardenImg = cv.toDataURL('image/jpeg', .86);

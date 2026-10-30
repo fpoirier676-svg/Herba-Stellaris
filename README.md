@@ -234,6 +234,23 @@ Tout est inscrit dans l'empreinte : la relecture rejoue chaque graine, chaque en
 - **iPhone** : là où le téléphone ne peut pas vibrer, un éclair de la couleur de la graine remplace la vibration.
 - **Vie privée** : une note sur la page du public précise que seuls la graine et le nom choisi sont transmis et conservés avec l'œuvre.
 
+## Lumières de salle (Philips Hue)
+Les ampoules de la salle prolongent l'image : chacune prend la teinte d'une zone de l'image (gauche, centre, droite) en fondus de
+1,4 s, et sa lumière suit l'intensité de la musique et l'arc de la pièce. Pendant les voyages dans l'espace, elle baisse ; à la fin
+de l'œuvre, elle s'éteint lentement vers un bleu de nuit.
+
+**Matériel** : un **pont Philips Hue** et des ampoules **Hue White and Color Ambiance** (culot E26, couleur). Le pont se branche en
+câble réseau sur le routeur auquel l'ordinateur du spectacle est relié. Les ampoules blanches seules et les prises sont ignorées.
+
+**Réglage** (carte 3 de l'accueil, *Lumières de salle*) :
+1. *Trouver* cherche le pont sur le réseau ; sinon, entre son adresse (application Hue, Paramètres › Ponts).
+2. Appuie sur le **bouton rond du pont**, puis sur *Associer* dans les 30 secondes. Si Chrome demande l'**accès au réseau local**, accepte.
+3. Choisis les ampoules, règle l'*Intensité maximale*, puis *Tester* : ambre, bleu, violet, blanc chaud.
+4. Coche *Ambiances pendant la composition*. Le panneau « Prêt pour le spectacle » affiche le voyant *Lumières*.
+
+Le pont accepte environ dix commandes par seconde ; l'application en envoie au plus deux par seconde et par ampoule, en fondus,
+pour rester fluide et ne jamais saturer le pont.
+
 ## Le voyage astral : départ et retour à la salle
 
 L'ouverture part de **la salle de spectacle** : la caméra est au-dessus de la ville, de nuit les lumières des villes et un point de
