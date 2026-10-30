@@ -58,6 +58,7 @@
   .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; } .row3 button { font-size:10px; letter-spacing:.1em; padding:14px 4px; }
   .shots { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; } .shots button { margin-top:0; padding:12px 4px; font-size:10px; letter-spacing:.08em; }
+  #modList { margin-top:10px; border-top:1px solid var(--line, rgba(255,255,255,.15)); padding-top:8px; } #modList .mh { font-size:11px; letter-spacing:.12em; text-transform:uppercase; opacity:.7; margin-bottom:6px; } #modList .mi { display:flex; gap:8px; align-items:center; margin:6px 0; } #modList .mi b { flex:1; font-weight:400; font-size:17px; } #modList button { padding:10px 12px; font-size:13px; }
 </style>
 </head>
 <body>
@@ -88,8 +89,9 @@
     <div class="vid"><video id="rv" muted playsinline autoplay></video><div id="rvMsg">Image en attente…</div></div>
     <div class="sc" id="sc"></div>
     <div class="lvl"><i id="scLvl"></i></div>
-    <div class="row2" id="repBtns"><button id="rMark">Poser un repère</button><button id="rRestart" class="hidden">Recommencer</button></div>
+    <div class="row2" id="repBtns"><button id="rLift">Inviter le public à lever</button><button id="rMark">Poser un repère</button><button id="rRestart" class="hidden">Recommencer</button></div>
     <div class="note" id="scMsg" style="text-align:center;margin-top:6px"></div>
+    <div id="modList" class="hidden"></div>
   </div>
 
   <div class="card hidden" id="remote">
@@ -234,6 +236,10 @@ function onStatus(m) {
     $('rRestart').classList.toggle('hidden', !S.rep); $('rMark').disabled = false;
   } else { $('sc').innerHTML = '<div style="grid-column:1/-1;font-size:17px;color:var(--dim)">' + (m.mode === 'idle' && m.epi ? 'Œuvre terminée' : 'Prêt — en attente de la composition') + '</div>'; $('scLvl').style.width = '0%'; $('scMsg').textContent = ''; $('rRestart').classList.add('hidden'); $('rMark').disabled = true; }
   const live = m.mode === 'live';
+  const ml = $('modList'), md = m.mod || [];
+  ml.classList.toggle('hidden', !md.length);
+  ml.innerHTML = md.length ? '<div class="mh">Noms du public à valider</div>' + md.map(x => `<div class="mi"><b>${String(x.name).replace(/[<>&]/g, '')}</b><button data-ok="${x.id}">Afficher</button><button data-no="${x.id}">Refuser</button></div>`).join('') : '';
+  $('rLift').disabled = !live;
   $('rTime').textContent = live ? '● ' + mmss(m.t || 0) : m.mode === 'replay' ? '▶ relecture' : m.mode === 'hd' ? 'Rendu HD en cours' : 'Prêt';
   $('epi').classList.toggle('hidden', !m.epi);
   $('rTime').style.color = live ? 'var(--rec)' : '';
@@ -252,6 +258,8 @@ let zLast = 0; $('rZoom').addEventListener('input', e => { const v = +e.target.v
 $('rZoom').addEventListener('change', e => { if (conn && conn.open) conn.send({ cmd: 'zoom', v: +e.target.value }); });
 $('rStart').onclick = () => send('start');
 $('rStartRep').onclick = () => send('start-rep');
+$('rLift').onclick = () => { send('lever'); try { navigator.vibrate && navigator.vibrate(30); } catch (e) {} };
+$('modList').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || !conn || !conn.open) return; conn.send({ cmd: b.dataset.ok ? 'nom-ok' : 'nom-non', id: +(b.dataset.ok || b.dataset.no) }); b.parentNode.remove(); });
 $('rMark').onclick = () => { send('mark'); try { navigator.vibrate && navigator.vibrate(30); } catch (e) {} };
 $('rRestart').onclick = () => { if (confirmTap2($('rRestart'), 'Recommencer')) send('restart'); };
 function confirmTap2(b, label) { if (b.dataset.armed) { b.dataset.armed = ''; b.textContent = label; return true; } b.dataset.armed = 1; b.textContent = 'Confirmer'; setTimeout(() => { b.dataset.armed = ''; b.textContent = label; }, 3000); return false; }

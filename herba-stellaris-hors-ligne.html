@@ -16,6 +16,7 @@
   #regie video { width:100%; aspect-ratio:16/9; background:#000; display:block; margin-bottom:10px; }
   #regie .rg-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px 12px; font-variant-numeric:tabular-nums; margin-bottom:10px; }
   #regie .rg-grid div span { display:block; font-size:9px; letter-spacing:.12em; text-transform:uppercase; opacity:.5; }
+  #rgMod { display:flex; flex-direction:column; gap:4px; margin:4px 0 8px; } #rgMod .mi { display:flex; align-items:center; gap:8px; font-size:12px; } #rgMod .mi b { flex:1; font-weight:400; } #rgMod button { font-size:10px; padding:5px 9px; }
   #regie .rg-btns { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; } #regie .rg-btns button { font-size:10px; padding:8px 10px; letter-spacing:.06em; } #regie .rg-btns button.on { background:#9fe8ff; color:#04121a; }
   #regie .rg-msg { color:#e8b98a; min-height:16px; }
   #pubBox { position:fixed; right:26px; bottom:26px; z-index:30; background:rgba(4,5,8,.72); border:1px solid rgba(255,240,220,.16); border-radius:14px; padding:14px 16px; width:190px; text-align:center; backdrop-filter:blur(6px); }
@@ -2625,6 +2626,7 @@ var qrcode = function() {
   <label class="ctl">Latence de la chaîne <output id="oLat">100 ms</output><input type="range" id="latency" min="0" max="400" step="5" value="100"></label>
   <label class="chk"><input type="checkbox" id="lowlat"> Affichage faible latence (au prochain chargement ; peut déchirer l’image)</label>
   <label class="chk"><input type="checkbox" id="names" checked> Noms des plantes du public à l’écran (touche N)</label>
+  <label class="chk"><input type="checkbox" id="modNamesH"> Valider chaque nom du public avant affichage (régie ou téléphone)</label>
   <label class="chk"><input type="checkbox" id="instru" checked> Instruments de scène (touche I) : égaliseur, compteur, matrice du jardin</label>
   <label class="chk"><input type="checkbox" id="mire"> Mire de synchronisation (touche M) : éclair à chaque attaque</label>
     <div class="xnote" style="font-size:10px;opacity:.6;margin-top:8px;line-height:1.5">Scène : 1 ensemble · 2 ras du sol · 3 grue · 4 plongée · 5 cime · 6 canopée · 7 ciel · 8 Terre · 9 contre-jour · E final · Q graines du public · S mode Scène · F plein écran · + / − zoom, 0 retour au sol</div>
@@ -2683,9 +2685,11 @@ var qrcode = function() {
   <div class="rg-btns" id="rgShots"></div>
   <div class="rg-btns">
     <button id="rgAube">Aube (A)</button><button id="rgFin">Final (E)</button><button id="rgPub">Graines public (Q)</button>
-    <button id="rgStage">Mode Scène (S)</button><button id="rgMire">Mire (M)</button><button id="rgCal">Mire de calage (G)</button><button id="rgKey">Coins (K)</button><button id="rgClose">Fermer la projection</button>
+    <button id="rgStage">Mode Scène (S)</button><button id="rgMire">Mire (M)</button><button id="rgLift">Inviter à lever (L)</button><button id="rgCal">Mire de calage (G)</button><button id="rgKey">Coins (K)</button><button id="rgClose">Fermer la projection</button>
   </div>
   <label class="rg-zoom" style="display:flex;align-items:center;gap:10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin:4px 0 8px">Zoom <input type="range" id="rgZoom" min="0" max="1" step="0.005" value="0" style="flex:1"></label>
+  <label class="chk" style="font-size:10px"><input type="checkbox" id="modNames"> Valider les noms du public avant de les afficher</label>
+  <div id="rgMod"></div>
   <div class="rg-msg" id="rgMsg"></div>
 </div>
 
@@ -4886,6 +4890,7 @@ class Sim {
       this.pubN++;
     } else if (!sd) return;
     else if (e.type === 'tilt') sd.tilt = [e.x, e.y];
+    else if (e.type === 'name') { sd.spec.name = String(e.name || '').slice(0, 18); sd.nameV = (sd.nameV || 0) + 1; }
     else if (e.type === 'lift') { sd.lift = clamp(e.v, 0, 1); if (sd.plant) { sd.plant.lift = sd.lift; if (sd.lift > .6 && t - (sd.liftFx || -9) > .8) { sd.liftFx = t; const p = sd.plant; emitSparks(this.rD, p.x, p.y + p.height * p.growth, p.z, 18, sd.col, t); } } }
     else if (e.type === 'grow' && sd.state === 'dormant') this.growSeed(sd, t);
     else if (e.type === 'shake') {
@@ -5158,7 +5163,7 @@ function startWorld(seed, startMs, intro, dawn) { world = buildWorld(seed, start
 
 async function startLive(kind, file) {
   const seed = (crypto.getRandomValues(new Uint32Array(1))[0]) >>> 0;
-  setTick(LIVE_TICK); startWorld(seed, Date.now(), true, !S.cycle); frames = []; recEvents = []; LIVE_EV.length = 0; LIVE_MARKS.length = 0; PUB.clients.clear(); ZM.sent = 0; ZM.sentT = 0; sim.manualEnd = true; world.venue = { ...S.venue }; world.fiche = { ...S.fiche }; sim.lat = S.latency / 1000; sim.predict = true;
+  setTick(LIVE_TICK); startWorld(seed, Date.now(), true, !S.cycle); frames = []; recEvents = []; LIVE_EV.length = 0; PUB.gardenImg = null; PUB.gardenAsked = false; PUB.collSent = null; MOD.pending.length = 0; LIVE_MARKS.length = 0; PUB.clients.clear(); ZM.sent = 0; ZM.sentT = 0; sim.manualEnd = true; world.venue = { ...S.venue }; world.fiche = { ...S.fiche }; sim.lat = S.latency / 1000; sim.predict = true;
   if (kind === 'mic') await AE.useMic(); else if (kind === 'phone') await AE.useRemote(PH.stream); else await AE.useFile(file);
   liveT0 = AE.ctx.currentTime; AE.silentFor = 0; AE.heard = 0; AE.silStart = null; AE.lastNow = 0;
   if (AE.el) AE.el.onended = () => { if (mode === 'live') finishLive(true); };
@@ -5167,7 +5172,7 @@ async function startLive(kind, file) {
 }
 function liveTime() { return AE.el ? AE.el.currentTime : AE.ctx.currentTime - liveT0; }
 
-let wantThumb = null;
+let wantThumb = null, wantGarden = false;
 async function finishLive(save) {
   if (mode !== 'live') return;
   mode = 'idle'; setUI(); keepAwake(false); if (uiHidden && !S.stage) toggleUI();
@@ -5177,6 +5182,7 @@ async function finishLive(save) {
   if (!save) return;
   const thumb = await new Promise(res => wantThumb = res);
   const rec = makeRec(audio, thumb);
+  sendSouvenirs(PUB.gardenImg || thumb); PUB.gardenImg = null; PUB.gardenAsked = false;
   secoursClear();
 
   try { await DB.put(rec); } catch (e) { memStore.set(rec.id, rec); }
@@ -5424,6 +5430,7 @@ addEventListener('keydown', e => {
   if (k === 's') setStage(!S.stage);
   else if (k === 'q') togglePublic();
   else if (k === 'e' && mode === 'live') PEND.end = true;
+  else if (k === 'l' && mode === 'live') inviteLift();
   else if (k === 'a' && mode === 'live') PEND.dawn = true;
   else if (k === 'm') { S.mire = !S.mire; $('mire').checked = S.mire; }
   else if (/^[1-9]$/.test(k) && mode === 'live') PEND.shot = +k;
@@ -5929,7 +5936,7 @@ function ensurePeer(onOpen) {
     if (c.metadata && c.metadata.role === 'public') { publicConn(c); return; }
     if (PH.conn) { try { PH.conn.close(); } catch (e) {} }
     PH.conn = c;
-    c.on('data', d => { if (d && d.cmd === 'zoom') { setZoom(+d.v, 'téléphone'); return; } phoneCommand(d && d.cmd); });
+    c.on('data', d => { if (d && d.cmd === 'zoom') { setZoom(+d.v, 'téléphone'); return; } phoneCommand(d && d.cmd, d); });
     c.on('open', () => { sendStatus(); if (!PH.stream) pState('Téléphone relié comme télécommande.', 'ok'); setTimeout(() => startRetour(c.peer), 600); });
   });
   PH.peer.on('disconnected', () => { if (!PH.peer.destroyed) setTimeout(() => PH.peer.reconnect(), 1500); });
@@ -6001,10 +6008,13 @@ function publicConn(c) {
         const sp = d.spec || {}, spec = { fam: PUB_FAMS.includes(sp.fam) ? sp.fam : 'fleur', col: clamp(sp.col | 0, 0, PUB_COLS.length - 1), size: clamp(sp.size | 0, 0, 2), form: clamp(sp.form | 0, 0, 3) };
         spec.auto = 1; spec.name = String(sp.name || '').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 18);
         if (isFinite(+sp.x) && isFinite(+sp.z)) { spec.x = Math.round(clamp(+sp.x, -56, 56) * 10) / 10; spec.z = Math.round(clamp(+sp.z, -56, 56) * 10) / 10; }
-        const id = PUB.nextId++; if (!spec.name) spec.name = PUB_COLN[spec.col] + ' ' + id;
+        const id = PUB.nextId++, raw = spec.name, bad = raw && badName(raw);
+        if (bad || (raw && S.modNames)) spec.name = '';                                         // nom refusé, ou en attente de la régie
+        if (!spec.name) spec.name = PUB_COLN[spec.col] + ' ' + id;
         cl = { cid, id, conn: c, state: 'fall', col: hexCol(PUB_COLS[spec.col]), name: spec.name, lastTilt: 0, lastShake: 0, tx: 0, ty: 0 };
         PUB.clients.set(cid, cl); PUB.byId.set(id, cl); LIVE_EV.push({ type: 'seed', id, spec });
-        return publicSay(c, { msg: 'accepted', id, col: cl.col, name: cl.name });
+        if (raw && !bad && S.modNames) { MOD.pending.push({ id, name: raw }); drawMod(); }
+        return publicSay(c, { msg: 'accepted', id, col: cl.col, name: cl.name, renamed: bad ? 1 : 0, pending: raw && !bad && S.modNames ? raw : '' });
       }
       if (!cl || mode !== 'live') return;
       const now = performance.now();
@@ -6060,9 +6070,9 @@ function sendStatus() {
   const live = mode === 'live' && sim, pubs = sim ? [...sim.seeds.values()] : [];
   const scene = live ? { act: (sim.act ? ACTS[sim.act.i] + ' · ' : '') + gardenStage(), chord: GT.chordName || '', key: GT.keyName || '', note: GT.note ? NOTE_NAMES[((GT.note.m0 % 12) + 12) % 12] + (Math.floor(GT.note.m0 / 12) - 1) : '', bpm: tempoBPM(), lvl: +(sim.loud || 0).toFixed(2),
     seeds: pubs.length, falling: pubs.filter(q => q.state === 'fall').length, zoom: zoomLabel(ZM.v), intro: !sim.introDone, rep: !!S.rehearsal, marks: LIVE_MARKS.length, last: LIVE_MARKS.length ? LIVE_MARKS[LIVE_MARKS.length - 1] : 0 } : null;
-  try { PH.conn.send({ scene, rep: !!S.rehearsal, mode, t: mode === 'live' ? liveTime() : 0, site: world ? world.name : '', plants: sim ? sim.plants.length : 0, epi: !!epiShownAt, fin: mode !== 'live' ? 'none' : !sim.introDone ? 'wait' : sim.finale ? 'on' : 'ready', finLeft: mode === 'live' && sim.finale ? Math.max(0, Math.ceil(FINALE_LEN + FINALE_HOLD - (sim.t - sim.finaleT0))) : 0 }); } catch (e) {}
+  try { PH.conn.send({ scene, mod: MOD.pending.slice(0, 6), modOn: !!S.modNames, rep: !!S.rehearsal, mode, t: mode === 'live' ? liveTime() : 0, site: world ? world.name : '', plants: sim ? sim.plants.length : 0, epi: !!epiShownAt, fin: mode !== 'live' ? 'none' : !sim.introDone ? 'wait' : sim.finale ? 'on' : 'ready', finLeft: mode === 'live' && sim.finale ? Math.max(0, Math.ceil(FINALE_LEN + FINALE_HOLD - (sim.t - sim.finaleT0))) : 0 }); } catch (e) {}
 }
-async function phoneCommand(cmd) {
+async function phoneCommand(cmd, d) {
   if (cmd === 'start' && (mode === 'intro' || mode === 'idle')) { closeGallery(); if (mode === 'idle') { mode = 'intro'; setUI(); } $('btnGo').click(); }
   else if (cmd === 'finish' && mode === 'live') finishLive(true);
   else if ((cmd === 'finale' || cmd === 'conclure') && mode === 'live') PEND.end = true;     // la conclusion décolle
@@ -6071,6 +6081,8 @@ async function phoneCommand(cmd) {
   else if (cmd === 'public') togglePublic();
   else if (typeof cmd === 'string' && /^shot[1-9]$/.test(cmd) && mode === 'live') PEND.shot = +cmd[4];
   else if (cmd === 'discard' && mode === 'live') finishLive(false);
+  else if (cmd === 'lever' && mode === 'live') inviteLift();
+  else if ((cmd === 'nom-ok' || cmd === 'nom-non') && d) modDecide(+d.id, cmd === 'nom-ok');
   else if (cmd === 'mark' && mode === 'live') { const tt = Math.round(liveTime()); LIVE_MARKS.push(tt); LIVE_EV.push({ type: 'mark', n: LIVE_MARKS.length }); }   // repère posé depuis la scène
   else if (cmd === 'restart' && mode === 'live' && S.rehearsal) { await finishLive(false); mode = 'intro'; setUI(); S.rehearsal = true; $('btnRep').click(); }
   else if (cmd === 'start-rep' && (mode === 'intro' || mode === 'idle')) { closeGallery(); if (mode === 'idle') { mode = 'intro'; setUI(); } $('btnRep').click(); }
@@ -6410,7 +6422,8 @@ function renderNames() {
   const ac = renderer.autoClear; renderer.autoClear = false; renderer.setRenderTarget(null); renderer.render(NAMESC, camera); renderer.autoClear = ac;
 }
 function nameSprite(sd) {
-  let o = NAMES.get(sd.id); if (o) return o;
+  let o = NAMES.get(sd.id); if (o && o.v === (sd.nameV || 0)) return o;
+  if (o) { NAMESC.remove(o.sp); o.sp.material.map.dispose(); o.sp.material.dispose(); NAMES.delete(sd.id); }
   const txt = (sd.spec.name || 'Graine ' + sd.id), cv = document.createElement('canvas'), c = cv.getContext('2d'), fs = 46;
   c.font = `500 ${fs}px "Cormorant Garamond", Georgia, serif`; const tw = Math.ceil(c.measureText(txt).width), W = tw + 92, H = 74; cv.width = W; cv.height = H;
   const col = 'rgb(' + sd.col.map(v => Math.round(v * 255)).join(',') + ')';
@@ -6419,7 +6432,7 @@ function nameSprite(sd) {
   c.shadowBlur = 0; c.font = `500 ${fs}px "Cormorant Garamond", Georgia, serif`; c.textBaseline = 'middle'; c.lineJoin = 'round'; c.strokeStyle = 'rgba(0,0,0,.6)'; c.lineWidth = 5; c.strokeText(txt, 62, H / 2 + 2); c.fillStyle = '#fff'; c.fillText(txt, 62, H / 2 + 2);
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false, toneMapped: false }));
-  sp.renderOrder = 20; sp.center.set(.5, 0); sp.userData.ar = W / H; NAMESC.add(sp); o = { sp, a: 0 }; NAMES.set(sd.id, o); return o;
+  sp.renderOrder = 20; sp.center.set(.5, 0); sp.userData.ar = W / H; NAMESC.add(sp); o = { sp, a: 0, v: sd.nameV || 0 }; NAMES.set(sd.id, o); return o;
 }
 function updateNames(vh) {
   if (NAMES.sim !== sim) { for (const o of NAMES.values()) { NAMESC.remove(o.sp); o.sp.material.map.dispose(); o.sp.material.dispose(); } NAMES.clear(); NAMES.sim = sim; }   // nouvelle composition
@@ -6516,6 +6529,8 @@ function advance(dt) {
       flushZoom(); const evs = LIVE_EV.length ? LIVE_EV.splice(0) : null; if (evs) for (const e of evs) recEvents.push({ k: sim.tick, ...e });
       sim.step(fr, evs);
       if (sim.lastPublic && sim.lastPublic !== lp) notifyPublic(sim.lastPublic);
+      if (sim.finale && !PUB.gardenAsked && PUB.clients.size && sim.t - sim.finaleT0 > .5) { PUB.gardenAsked = true; wantGarden = true; }
+      if (sim.collT != null && sim.collT !== PUB.collSent) { PUB.collSent = sim.collT; publicAll({ msg: 'ensemble', n: sim.collN }); }
       if (sim.notes.length) for (const n of sim.notes.splice(0)) notifySeed(n);
     }
     renderT = Math.max(sim.t, T);
@@ -6776,6 +6791,50 @@ function renderInstruments(dt) {
 }
 let frameN = 0, lastFrameT = 0, frameDur = 16;
 
+
+/* ---- Public : filtre des noms, validation par la régie, élan collectif, souvenir ---- */
+// filtre simple : insultes et termes crus courants (français et anglais), contournements usuels compris (accents, chiffres, lettres doublées)
+const BAD_ROOTS = ['connard', 'connasse', 'salope', 'salaud', 'encule', 'enculer', 'batard', 'putain', 'pute', 'merde', 'bordel', 'niquer', 'nique', 'couille', 'bite', 'pénis', 'penis', 'vagin', 'chatte', 'branle', 'branleur', 'pouffiasse', 'pédé', 'pede', 'tapette', 'gouine', 'negre', 'bougnoul', 'youpin', 'nazi', 'hitler', 'fuck', 'shit', 'bitch', 'cunt', 'dick', 'pussy', 'whore', 'slut', 'nigger', 'nigga', 'faggot', 'retard', 'asshole', 'porn', 'porno', 'sexe', 'tabarnak', 'tabarnac', 'calisse', 'crisse', 'osti', 'esti', 'ciboire', 'viol', 'violer', 'suicide', 'cocaine'];
+const BAD_WORDS = ['con', 'conne', 'cul', 'pd', 'fdp', 'ntm', 'tg', 'ass', 'sex', 'kkk', 'wtf', 'stfu'];
+function normName(s) { return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/0/g, 'o').replace(/[1!|]/g, 'i').replace(/3/g, 'e').replace(/[4@]/g, 'a').replace(/[5$]/g, 's').replace(/7/g, 't').replace(/(.)\1+/g, '$1'); }
+function badName(s) {
+  const n = normName(s), flat = n.replace(/[^a-z]/g, ''), words = n.split(/[^a-z]+/).filter(Boolean);
+  if (BAD_ROOTS.some(r => flat.includes(normName(r).replace(/[^a-z]/g, '')))) return true;
+  return words.some(w => BAD_WORDS.includes(w));
+}
+const MOD = { pending: [] };
+try { S.modNames = localStorage.getItem('herba-moderation') === '1'; } catch (e) { S.modNames = false; }
+function setMod(v) { S.modNames = !!v; try { localStorage.setItem('herba-moderation', v ? '1' : '0'); } catch (e) {} for (const id of ['modNames', 'modNamesH']) if ($(id)) $(id).checked = S.modNames; }
+for (const id of ['modNames', 'modNamesH']) $(id).addEventListener('change', e => setMod(e.target.checked));
+setMod(S.modNames);
+function modDecide(id, ok) {
+  const i = MOD.pending.findIndex(x => x.id === id); if (i < 0) return; const it = MOD.pending.splice(i, 1)[0], cl = PUB.byId.get(id);
+  if (ok && mode === 'live') { LIVE_EV.push({ type: 'name', id, name: it.name }); if (cl) cl.name = it.name; }
+  if (cl && cl.conn && cl.conn.open) publicSay(cl.conn, { msg: 'named', name: ok ? it.name : (cl ? cl.name : ''), ok: ok ? 1 : 0 });
+  drawMod(); sendStatus();
+}
+function drawMod() {
+  const box = $('rgMod'); if (!box) return;
+  box.innerHTML = MOD.pending.length ? MOD.pending.map(x => `<div class="mi"><b>${x.name.replace(/[<>&]/g, '')}</b><button data-ok="${x.id}">Afficher</button><button data-no="${x.id}">Refuser</button></div>`).join('') : (S.modNames ? '<div class="mi" style="opacity:.6">Aucun nom en attente</div>' : '');
+}
+$('rgMod').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.ok) modDecide(+b.dataset.ok, true); else if (b.dataset.no) modDecide(+b.dataset.no, false); });
+function publicAll(o) { for (const cl of PUB.clients.values()) if (cl.conn && cl.conn.open) try { cl.conn.send(o); } catch (e) {} }
+function inviteLift() { publicAll({ msg: 'lever' }); $('rgMsg').textContent = 'Invitation envoyée : le public lève ses téléphones.'; setTimeout(() => { $('rgMsg').textContent = ''; }, 6000); }
+$('rgLift').onclick = () => { if (mode === 'live') inviteLift(); };
+function sendSouvenirs(img) {
+  if (S.rehearsal || !img || !PUB.clients.size) return;
+  const F = world.fiche || {}, o = { msg: 'souvenir', img, title: F.title || sim.W.name, sub: F.sub || '', artist: F.artist || '', site: sim.W.name, venue: (world.venue && world.venue.name) || '', date: skyDate() };
+  publicAll(o);
+}
+// élan collectif : quand au moins 60 % des plantes du public (3 au minimum) sont levées en même temps
+function collStep(s) {
+  let n = 0, up = 0; for (const sd of s.seeds.values()) if (sd.plant && !sd.plant.dead) { n++; if ((sd.lift || 0) > .55) up++; }
+  if (n >= 3 && up / n >= .6 && s.t - (s.collT == null ? -99 : s.collT) > 20) {
+    s.collT = s.t; s.collN = up;
+    for (const sd of s.seeds.values()) { const p = sd.plant; if (p && !p.dead) { p.pulse = 1; p.flut = 1; emitSparks(s.rD, p.x, p.y + p.height * p.growth, p.z, 40, sd.col, s.t); } }
+  }
+}
+
 /* =====================================================================
    DRAMATURGIE — fiche de composition, carton de titre, actes, générique, écran d'attente, QR du public
    Tout est dessiné dans l'image : visible sur la projection, et rejoué à l'identique (sauf le QR, propre au direct)
@@ -6800,7 +6859,7 @@ function actStep() {
   return A;
 }
 // évalué avec la simulation (4 fois par seconde), jamais au rythme de l'affichage : identique en direct, en rejeu et à l'export
-{ const st0 = Sim.prototype.step; Sim.prototype.step = function (...a) { const r = st0.apply(this, a); if (this === sim && this.tick % 15 === 0) actStep(); return r; }; }
+{ const st0 = Sim.prototype.step; Sim.prototype.step = function (...a) { const r = st0.apply(this, a); if (this === sim && this.tick % 15 === 0) { actStep(); collStep(this); } return r; }; }
 const fade = (t, a, b, fi, fo) => (fi > 0 ? smoothstep(a, a + fi, t) : t >= a ? 1 : 0) * (fo > 0 ? 1 - smoothstep(b - fo, b, t) : t < b ? 1 : 0);
 const OVL = { scene: new THREE.Scene(), cam: new THREE.OrthographicCamera(0, 1, 1, 0, -1, 1), v2: new THREE.Vector2() };
 {
@@ -6865,6 +6924,11 @@ function drawNamesCredit(c, w, h, names) {
     txt(c, o.n, cx + fs * .1, y, `400 ${fs}px ${SERIF}`, '#f3ead8', { max: cw * .82, blur: fs * .3 });
   });
 }
+function drawEnsemble(c, w, h, n) {
+  const u = h / 100;
+  txt(c, 'Ensemble', w / 2, h * .2, `400 ${11 * u}px ${SCRIPT}`, '#fff6e6', { glow: 'rgba(255,226,180,.7)', blur: 4 * u });
+  txt(c, `${n} TÉLÉPHONES LEVÉS VERS LA LUNE`, w / 2, h * .27, `300 ${1.9 * u}px ${SANS}`, 'rgba(243,234,216,.8)', { ls: (.5 * u).toFixed(1) + 'px', blur: u });
+}
 function drawAttract(c, w, h, F) {
   const u = h / 100, soft = 'rgba(243,234,216,.8)', v = S.venue || {};
   veil(c, w, h, h * .5, h * .7, .45);
@@ -6893,6 +6957,7 @@ function renderOverlay(dt) {
     if (F.card && sim.introDone) { const x = fade(t - sim.introDoneAt, 6.5, 16.5, 2, 2.2);   // le titre, comme au cinéma : après la séquence d'ouverture, à l'arrivée sur la Lune
       if (x > 0) { key = 'titre'; a = x; draw = (c, w, h) => drawTitle(c, w, h, F); } }
     if (F.acts && A && A.i >= 1) { const d = A.i === 1 ? (F.card ? 18.5 : 3) : A.i === 4 ? 1.5 : .8, x = fade(t - A.t, d, d + 5.5, 1, 1.3); if (x > 0) { key = 'acte' + A.i; a = x; draw = (c, w, h) => drawAct(c, w, h, A.i); } }
+    if (sim.collT != null && !credits) { const x = fade(t - sim.collT, 0, 5, .6, 1.4); if (x > 0) { key = 'ensemble' + sim.collN; a = x; draw = (c, w, h) => drawEnsemble(c, w, h, sim.collN); } }
     if (F.cred && sim.finale) {
       const hh = t - sim.finaleT0 - FINALE_LEN, names = creditNames(), split = names.length ? 5.5 : 1e9;
       if (hh >= 0 && hh < split) { key = 'gen'; a = fade(hh, 0, split, 1.4, names.length ? 1 : 0); draw = (c, w, h) => drawCredits(c, w, h, F); credits = true; }
@@ -6937,6 +7002,10 @@ function frame() {
       const sw = canvas.width, sh = Math.min(canvas.height, sw / 2.39);
       cv.getContext('2d').drawImage(canvas, 0, (canvas.height - sh) / 2, sw, sh, 0, 0, tw, th);
       const r = wantThumb; wantThumb = null; r(cv.toDataURL('image/jpeg', .85));
+    }
+    if (wantGarden && !ctxLost) {        // image du jardin pour le souvenir des spectateurs : prise avant les noms et les instruments
+      wantGarden = false; const tw = 1080, th = Math.round(tw / 2.39), cv = document.createElement('canvas'); cv.width = tw; cv.height = th;
+      const sw = canvas.width, sh = Math.min(canvas.height, sw / 2.39); cv.getContext('2d').drawImage(canvas, 0, (canvas.height - sh) / 2, sw, sh, 0, 0, tw, th); PUB.gardenImg = cv.toDataURL('image/jpeg', .86);
     }
     if (!ctxLost) { renderNames(); renderInstruments(dt); renderOverlay(dt); drawRetour(); }
   } else clock.getDelta();

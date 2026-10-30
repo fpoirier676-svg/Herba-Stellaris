@@ -111,7 +111,7 @@ est un point lumineux à sa place, à la hauteur de sa croissance. Les instrumen
 
 ### Pendant le spectacle (clavier)
 1 à 9 : plans (ensemble, ras du sol, grue, plongée, cime, canopée, ciel, Terre, contre-jour) · **A** lève le Soleil · **E** conclut ·
-**Q** graines du public · **N** noms du public · **S** mode Scène · **+ / −** zoom, **0** retour au sol · **I** instruments de scène · **H** commandes · **F** plein écran · **G** mire de calage et **K** coins (dans la fenêtre de projection).
+**Q** graines du public · **L** inviter le public à lever · **N** noms du public · **S** mode Scène · **+ / −** zoom, **0** retour au sol · **I** instruments de scène · **H** commandes · **F** plein écran · **G** mire de calage et **K** coins (dans la fenêtre de projection).
 Tout est inscrit dans l'empreinte : la galerie et les exports rejouent l'œuvre à l'identique.
 
 ### Soir de spectacle : le panneau « Prêt pour le spectacle »
@@ -206,6 +206,21 @@ l'écran chacune de leurs plantes lance **un fil de lumière vers la nouvelle ve
 
 **Une seule graine par personne** (identifiant gardé par chaque téléphone). Au final, les graines encore endormies germent toutes seules.
 Tout est inscrit dans l'empreinte : la relecture rejoue chaque graine, chaque endroit et chaque geste. La régie compte les graines.
+
+### Soirée avec le public : ce qui s'ajoute
+- **Semer dès l'entrée** : le QR de l'écran d'attente permet de composer sa graine avant le début. Une graine envoyée trop tôt
+  attend sur le téléphone (« elle sera semée d'elle-même dès l'ouverture du semis ») et part seule à l'ouverture.
+- **Noms filtrés** : les insultes et termes crus courants, en français, en anglais et en sacres québécois, sont écartés, y compris les variantes
+  avec des chiffres ou des accents. La plante prend alors un nom de couleur (« Violette 2 ») et le spectateur en est informé.
+- **Validation des noms (facultative)** : la case *Valider chaque nom du public avant affichage* (accueil ou régie) garde chaque nom
+  en attente. Il s'affiche après un toucher sur *Afficher*, dans la régie ou sur ton téléphone ; *Refuser* garde le nom de couleur.
+- **Élan collectif** : **L** au clavier, *Inviter à lever* dans la régie ou *Inviter le public à lever* sur ton téléphone affiche
+  « Levez votre téléphone vers la Lune » sur tous les téléphones. Quand au moins 60 % des plantes du public (3 au minimum) sont levées
+  ensemble, toutes s'illuminent, l'écran affiche « Ensemble » et le nombre de téléphones levés, et chaque téléphone le célèbre.
+- **Souvenir** : à la fin de l'œuvre, chaque spectateur reçoit une image à garder : le jardin au moment de la conclusion,
+  sa plante, son nom, le titre, l'interprète, la date, le lieu et le site lunaire (*Enregistrer le souvenir*).
+- **iPhone** : là où le téléphone ne peut pas vibrer, un éclair de la couleur de la graine remplace la vibration.
+- **Vie privée** : une note sur la page du public précise que seuls la graine et le nom choisi sont transmis et conservés avec l'œuvre.
 
 ## Le voyage astral : départ et retour à la salle
 

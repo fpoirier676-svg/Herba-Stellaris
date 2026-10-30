@@ -30,6 +30,14 @@
   input[type=text] { width:100%; background:rgba(239,232,218,.05); border:1px solid var(--line); border-radius:12px; color:var(--ink); font:inherit; font-size:15px; padding:12px 14px; }
   #map { display:block; width:100%; aspect-ratio:1; border-radius:50%; border:1px solid var(--line); background:radial-gradient(circle, rgba(150,145,135,.16), rgba(80,78,72,.08) 70%, transparent 71%); touch-action:none; }
   .maphint { color:var(--dim); font-size:12px; line-height:1.5; margin-top:8px; text-align:center; }
+  #flash { position:fixed; inset:0; pointer-events:none; z-index:40; opacity:0; background:radial-gradient(circle at 50% 42%, var(--seed) 0%, rgba(0,0,0,0) 72%); }
+  @keyframes sig { 0% { opacity:.9 } 100% { opacity:0 } }
+  #banner { position:fixed; left:14px; right:14px; bottom:calc(env(safe-area-inset-bottom) + 16px); z-index:6; padding:18px 16px; border-radius:16px; border:1px solid var(--seed); background:rgba(0,0,0,.86);
+    box-shadow:0 0 40px var(--seed); font-family:'Corinthia','Cormorant Garamond',cursive; font-size:38px; line-height:1; text-align:center; display:none; }
+  #banner small { display:block; font-family:'Cormorant Garamond',serif; font-size:17px; color:var(--dim); margin-top:6px; }
+  #banner.on { display:block; animation:pulse 1.6s ease-in-out infinite; } @keyframes pulse { 50% { box-shadow:0 0 70px var(--seed); } }
+  #souv { margin-top:18px; text-align:center; } #souv img { width:100%; border-radius:12px; border:1px solid var(--line); display:block; }
+  #souv a { display:block; margin-top:10px; } .priv { font-size:11px; color:var(--faint); line-height:1.5; margin-top:14px; text-align:center; }
   #welcome { position:fixed; left:14px; right:14px; top:calc(env(safe-area-inset-top) + 14px); z-index:5; padding:14px 16px; border-radius:14px; border:1px solid var(--wc,#fff);
     background:rgba(0,0,0,.82); box-shadow:0 0 30px var(--wc,#fff); font-family:'Cormorant Garamond',serif; font-size:19px; text-align:center; opacity:0; pointer-events:none; transform:translateY(-12px); }
   #welcome span { font-family:Inter,sans-serif; font-size:11.5px; color:var(--dim); }
@@ -99,8 +107,11 @@
     <button class="big hidden" id="motion" style="border-color:var(--line)">Activer les mouvements</button>
   </section>
 
+  <section id="souv" class="hidden"><h2 style="text-align:center">Votre souvenir</h2><img id="souvImg" alt="Souvenir de votre plante"><a class="big" id="souvDl" download="herba-stellaris-souvenir.jpg">Enregistrer le souvenir</a><div class="priv">Sur iPhone : touchez l’image longuement, puis « Ajouter à Photos ».</div></section>
   <div id="msg">Connexion…</div>
   <div class="note">Regardez l’écran derrière le musicien : votre graine y tombe du ciel lunaire.</div>
+  <div class="priv">Vie privée : seuls la graine et le nom que vous choisissez sont transmis à l’ordinateur du spectacle. Le nom est affiché à l’écran et conservé avec l’œuvre. Un prénom ou un surnom suffit. Aucun compte, aucune autre donnée.</div>
+  <div id="flash"></div><div id="banner"></div>
 </div>
 <script>
 const $ = id => document.getElementById(id);
@@ -229,9 +240,13 @@ function connect() {
 function onMsg(d) {
   if ((d.msg === 'hello' || d.msg === 'state') && d.site) $('sub').innerHTML = 'Une flore naît en ce moment sur la Lune,<br>au site <b>' + d.site + '</b>. Une graine par personne.';
   if (d.msg === 'state') { if (d.col) tint(d.col); setState(d.state === 'growing' ? 'grown' : d.state); }
-  else if (d.msg === 'wait') say('Le semis n’est pas encore ouvert.<br><i>Attendez que le musicien invite le public, puis réessayez.</i>');
-  else if (d.msg === 'deja') { say('Ce téléphone a déjà semé sa graine pour ce concert.'); setState(d.state === 'growing' ? 'grown' : d.state); }
-  else if (d.msg === 'accepted') { if (d.col) tint(d.col); if (d.name) { MYNAME = d.name; try { localStorage.setItem('herba-nom', d.name); } catch (e) {} } setState('fall'); buzz([20]); }
+  else if (d.msg === 'wait') { if (PENDING) say('Votre graine est prête.<br><i>Elle sera semée d’elle-même dès l’ouverture du semis. Gardez cette page ouverte.</i>'); else say('Le semis n’est pas encore ouvert.<br><i>Composez votre graine : elle partira dès l’ouverture.</i>'); }
+  else if (d.msg === 'named') { if (d.ok) { MYNAME = d.name; try { localStorage.setItem('herba-nom', d.name); } catch (e) {} say('Votre nom s’affiche maintenant au-dessus de votre plante.'); } else say('Votre nom n’a pas été retenu ; votre plante s’appelle ' + String(d.name).replace(/</g, '&lt;') + '.'); setState(st); }
+  else if (d.msg === 'lever') { banner('Levez votre téléphone<br>vers la Lune<small>Tous ensemble, maintenant</small>', 10000); buzz([60, 80, 60]); }
+  else if (d.msg === 'ensemble') { banner('Ensemble !<small>' + (d.n || '') + ' téléphones levés : la Lune a senti votre élan</small>', 6000); buzz([120, 60, 200]); }
+  else if (d.msg === 'souvenir') makeSouvenir(d);
+  else if (d.msg === 'deja') { const wasP = !!PENDING; PENDING = null; clearInterval(PTIMER); if (!wasP && performance.now() - ACC_T > 10000) say('Ce téléphone a déjà semé sa graine pour ce concert.'); setState(d.state === 'growing' ? 'grown' : d.state); }
+  else if (d.msg === 'accepted') { ACC_T = performance.now(); PENDING = null; clearInterval(PTIMER); say(''); if (d.renamed) setTimeout(() => say('Ce nom ne peut pas être affiché ; votre plante s’appelle ' + String(d.name).replace(/</g, '&lt;') + '.'), 400); else if (d.pending) setTimeout(() => say('Votre nom s’affichera dès que la régie l’aura validé.'), 400); if (d.col) tint(d.col); if (d.name) { MYNAME = d.name; try { localStorage.setItem('herba-nom', d.name); } catch (e) {} } setState('fall'); buzz([20]); }
   else if (d.msg === 'landed') { setState('dormant'); buzz([30, 50, 30]); }
   else if (d.msg === 'map') { MAP = d; drawMap(); }
   else if (d.msg === 'buzz') {                                  // une nouvelle graine vient de se poser : toute la communauté la sent
@@ -242,7 +257,9 @@ function onMsg(d) {
   else if (d.msg === 'live') { LIVE = d; LIVE.at = performance.now(); if (d.st && d.st !== st && (d.st === 'dormant' || d.st === 'grown') && st !== d.st && st !== 'none') setState(d.st); }
   else if (d.msg === 'grown') { $('state').innerHTML = 'Votre plante a germé' + nameLine() + '<br><span style="font-size:15px;color:var(--dim)">' + d.nom + ' · <i>' + d.chem + '</i></span>'; setState('grown', true); buzz([40, 60, 40, 60, 80]); }
 }
-const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
+// vibration là où le navigateur le permet ; sinon (iPhone) un éclair de la couleur de la graine
+const buzz = p => { let ok = false; try { ok = !!(navigator.vibrate && navigator.vibrate(p)); } catch (e) {} if (!ok) { const f = $('flash'), n = Math.max(1, Math.ceil((p || [1]).length / 2)); f.style.animation = 'none'; void f.offsetWidth; f.style.animation = `sig .45s ease-out ${n}`; } };
+function banner(h, ms) { const b = $('banner'); b.innerHTML = h; b.classList.add('on'); clearTimeout(banner.t); banner.t = setTimeout(() => b.classList.remove('on'), ms || 8000); }
 function tint(c) { document.documentElement.style.setProperty('--seed', c); }
 function setState(s, keepText) {
   st = s || 'none';
@@ -262,6 +279,7 @@ $('sow').onclick = async () => {
   const sp = { fam: spec.fam, col: spec.col, size: spec.size, form: spec.form, name: spec.name }; if (spec.x != null) { sp.x = spec.x; sp.z = spec.z; }
   try { localStorage.setItem('herba-graine', JSON.stringify(sp)); } catch (e) {}
   conn.send({ cid, type: 'seed', spec: sp });
+  PENDING = sp; clearInterval(PTIMER); PTIMER = setInterval(() => { if (PENDING && conn && conn.open) conn.send({ cid, type: 'seed', spec: PENDING }); else if (!PENDING) clearInterval(PTIMER); }, 4000);
   $('sow').disabled = true; say('Envoi de votre graine…'); setTimeout(refresh, 3000);
 };
 $('motion').onclick = async () => { await askMotion(); setState(st); };
@@ -334,6 +352,27 @@ setInterval(() => { if (st === 'none' && spec.x != null) drawMap(); }, 120);
 
 /* ---- Vue en direct de sa propre plante ---- */
 const WEL = { t: -1e9, col: '#fff' };
+let PENDING = null, PTIMER = 0, ACC_T = -1e9;
+// souvenir : l'image de l'œuvre, votre plante telle que dessinée ici, son nom, le titre, la date
+function makeSouvenir(d) {
+  const im = new Image(); im.onload = () => {
+    const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+    g.fillStyle = '#05060a'; g.fillRect(0, 0, W, H);
+    const ih = Math.round(W * im.height / im.width); g.drawImage(im, 0, 0, W, ih);
+    const fadeG = g.createLinearGradient(0, ih - 120, 0, ih); fadeG.addColorStop(0, 'rgba(5,6,10,0)'); fadeG.addColorStop(1, '#05060a'); g.fillStyle = fadeG; g.fillRect(0, ih - 120, W, 120);
+    const lv = $('live'); try { const s = Math.min(620 / lv.width, 560 / lv.height), lw = lv.width * s, lh = lv.height * s; g.drawImage(lv, (W - lw) / 2, ih + 4, lw, lh); } catch (e) {}
+    const col = getComputedStyle(document.documentElement).getPropertyValue('--seed').trim() || '#ffe2a0';
+    const fit = (t, font, max) => { g.font = font; const m = g.measureText(t).width; if (m > max) g.font = font.replace(/(\d+)px/, (x, n) => Math.floor(n * max / m) + 'px'); };
+    g.textAlign = 'center'; g.fillStyle = '#f6eedd'; g.shadowColor = col; g.shadowBlur = 24;
+    fit(MYNAME || 'Ma plante', '400 104px Corinthia, "Cormorant Garamond", serif', W - 120); g.fillText(MYNAME || 'Ma plante', W / 2, H - 236); g.shadowBlur = 0;
+    const l1 = d.title + (d.artist ? ' — ' + d.artist : ''); g.fillStyle = 'rgba(243,234,216,.85)'; fit(l1, 'italic 300 40px "Cormorant Garamond", serif', W - 120); g.fillText(l1, W / 2, H - 172);
+    g.fillStyle = 'rgba(243,234,216,.6)'; const l2 = ['HERBA STELLARIS', d.date].filter(Boolean).join('  ·  ').toUpperCase(); fit(l2, '300 24px Inter, sans-serif', W - 120); g.fillText(l2, W / 2, H - 118);
+    if (d.venue) { fit(d.venue, '300 24px Inter, sans-serif', W - 120); g.fillText(d.venue, W / 2, H - 84); }
+    const l3 = 'a poussé sur la Lune, au site ' + d.site; fit(l3, 'italic 300 28px "Cormorant Garamond", serif', W - 120); g.fillText(l3, W / 2, H - 46);
+    const url = c.toDataURL('image/jpeg', .9); $('souvImg').src = url; $('souvDl').href = url; $('souv').classList.remove('hidden');
+    buzz([40, 40, 40]); setTimeout(() => $('souv').scrollIntoView({ behavior: 'smooth' }), 300);
+  }; im.src = d.img;
+}
 let MYNAME = ''; try { MYNAME = localStorage.getItem('herba-nom') || ''; } catch (e) {}
 const nameLine = () => MYNAME ? '<br><span style="display:inline-block;margin-top:8px;padding:5px 14px;border:1px solid var(--seed);border-radius:999px;font-size:17px;box-shadow:0 0 14px var(--seed)">« ' + MYNAME.replace(/</g, '&lt;') + ' »</span>' : '';
 let LIVE = null; const lcv = $('live'), lcx = lcv.getContext('2d'); const SM = { b: 0, m: 0, h: 0, g: 0, gl: 0, pu: 0 };
