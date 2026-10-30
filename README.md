@@ -82,6 +82,15 @@ surtout **Conclure la composition** : un toucher fait décoller la conclusion (d
 conservée d'elle-même environ 40 s plus tard, une fois la caméra revenue au-dessus de la salle. Il n'y a plus de fin au silence : la composition dure tant que tu ne la conclus pas
 (**E** au clavier fait de même ; *Arrêter et conserver* coupe sans conclusion).
 
+### Ton téléphone : écran de retour
+Tu joues dos à l'écran : le téléphone-capteur, posé face à toi, montre **en miniature l'image projetée** et l'état de la scène :
+temps, acte, tempo, accord, tonalité, note, graines du public (et celles en chute), zoom, niveau, repères, « conclusion possible ».
+Il garde le démarrage, la conclusion et la réalisation. Tourné en paysage, il n'affiche que l'essentiel.
+
+### Le mode répétition
+**Répéter** (accueil ou téléphone) lance une composition **qui n'enregistre rien**. Depuis le téléphone : **Poser un repère** (noté avec
+son minutage, utile pour retrouver un passage), **Recommencer** (deux touchers) pour repartir aussitôt. À la fin, l'accueil rappelle les repères posés.
+
 ### Fenêtre de projection et régie
 L'image seule s'ouvre dans une fenêtre à placer sur le projecteur (touche F ou double-clic dedans pour le plein écran). La fenêtre
 principale devient la **régie** : aperçu, temps, phrase, plantes, Soleil, niveau, dynamique, plan, images par seconde, source, public,

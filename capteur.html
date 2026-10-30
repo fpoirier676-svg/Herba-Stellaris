@@ -41,6 +41,15 @@
   .epi { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:21px; line-height:1.4; text-align:center; margin:14px 4px 4px; }
   .note { color:var(--faint); font-size:12px; line-height:1.65; }
   .hidden { display:none !important; }
+  .vid { position:relative; aspect-ratio:16/9; background:#000; border:1px solid var(--line); overflow:hidden; }
+  .vid video { width:100%; height:100%; object-fit:contain; display:block; }
+  #rvMsg { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--faint); font-size:12px; letter-spacing:.1em; pointer-events:none; }
+  .sc { display:grid; grid-template-columns:repeat(3,1fr); gap:10px 8px; margin-top:12px; }
+  .sc div { font-family:'Cormorant Garamond',serif; font-size:22px; line-height:1.1; text-align:center; }
+  .sc div span { display:block; font-family:Inter,sans-serif; font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--faint); margin-bottom:3px; }
+  .lvl { height:5px; background:rgba(233,228,218,.1); margin-top:12px; } .lvl i { display:block; height:100%; width:0; background:linear-gradient(90deg,#9fe3c8,#e9e4da 70%,#e8b98a); transition:width .2s; }
+  body.scene h1, body.scene .role { display:none; }
+  @media (orientation:landscape) { body { padding-top:10px; } h1, .role { display:none; } }
   button.conclude { margin-top:12px; padding:30px 10px; font-size:15px; letter-spacing:.2em; border-color:#e8c98a; color:#fff3dc;
     background:radial-gradient(ellipse at 50% 0%, rgba(232,201,138,.28), rgba(232,201,138,.04) 70%); box-shadow:0 0 30px rgba(232,201,138,.18); }
   button.conclude:disabled { opacity:.35; box-shadow:none; }
@@ -74,12 +83,22 @@
     <p class="note" id="hint">Place le téléphone près de la source. Si les barres rouges s’allument, éloigne‑le un peu.</p>
   </div>
 
+  <div class="card hidden" id="retour">
+    <div class="lbl">Écran de retour — ce que voit le public</div>
+    <div class="vid"><video id="rv" muted playsinline autoplay></video><div id="rvMsg">Image en attente…</div></div>
+    <div class="sc" id="sc"></div>
+    <div class="lvl"><i id="scLvl"></i></div>
+    <div class="row2" id="repBtns"><button id="rMark">Poser un repère</button><button id="rRestart" class="hidden">Recommencer</button></div>
+    <div class="note" id="scMsg" style="text-align:center;margin-top:6px"></div>
+  </div>
+
   <div class="card hidden" id="remote">
     <div class="lbl">Herba Stellaris</div>
     <div class="time" id="rTime">—</div>
     <div class="site" id="rSite"></div>
     <p class="epi hidden" id="epi">Cette œuvre fait maintenant partie de votre présent passé sur&nbsp;la&nbsp;Lune</p>
     <button class="big" id="rStart">Lancer la composition</button>
+    <button id="rStartRep">Répéter (sans enregistrer)</button>
     <button class="big conclude" id="rConclude" disabled>Conclure la composition</button>
     <div class="note" id="rCon" style="text-align:center;margin-top:6px"></div>
     <div class="row2" style="margin-top:14px"><button id="rFinish">Arrêter et conserver</button><button id="rDiscard">Abandonner</button></div>
@@ -154,6 +173,11 @@ function connect() {
   if (!peer || peer.destroyed) {
     peer = new Peer();
     peer.on('open', () => { retry = 0; dial(); });
+    peer.on('call', c => {                                   // l'ordinateur envoie la miniature de l'image projetée
+      if (!c.metadata || c.metadata.role !== 'retour') return;
+      c.answer(); c.on('stream', st => { const v = $('rv'); v.srcObject = st; v.play().catch(() => {}); $('rvMsg').textContent = ''; });
+      c.on('close', () => { $('rvMsg').textContent = 'Image interrompue…'; });
+    });
     peer.on('disconnected', () => { if (!peer.destroyed) setTimeout(() => peer.reconnect(), 1000); });
     peer.on('error', e => {
       if (e.type === 'peer-unavailable') state('Herba Stellaris ne répond pas : vérifie que la page d’accueil d’Herba Stellaris est ouverte sur l’ordinateur, puis rescanne le QR code.', 'err');
@@ -199,12 +223,22 @@ async function tuneSender(pc) {                  // priorité haute et débit g�
 const mmss = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(Math.floor(s % 60)).padStart(2, '0');
 function onStatus(m) {
   if (!m || typeof m !== 'object') return;
+  $('retour').classList.remove('hidden'); document.body.classList.add('scene');
+  const S = m.scene;
+  if (S) {
+    const cell = (k, v) => `<div><span>${k}</span>${v || '—'}</div>`;
+    $('sc').innerHTML = cell('Temps', mmss(m.t || 0)) + cell('Acte', S.intro ? 'Voyage' : S.act) + cell('Tempo', S.bpm ? S.bpm + ' bpm' : '') + cell('Accord', S.chord) + cell('Tonalité', S.key) + cell('Note', S.note) +
+      cell('Graines', S.seeds + (S.falling ? ' · ' + S.falling + ' en chute' : '')) + cell('Zoom', S.zoom) + cell('Repères', S.marks ? S.marks + ' · ' + mmss(S.last) : '');
+    $('scLvl').style.width = Math.round(Math.min(1, S.lvl) * 100) + '%';
+    $('scMsg').textContent = m.fin === 'on' ? 'La conclusion décolle…' : m.fin === 'ready' ? (S.rep ? 'Répétition — rien n’est enregistré' : 'Conclusion possible') : S.intro ? 'Voyage vers la Lune…' : '';
+    $('rRestart').classList.toggle('hidden', !S.rep); $('rMark').disabled = false;
+  } else { $('sc').innerHTML = '<div style="grid-column:1/-1;font-size:17px;color:var(--dim)">' + (m.mode === 'idle' && m.epi ? 'Œuvre terminée' : 'Prêt — en attente de la composition') + '</div>'; $('scLvl').style.width = '0%'; $('scMsg').textContent = ''; $('rRestart').classList.add('hidden'); $('rMark').disabled = true; }
   const live = m.mode === 'live';
   $('rTime').textContent = live ? '● ' + mmss(m.t || 0) : m.mode === 'replay' ? '▶ relecture' : m.mode === 'hd' ? 'Rendu HD en cours' : 'Prêt';
   $('epi').classList.toggle('hidden', !m.epi);
   $('rTime').style.color = live ? 'var(--rec)' : '';
   $('rSite').textContent = m.site ? m.site + (m.plants ? ' · ' + m.plants + ' spécimens' : '') : '';
-  $('rStart').disabled = !(m.mode === 'intro' || m.mode === 'idle');
+  $('rStart').disabled = $('rStartRep').disabled = !(m.mode === 'intro' || m.mode === 'idle'); $('rStartRep').classList.toggle('hidden', live);
   $('rFinish').disabled = $('rDiscard').disabled = !live;
   const cb = $('rConclude'); cb.classList.toggle('hidden', !live); $('rStart').classList.toggle('hidden', live);
   cb.disabled = m.fin !== 'ready'; cb.classList.toggle('on', m.fin === 'on');
@@ -217,6 +251,10 @@ $('rAube').onclick = () => send('aube'); $('rStage').onclick = () => send('stage
 let zLast = 0; $('rZoom').addEventListener('input', e => { const v = +e.target.value, now = performance.now(); $('rZv').textContent = v < .01 ? 'sol' : v < .72 ? 'au-dessus du jardin' : 'orbite'; if (now - zLast > 40 || v === 0 || v === 1) { zLast = now; if (conn && conn.open) conn.send({ cmd: 'zoom', v }); } });
 $('rZoom').addEventListener('change', e => { if (conn && conn.open) conn.send({ cmd: 'zoom', v: +e.target.value }); });
 $('rStart').onclick = () => send('start');
+$('rStartRep').onclick = () => send('start-rep');
+$('rMark').onclick = () => { send('mark'); try { navigator.vibrate && navigator.vibrate(30); } catch (e) {} };
+$('rRestart').onclick = () => { if (confirmTap2($('rRestart'), 'Recommencer')) send('restart'); };
+function confirmTap2(b, label) { if (b.dataset.armed) { b.dataset.armed = ''; b.textContent = label; return true; } b.dataset.armed = 1; b.textContent = 'Confirmer'; setTimeout(() => { b.dataset.armed = ''; b.textContent = label; }, 3000); return false; }
 $('rFinish').onclick = () => send('finish');
 $('rConclude').onclick = () => { send('conclure'); $('rConclude').disabled = true; $('rConclude').textContent = 'La conclusion décolle…'; try { navigator.vibrate && navigator.vibrate(60); } catch (e) {} };
 $('rDiscard').onclick = () => { if (confirmTap($('rDiscard'))) send('discard'); };

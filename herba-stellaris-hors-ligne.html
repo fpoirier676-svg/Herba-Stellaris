@@ -2620,7 +2620,7 @@ var qrcode = function() {
     </div>
    </section>
   </div>
-  <div class="row go"><button class="primary" id="btnGo">Commencer la composition</button><button id="btnGal1">Galerie des créations</button></div>
+  <div class="row go"><button class="primary" id="btnGo">Commencer la composition</button><button id="btnRep" title="Jouer sans rien enregistrer ; recommencer depuis le téléphone">Répéter</button><button id="btnGal1">Galerie des créations</button></div>
   <div id="status"></div>
   <div class="xnote help">Pendant la composition, l’écran reste vide de toute commande. H affiche ou masque les commandes · E lance le final · A lève le Soleil · 1 à 9 changent de plan · le bouton « Conclure » du téléphone-capteur (ou E) fait décoller la conclusion, puis l’œuvre est conservée.</div>
  </div>
@@ -5139,7 +5139,7 @@ function startWorld(seed, startMs, intro, dawn) { world = buildWorld(seed, start
 
 async function startLive(kind, file) {
   const seed = (crypto.getRandomValues(new Uint32Array(1))[0]) >>> 0;
-  setTick(LIVE_TICK); startWorld(seed, Date.now(), true, !S.cycle); frames = []; recEvents = []; LIVE_EV.length = 0; PUB.clients.clear(); ZM.sent = 0; ZM.sentT = 0; sim.manualEnd = true; world.venue = { ...S.venue }; sim.lat = S.latency / 1000; sim.predict = true;
+  setTick(LIVE_TICK); startWorld(seed, Date.now(), true, !S.cycle); frames = []; recEvents = []; LIVE_EV.length = 0; LIVE_MARKS.length = 0; PUB.clients.clear(); ZM.sent = 0; ZM.sentT = 0; sim.manualEnd = true; world.venue = { ...S.venue }; sim.lat = S.latency / 1000; sim.predict = true;
   if (kind === 'mic') await AE.useMic(); else if (kind === 'phone') await AE.useRemote(PH.stream); else await AE.useFile(file);
   liveT0 = AE.ctx.currentTime; AE.silentFor = 0; AE.heard = 0; AE.silStart = null; AE.lastNow = 0;
   if (AE.el) AE.el.onended = () => { if (mode === 'live') finishLive(true); };
@@ -5153,6 +5153,7 @@ async function finishLive(save) {
   if (mode !== 'live') return;
   mode = 'idle'; setUI(); keepAwake(false); if (uiHidden && !S.stage) toggleUI();
   const audio = await AE.finishRecording(); AE.stop();
+  if (S.rehearsal) { mode = 'intro'; setUI(); status('Répétition terminée : rien n’a été enregistré.' + (LIVE_MARKS.length ? ' Repères posés : ' + LIVE_MARKS.map(mmss).join(', ') + '.' : '')); sendStatus(); return; }
   if (!save) return;
   const thumb = await new Promise(res => wantThumb = res);
   const rec = {
@@ -5541,7 +5542,9 @@ requestAnimationFrame(function testLoop() {                    // démarre à la
 });
 $('fileLive').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; S.file = f; $('fileName').textContent = f.name; status(''); });
 $('btnPubH').addEventListener('click', () => togglePublic());
-$('btnGo').addEventListener('click', async () => {
+$('btnRep').addEventListener('click', () => { S.rehearsal = true; startFromHome(); });
+$('btnGo').addEventListener('click', () => { S.rehearsal = false; startFromHome(); });
+async function startFromHome() {
   status(''); testStop();
   try {
     if (S.src === 'phone') { if (!PH.stream) { status('Relie d’abord le téléphone (étape 1) : son micro doit être actif.'); return; } await startLive('phone'); }
@@ -5551,7 +5554,7 @@ $('btnGo').addEventListener('click', async () => {
       await startLive('mic');
     }
   } catch (e) { mode = 'intro'; setUI(); status(e.name === 'NotAllowedError' ? 'Accès au micro refusé. Autorise-le via l’icône à gauche de l’adresse, puis réessaie.' : 'Impossible de démarrer (' + (e.message || e.name) + ').'); }
-});
+}
 setTimeout(() => setSrc(S.src), 0);
 try { S.names = localStorage.getItem('herba-noms') !== '0'; } catch (e) { S.names = true; }
 setTimeout(() => { $('names').checked = S.names; $('names').addEventListener('change', e => { S.names = e.target.checked; try { localStorage.setItem('herba-noms', S.names ? '1' : '0'); } catch (er) {} }); }, 0);
@@ -5753,7 +5756,7 @@ function ensurePeer(onOpen) {
     if (PH.conn) { try { PH.conn.close(); } catch (e) {} }
     PH.conn = c;
     c.on('data', d => { if (d && d.cmd === 'zoom') { setZoom(+d.v, 'téléphone'); return; } phoneCommand(d && d.cmd); });
-    c.on('open', () => { sendStatus(); if (!PH.stream) pState('Téléphone relié comme télécommande.', 'ok'); });
+    c.on('open', () => { sendStatus(); if (!PH.stream) pState('Téléphone relié comme télécommande.', 'ok'); setTimeout(() => startRetour(c.peer), 600); });
   });
   PH.peer.on('disconnected', () => { if (!PH.peer.destroyed) setTimeout(() => PH.peer.reconnect(), 1500); });
   PH.peer.on('error', e => {
@@ -5877,9 +5880,13 @@ function phoneMeter() {
   requestAnimationFrame(phoneMeter);
 }
 phoneMeter();
+function tempoBPM() { const bt = sim && sim.beats; if (!bt || bt.length < 5) return 0; const iv = []; for (let i = 1; i < bt.length; i++) iv.push(bt[i] - bt[i - 1]); iv.sort((a, b) => a - b); const per = iv[iv.length >> 1]; return per > .25 && per < 1.6 && sim.t - bt[bt.length - 1] < 4 ? Math.round(60 / per) : 0; }
 function sendStatus() {
   if (!PH.conn || !PH.conn.open) return;
-  try { PH.conn.send({ mode, t: mode === 'live' ? liveTime() : 0, site: world ? world.name : '', plants: sim ? sim.plants.length : 0, epi: !!epiShownAt, fin: mode !== 'live' ? 'none' : !sim.introDone ? 'wait' : sim.finale ? 'on' : 'ready', finLeft: mode === 'live' && sim.finale ? Math.max(0, Math.ceil(FINALE_LEN + FINALE_HOLD - (sim.t - sim.finaleT0))) : 0 }); } catch (e) {}
+  const live = mode === 'live' && sim, pubs = sim ? [...sim.seeds.values()] : [];
+  const scene = live ? { act: gardenStage(), chord: GT.chordName || '', key: GT.keyName || '', note: GT.note ? NOTE_NAMES[((GT.note.m0 % 12) + 12) % 12] + (Math.floor(GT.note.m0 / 12) - 1) : '', bpm: tempoBPM(), lvl: +(sim.loud || 0).toFixed(2),
+    seeds: pubs.length, falling: pubs.filter(q => q.state === 'fall').length, zoom: zoomLabel(ZM.v), intro: !sim.introDone, rep: !!S.rehearsal, marks: LIVE_MARKS.length, last: LIVE_MARKS.length ? LIVE_MARKS[LIVE_MARKS.length - 1] : 0 } : null;
+  try { PH.conn.send({ scene, rep: !!S.rehearsal, mode, t: mode === 'live' ? liveTime() : 0, site: world ? world.name : '', plants: sim ? sim.plants.length : 0, epi: !!epiShownAt, fin: mode !== 'live' ? 'none' : !sim.introDone ? 'wait' : sim.finale ? 'on' : 'ready', finLeft: mode === 'live' && sim.finale ? Math.max(0, Math.ceil(FINALE_LEN + FINALE_HOLD - (sim.t - sim.finaleT0))) : 0 }); } catch (e) {}
 }
 async function phoneCommand(cmd) {
   if (cmd === 'start' && (mode === 'intro' || mode === 'idle')) { closeGallery(); if (mode === 'idle') { mode = 'intro'; setUI(); } $('btnGo').click(); }
@@ -5890,7 +5897,28 @@ async function phoneCommand(cmd) {
   else if (cmd === 'public') togglePublic();
   else if (typeof cmd === 'string' && /^shot[1-9]$/.test(cmd) && mode === 'live') PEND.shot = +cmd[4];
   else if (cmd === 'discard' && mode === 'live') finishLive(false);
+  else if (cmd === 'mark' && mode === 'live') { const tt = Math.round(liveTime()); LIVE_MARKS.push(tt); LIVE_EV.push({ type: 'mark', n: LIVE_MARKS.length }); }   // repère posé depuis la scène
+  else if (cmd === 'restart' && mode === 'live' && S.rehearsal) { await finishLive(false); mode = 'intro'; setUI(); S.rehearsal = true; $('btnRep').click(); }
+  else if (cmd === 'start-rep' && (mode === 'intro' || mode === 'idle')) { closeGallery(); if (mode === 'idle') { mode = 'intro'; setUI(); } $('btnRep').click(); }
   sendStatus();
+}
+const LIVE_MARKS = [];
+// écran de retour : une miniature de l'image projetée, envoyée en vidéo au téléphone du musicien
+const RET = { cv: document.createElement('canvas'), call: null, peer: null };
+RET.cv.width = 640; RET.cv.height = 360; RET.cx = RET.cv.getContext('2d');
+function startRetour(pid) {
+  try {
+    if (RET.call) { try { RET.call.close(); } catch (e) {} RET.call = null; }
+    RET.cx.fillStyle = '#000'; RET.cx.fillRect(0, 0, 640, 360);
+    RET.stream = RET.stream || RET.cv.captureStream(15); RET.peer = pid;
+    RET.call = PH.peer.call(pid, RET.stream, { metadata: { role: 'retour' } });
+    if (RET.call) RET.call.on('close', () => { RET.call = null; });
+  } catch (e) {}
+}
+function drawRetour() {
+  if (!RET.call || frameN % 4) return;
+  const w = canvas.width, h = canvas.height, k = Math.min(640 / w, 360 / h), dw = w * k, dh = h * k;
+  try { RET.cx.fillStyle = '#000'; RET.cx.fillRect(0, 0, 640, 360); RET.cx.drawImage(canvas, (640 - dw) / 2, (360 - dh) / 2, dw, dh); } catch (e) {}
 }
 $('pClose').addEventListener('click', () => $('phoneBox').classList.add('hidden'));
 $('pGo').addEventListener('click', async () => { if (!PH.stream) return; $('phoneBox').classList.add('hidden'); try { await startLive('phone'); } catch (e) { $('pMsg').textContent = 'Impossible de démarrer : ' + e.message; } });
@@ -6318,7 +6346,7 @@ function advance(dt) {
     }
     renderT = Math.max(sim.t, T);
     const finEl2 = sim.finale ? sim.t - sim.finaleT0 : -1;
-    $('rec').innerHTML = `<span class="dot"></span>Composition ${mmss(T)}${finEl2 >= 0 ? ' · conclusion' : ''}`;
+    $('rec').innerHTML = `<span class="dot"></span>${S.rehearsal ? 'Répétition' : 'Composition'} ${mmss(T)}${finEl2 >= 0 ? ' · conclusion' : ''}`;
     if (finEl2 >= FINALE_LEN + FINALE_HOLD) finishLive(true);      // la conclusion décolle, monte en orbite, puis l'œuvre est conservée
   } else if (mode === 'replay' || mode === 'export') {
     const T = replayTime();
@@ -6589,7 +6617,7 @@ function frame() {
       cv.getContext('2d').drawImage(canvas, 0, (canvas.height - sh) / 2, sw, sh, 0, 0, tw, th);
       const r = wantThumb; wantThumb = null; r(cv.toDataURL('image/jpeg', .85));
     }
-    if (!ctxLost) { renderNames(); renderInstruments(dt); }
+    if (!ctxLost) { renderNames(); renderInstruments(dt); drawRetour(); }
   } else clock.getDelta();
   lastFrameT = performance.now(); frameDur += (lastFrameT - fs0 - frameDur) * .1;
   schedule();
