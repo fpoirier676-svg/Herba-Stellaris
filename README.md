@@ -196,6 +196,19 @@ En plus des harmoniques, notes étouffées, percussions sur la caisse, glissés,
 Ces effets sont calculés à partir de l'empreinte, donc rejoués à l'identique. Les œuvres enregistrées avant leur arrivée gardent
 leur rendu d'origine. Les seuils seront affinés pendant la séance d'écoute.
 
+## Les cinq mondes
+Dans la fiche de composition, **Monde** choisit la couleur et la matière de toute l'image :
+- **Organique** : chaud et naturel, poussière dorée qui flotte.
+- **Espace** : bleu-violet profond, reflets bleus, étoiles immobiles.
+- **Masse** : lourd, sombre et désaturé, vignettage marqué, cendre qui tombe lentement.
+- **Eau** : turquoise, la poussière ondule comme en suspension.
+- **Feu** : ambre et rouge, lumière ardente, braises qui montent.
+
+Chaque monde règle l'étalonnage, la saturation, l'éclat (bloom), la couleur des **reflets anamorphiques** (les hautes lumières
+s'étirent à l'horizontale, comme à travers une optique de cinéma) et la **poussière de lumière** qui flotte devant la caméra,
+plus vive avec les aigus et sous le soleil. Dans l'espace, le monde se fait discret : la Terre et la Lune gardent leurs vraies couleurs.
+En qualité *Fluide*, les reflets sont coupés pour économiser la carte graphique. Le monde est enregistré avec l'œuvre.
+
 ## Les graines du public
 
 **Graines du public** (carte 3 de l'accueil, Q, la régie ou le téléphone-capteur) affiche un QR code. Chaque spectateur compose sa graine

@@ -2571,7 +2571,7 @@ var qrcode = function() {
   <div class="prep">
    <section class="card fiche">
     <h5><b>✦</b> La composition</h5>
-    <div class="frow"><input id="fTitle" class="vin" placeholder="Titre de l’œuvre (vide : le nom du site lunaire)" maxlength="60"><input id="fSub" class="vin" placeholder="Sous-titre ou dédicace (facultatif)" maxlength="80"><input id="fArtist" class="vin" placeholder="Interprète" maxlength="50"></div>
+    <div class="frow"><input id="fTitle" class="vin" placeholder="Titre de l’œuvre (vide : le nom du site lunaire)" maxlength="60"><input id="fSub" class="vin" placeholder="Sous-titre ou dédicace (facultatif)" maxlength="80"><input id="fArtist" class="vin" placeholder="Interprète" maxlength="50"><select id="fMonde" class="vin" style="flex:0 0 auto;min-width:210px" title="La couleur et la matière de toute l’image"><option value="organique">Monde : Organique</option><option value="espace">Monde : Espace</option><option value="masse">Monde : Masse</option><option value="eau">Monde : Eau</option><option value="feu">Monde : Feu</option></select></div>
     <div class="frow chks"><label class="chk"><input type="checkbox" id="fCard"> Carton de titre</label><label class="chk"><input type="checkbox" id="fActs"> Cartons d’actes</label><label class="chk"><input type="checkbox" id="fCred"> Générique final avec les noms du public</label><label class="chk"><input type="checkbox" id="fAttract"> Écran d’attente sur la projection</label></div>
    </section>
    <section class="card">
@@ -3232,10 +3232,10 @@ composer.addPass(fxaa);
 const cine = new ShaderPass({
   uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uAberr: { value: .0012 }, uGrain: { value: .05 }, uVig: { value: .85 },
     uBars: { value: 1 }, uAspect: { value: innerWidth / innerHeight }, uFade: { value: 0 }, uSat: { value: 1.22 },
-    uTexel: { value: new THREE.Vector2(1 / 1920, 1 / 1080) }, uSharp: { value: .32 }, uGain: { value: new THREE.Vector3(1, 1, 1) }, uLift: { value: new THREE.Vector3(0, 0, 0) } },
+    uTexel: { value: new THREE.Vector2(1 / 1920, 1 / 1080) }, uSharp: { value: .32 }, uFlare: { value: 0 }, uFlareC: { value: new THREE.Vector3(.6, .75, 1) }, uGain: { value: new THREE.Vector3(1, 1, 1) }, uLift: { value: new THREE.Vector3(0, 0, 0) } },
   vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uTime,uAberr,uGrain,uVig,uBars,uAspect,uFade,uSat,uPanelA,uMsgA,uSharp; uniform vec2 uTexel; uniform vec3 uGain,uLift; uniform vec4 uFlash; uniform sampler2D tPanel,tMsg; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uTime,uAberr,uGrain,uVig,uBars,uAspect,uFade,uSat,uPanelA,uMsgA,uSharp,uFlare; uniform vec3 uFlareC; uniform vec2 uTexel; uniform vec3 uGain,uLift; uniform vec4 uFlash; uniform sampler2D tPanel,tMsg; varying vec2 vUv;
     float hash(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }
     void main(){
       vec2 uv=vUv, c=uv-.5; vec2 ca=c*vec2(uAspect,1.);
@@ -3243,7 +3243,12 @@ const cine = new ShaderPass({
       vec2 off=c*uAberr*(.3+r2*2.5);
       vec3 col=vec3(texture2D(tDiffuse,uv+off).r,texture2D(tDiffuse,uv).g,texture2D(tDiffuse,uv-off).b);
       { vec3 nb=(texture2D(tDiffuse,uv+vec2(uTexel.x,0.)).rgb+texture2D(tDiffuse,uv-vec2(uTexel.x,0.)).rgb+texture2D(tDiffuse,uv+vec2(0.,uTexel.y)).rgb+texture2D(tDiffuse,uv-vec2(0.,uTexel.y)).rgb)*.25;
-        col=max(col+(col-nb)*uSharp,0.); }                                            // accentuation douce : la haute définition se voit
+        col=max(col+(col-nb)*uSharp,0.); }
+      if(uFlare>.001){ vec3 fl=vec3(0.);                                                // reflet anamorphique : les hautes lumières s'étirent à l'horizontale, comme à travers une optique de cinéma
+        for(int i=1;i<=8;i++){ float d=float(i*i)*.0031/uAspect*1.78, w=exp(-float(i)*.36);
+          vec3 a=texture2D(tDiffuse,uv+vec2(d,0.)).rgb, b=texture2D(tDiffuse,uv-vec2(d,0.)).rgb;
+          fl+=vec3((max(dot(a,vec3(.333))-.78,0.)+max(dot(b,vec3(.333))-.78,0.))*w); }
+        col+=uFlareC*fl*uFlare; }                                            // accentuation douce : la haute définition se voit
       col=col*uGain+uLift*(1.-col);                                                      // étalonnage du moment (nuit d'argent, aube d'ambre, climax d'or)
       { vec3 x=max(col-.78,0.); col=min(col,.78)+(1.-exp(-x*3.2))*.22; }               // épaule douce : plus de blanc brûlé
       col*=mix(1.,smoothstep(1.2,.12,r2),uVig);
@@ -6668,6 +6673,7 @@ function updateVisuals(dt, withUI) {
     const sp = inSpace ? 1 : 0;
     G.set(1 + .06 * dawn + .01 * gold - .05 * night, 1 + .01 * dawn + .005 * gold - .01 * night, 1 - .08 * dawn - .005 * gold + .07 * night).lerp(new THREE.Vector3(1, 1, 1), sp);
     Lf.set(.006 * dawn, .004 * night, .016 * night + .004).multiplyScalar(1 - sp); cine.uniforms.uSharp.value = S.quality === 'fluide' ? .18 : .32; }
+  applyLook(f, inSpace, vh);
   cine.uniforms.uTime.value = renderT; cine.uniforms.uGrain.value = S.grain; cine.uniforms.uBars.value = S.scope && S.output === 'cinema' ? 1 : 0;
 
   if (withUI) {
@@ -6802,6 +6808,44 @@ let frameN = 0, lastFrameT = 0, frameDur = 16;
 
 
 
+
+/* ---- Les cinq mondes : couleur et matière de toute l'image, reflets anamorphiques, poussière de lumière ---- */
+const WORLDS = {
+  organique: { gain: [1.03, 1.01, .96], lift: [.006, .004, 0], sat: 1, bloom: 1, flare: [1, .86, .62], flareK: .45, dust: [1, .9, .7], dustK: .7, vel: [.05, .04, .02], sway: .6 },
+  espace: { gain: [.8, .93, 1.26], lift: [.004, .01, .05], sat: .85, bloom: 1.15, flare: [.5, .72, 1], flareK: .9, dust: [.72, .84, 1], dustK: .85, vel: [0, 0, 0], sway: .15 },
+  masse: { gain: [.9, .86, .82], lift: [.03, .026, .022], sat: .45, bloom: .65, flare: [.92, .82, .72], flareK: .2, dust: [.78, .74, .7], dustK: 1.2, vel: [.02, -.25, 0], sway: .25, vig: 1.35 },
+  eau: { gain: [.76, 1.05, 1.13], lift: [0, .035, .045], sat: 1.08, bloom: 1.08, flare: [.45, 1, .95], flareK: .65, dust: [.6, 1, .95], dustK: .85, vel: [.04, .03, 0], sway: 1.3 },
+  feu: { gain: [1.24, .93, .72], lift: [.04, .01, 0], sat: 1.18, bloom: 1.25, flare: [1, .58, .28], flareK: .8, dust: [1, .55, .2], dustK: 1.2, vel: [0, .6, 0], sway: .7 },
+};
+const DUST = (() => {
+  const N = 900, g = new THREE.BufferGeometry(), P = new Float32Array(N * 3), A = new Float32Array(N), h = x => { const v = Math.sin(x) * 43758.5453; return v - Math.floor(v); };
+  for (let i = 0; i < N; i++) { P[i * 3] = h(i * 12.9898); P[i * 3 + 1] = h(i * 78.233 + 1.3); P[i * 3 + 2] = h(i * 39.425 + 7.1); A[i] = h(i * 93.989 + 3.7); }
+  g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('seed', new THREE.BufferAttribute(A, 1));
+  const m = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    uniforms: { uT: { value: 0 }, uC: { value: new THREE.Vector3() }, uBox: { value: 26 }, uVel: { value: new THREE.Vector3() }, uSway: { value: .5 }, uCol: { value: new THREE.Color(1, .9, .7) }, uI: { value: 0 }, uPx: { value: 1 } },
+    vertexShader: `attribute float seed; uniform float uT,uBox,uSway,uPx; uniform vec3 uC,uVel; varying float vA;
+      void main(){ vec3 q=position*uBox+uVel*uT*(.6+seed*.8)+vec3(sin(uT*.31+seed*6.3),sin(uT*.23+seed*4.1)*.4,cos(uT*.27+seed*5.2))*uSway;
+        vec3 o=uC-vec3(uBox*.5); q=mod(q-o,uBox)+o; vec4 mv=modelViewMatrix*vec4(q,1.); float d=-mv.z;
+        vA=smoothstep(.8,3.,d)*(1.-smoothstep(uBox*.35,uBox*.5,d))*(.55+.45*sin(uT*(1.3+seed*2.)+seed*40.));
+        gl_PointSize=uPx*(2.+seed*3.6)*clamp(14./d,.4,5.); gl_Position=projectionMatrix*mv; }`,
+    fragmentShader: `uniform vec3 uCol; uniform float uI; varying float vA; void main(){ vec2 c=gl_PointCoord-.5; float a=exp(-dot(c,c)*14.)*vA*uI; if(a<.004) discard; gl_FragColor=vec4(uCol*a,a); }` });
+  const pts = new THREE.Points(g, m); pts.frustumCulled = false; pts.renderOrder = 5; pts.visible = false; scene.add(pts); return { pts, m };
+})();
+const _fw = new THREE.Vector3();
+function applyLook(f, inSpace, vh) {
+  const on = sim && (sim.fx || 0) >= 8, L = on ? WORLDS[(world.fiche && world.fiche.monde) || 'organique'] || WORLDS.organique : null, U = cine.uniforms;
+  if (!L) { U.uFlare.value = 0; U.uSat.value = 1.22; U.uVig.value = .85; DUST.pts.visible = false; return; }
+  const k = inSpace ? .4 : 1;                                       // dans l'espace, le monde se fait discret : la Terre et la Lune gardent leurs vraies couleurs
+  U.uGain.value.x *= 1 + (L.gain[0] - 1) * k; U.uGain.value.y *= 1 + (L.gain[1] - 1) * k; U.uGain.value.z *= 1 + (L.gain[2] - 1) * k;
+  U.uLift.value.x += L.lift[0] * k; U.uLift.value.y += L.lift[1] * k; U.uLift.value.z += L.lift[2] * k;
+  U.uSat.value = 1.22 * (1 + (L.sat - 1) * k); U.uVig.value = .85 * (L.vig || 1); bloom.strength *= 1 + (L.bloom - 1) * k;
+  U.uFlare.value = S.quality === 'fluide' ? 0 : L.flareK * (.55 + .45 * (f.high || 0)); U.uFlareC.value.set(...L.flare);
+  // poussière de lumière : dans le jardin seulement, plus vive avec les aigus et sous le soleil
+  const night = CEL ? CEL.night : .5, I = inSpace ? 0 : 1.5 * L.dustK * (.3 + .85 * (f.high || 0)) * (.6 + .4 * (1 - night));
+  DUST.pts.visible = I > .01;
+  if (DUST.pts.visible) { const m = DUST.m.uniforms; camera.getWorldDirection(_fw); m.uC.value.copy(camera.position).addScaledVector(_fw, 9); m.uT.value = renderT; m.uVel.value.set(...L.vel); m.uSway.value = L.sway; m.uCol.value.setRGB(...L.dust); m.uI.value = I; m.uPx.value = vh / 1080; }
+}
+
 /* ---- Lumières de salle : Philips Hue, par le pont local (API REST). Les ampoules suivent l'image, en fondus lents ---- */
 const LUX = (() => { let v = {}; try { v = JSON.parse(localStorage.getItem('herba-hue') || '{}'); } catch (e) {} return { ip: v.ip || '', user: v.user || '', lights: v.lights || [], on: v.on !== false, max: v.max || .6, all: [], last: 0, busy: false, err: '', cols: null, smooth: null }; })();
 function luxSave() { try { localStorage.setItem('herba-hue', JSON.stringify({ ip: LUX.ip, user: LUX.user, lights: LUX.lights, on: LUX.on, max: LUX.max })); } catch (e) {} }
@@ -6875,7 +6919,7 @@ function luxEnd() { if (!LUX.on || !LUX.user || !LUX.lights.length) return; let 
 /* ---- Signatures du fingerstyle : tapping, slap, retour des motifs ----
    Calculées par la simulation à partir de l'empreinte (attaques, notes, hauteur) : rejouées à l'identique.
    Les seuils seront affinés pendant la séance d'écoute avec le musicien. */
-const FX_LEVEL = 6;     // niveau des effets des œuvres nouvelles ; les œuvres anciennes gardent leur rendu d'origine
+const FX_LEVEL = 8;     // niveau des effets des œuvres nouvelles ; les œuvres anciennes gardent leur rendu d'origine
 const TECH_FR = { harm: 'Harmonique', muted: 'Étouffé', percLo: 'Caisse grave', percHi: 'Caisse aiguë', slide: 'Glissé', strum: 'Rasgueado' };
 Sim.prototype.signatures = function (t, live, e, loud, r) {
   const G = this.g, n = live.length; if (!n) return;
@@ -6973,10 +7017,12 @@ function collStep(s) {
    DRAMATURGIE — fiche de composition, carton de titre, actes, générique, écran d'attente, QR du public
    Tout est dessiné dans l'image : visible sur la projection, et rejoué à l'identique (sauf le QR, propre au direct)
    ===================================================================== */
-const FICHE_DEF = { title: '', sub: '', artist: 'Fabien Poirier', card: true, acts: true, cred: true, attract: true };
+const FICHE_DEF = { title: '', sub: '', artist: 'Fabien Poirier', card: true, acts: true, cred: true, attract: true, monde: 'organique' };
 S.fiche = (() => { try { return { ...FICHE_DEF, ...JSON.parse(localStorage.getItem('herba-fiche') || '{}') }; } catch (e) { return { ...FICHE_DEF }; } })();
 try {
-  const F = S.fiche, map = { fTitle: 'title', fSub: 'sub', fArtist: 'artist' }, chk = { fCard: 'card', fActs: 'acts', fCred: 'cred', fAttract: 'attract' };
+  const F = S.fiche, map = { fTitle: 'title', fSub: 'sub', fArtist: 'artist' };
+  $('fMonde').value = F.monde || 'organique'; $('fMonde').addEventListener('change', e => { F.monde = e.target.value; try { localStorage.setItem('herba-fiche', JSON.stringify(F)); } catch (er) {} });
+  const map2 = map, chk = { fCard: 'card', fActs: 'acts', fCred: 'cred', fAttract: 'attract' };
   const save = () => { try { localStorage.setItem('herba-fiche', JSON.stringify(F)); } catch (e) {} };
   for (const id in map) { $(id).value = F[map[id]] || ''; $(id).addEventListener('input', e => { F[map[id]] = e.target.value.replace(/[\u0000-\u001f]/g, '').trim(); save(); }); }
   for (const id in chk) { $(id).checked = !!F[chk[id]]; $(id).addEventListener('change', e => { F[chk[id]] = e.target.checked; save(); }); }
