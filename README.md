@@ -196,6 +196,19 @@ En plus des harmoniques, notes étouffées, percussions sur la caisse, glissés,
 Ces effets sont calculés à partir de l'empreinte, donc rejoués à l'identique. Les œuvres enregistrées avant leur arrivée gardent
 leur rendu d'origine. Les seuils seront affinés pendant la séance d'écoute.
 
+## Après le spectacle
+Dans la galerie, chaque œuvre propose :
+- **Vidéo HD** : rendu image par image en 8K, 4K, Full HD ou **vertical 9:16** (1080 × 1920, sans bandes cinéma, pour les réseaux sociaux),
+  de **l'œuvre entière** ou d'un **extrait de 30 ou 60 s** : le sommet de l'œuvre, là où l'énergie jouée est la plus forte,
+  avec un fondu sonore d'une seconde à chaque bout.
+- **Affiche** : une image 1800 × 2700 (format 2:3, 30 × 45 cm à 150 ppp) avec le sommet de l'œuvre rendu en haute définition, le titre,
+  le sous-titre, l'interprète, le lieu, la date et le bilan du jardin.
+- **Carnet + MIDI** : un carnet de composition à ouvrir ou imprimer (durée, lieu, site lunaire, monde, sommet de l'œuvre, notes reconnues,
+  tessiture, notes les plus jouées, techniques, tonalités et accords dans le temps, repères posés, noms du public) et un **fichier MIDI**
+  des notes jouées, à une noire par seconde (60 battements par minute) pour garder les temps exacts.
+
+Le son enregistré est celui de l'entrée choisie : avec le GX-1 en USB, c'est le son de ton pédalier, effets compris.
+
 ## Les cinq mondes
 Dans la fiche de composition, **Monde** choisit la couleur et la matière de toute l'image :
 - **Organique** : chaud et naturel, poussière dorée qui flotte.

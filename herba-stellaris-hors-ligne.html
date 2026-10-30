@@ -2729,7 +2729,8 @@ var qrcode = function() {
     <div class="xsub" id="xTitle"></div>
     <div id="xForm">
       <p class="xnote">La création est rejouée image par image, hors temps réel, avec le détail maximal : même musique, même ciel, même film. En 8K, chaque image compte 33 millions de pixels — prévois de longues heures pour un morceau entier, et garde cet onglet au premier plan.</p>
-      <div class="xrow"><label>Résolution<select id="xRes"><option value="8k">8K UHD — 7680 × 4320</option><option value="4k">4K UHD — 3840 × 2160</option><option value="fhd">Full HD — 1920 × 1080</option></select></label>
+      <div class="xrow"><label>Résolution<select id="xRes"><option value="8k">8K UHD — 7680 × 4320</option><option value="4k">4K UHD — 3840 × 2160</option><option value="fhd">Full HD — 1920 × 1080</option><option value="vert">Vertical 9:16 — 1080 × 1920 (réseaux sociaux)</option></select></label>
+      <label>Durée<select id="xLen"><option value="0">L’œuvre entière</option><option value="60">Extrait de 60 s : le sommet de l’œuvre</option><option value="30">Extrait de 30 s : le sommet de l’œuvre</option></select></label>
       <label>Cadence<select id="xFps"><option value="24">24 i/s — cinéma</option><option value="30" selected>30 i/s</option><option value="60">60 i/s</option></select></label></div>
       <p class="xnote" id="xGpu"></p>
       <div class="row" style="justify-content:flex-start"><button class="primary" id="xGo">Lancer le rendu</button><button id="xClose">Fermer</button></div>
@@ -5201,7 +5202,7 @@ async function finishLive(save) {
   showEpilogue(rec);
 }
 function makeRec(audio, thumb) { return {
-    id: Date.now().toString(36) + '-' + sim.W.seed.toString(36), name: (world.fiche && world.fiche.title) || sim.W.name, fiche: world.fiche || null, fx: sim.fx || 0, date: new Date().toISOString(), seed: sim.W.seed, startUTC: sim.W.startMs,
+    id: Date.now().toString(36) + '-' + sim.W.seed.toString(36), name: (world.fiche && world.fiche.title) || sim.W.name, site: sim.W.name, fiche: world.fiche || null, fx: sim.fx || 0, date: new Date().toISOString(), seed: sim.W.seed, startUTC: sim.W.startMs,
     stride: FSTRIDE, tick: TICK, manualEnd: true, venue: world.venue, events: recEvents.slice(), lat: S.latency / 1000, tscale: sim.tscale, dawn: sim.dawn, publicSeeds: sim.pubN, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), varieties: new Set(sim.plants.map(p => p.var)).size, frames: new Float32Array(frames), audio, thumb,
   }; }
 /* ---- Sauvegarde de secours : toutes les 10 s pendant une composition ; reprise après un plantage ---- */
@@ -5703,12 +5704,14 @@ async function renderGallery() {
     c.innerHTML = `<div class="th" style="background-image:url('${rec.thumb || ''}')"></div>
       <div class="meta"><div class="nm"></div><div class="dt">Ciel du ${dateFR(sky)} · ${mmss(rec.duration)}${rec.lunarT ? ' · ' + durLunaire(rec.lunarT) + ' lunaires' : ''}<br>
       ${rec.plants} spécimens${rec.varieties ? ' · ' + rec.varieties + ' variétés' : ''} — ${speciesLine(sp)}</div></div>
-      <div class="acts"><button class="small" data-a="play">Rejouer</button><button class="small" data-a="hd">Vidéo 8K</button><button class="small" data-a="video">Vidéo écran</button><button class="small" data-a="json">Sauvegarde</button><button class="small" data-a="del">Supprimer</button></div>`;
+      <div class="acts"><button class="small" data-a="play">Rejouer</button><button class="small" data-a="hd">Vidéo HD</button><button class="small" data-a="video">Vidéo écran</button><button class="small" data-a="poster">Affiche</button><button class="small" data-a="carnet">Carnet + MIDI</button><button class="small" data-a="json">Sauvegarde</button><button class="small" data-a="del">Supprimer</button></div>`;
     c.querySelector('.nm').textContent = rec.name;
     c.querySelector('[data-a=play]').onclick = () => startReplay(rec, false);
     c.querySelector('[data-a=video]').onclick = () => startReplay(rec, true);
     c.querySelector('[data-a=hd]').onclick = () => openExport(rec);
     c.querySelector('[data-a=json]').onclick = () => exportJSON(rec);
+    c.querySelector('[data-a=poster]').onclick = () => makePoster(rec).catch(e => status('Affiche impossible : ' + e.message));
+    c.querySelector('[data-a=carnet]').onclick = () => { try { makeCarnet(rec); } catch (e) { status('Carnet impossible : ' + e.message); } };
     const del = c.querySelector('[data-a=del]');
     del.onclick = async () => { if (del.dataset.armed) { try { await DB.del(rec.id); } catch (e) {} memStore.delete(rec.id); renderGallery(); } else { del.dataset.armed = 1; del.textContent = 'Confirmer'; setTimeout(() => { del.dataset.armed = ''; del.textContent = 'Supprimer'; }, 3000); } };
     box.appendChild(c);
@@ -7201,7 +7204,7 @@ function schedule() { const id = ++loopTok; (PROJ && !PROJ.closed ? PROJ : windo
 /* =====================================================================
    11. HAUTE DÉFINITION — photo 8K, vidéo 8K calculée image par image
    ===================================================================== */
-const RES = { '8k': [7680, 4320, '8K UHD'], '4k': [3840, 2160, '4K UHD'], 'fhd': [1920, 1080, 'Full HD'] };
+const RES = { '8k': [7680, 4320, '8K UHD'], '4k': [3840, 2160, '4K UHD'], 'fhd': [1920, 1080, 'Full HD'], 'vert': [1080, 1920, 'Vertical 9:16'] };
 function gpuMax() { const gl = renderer.getContext(); return Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE), gl.getParameter(gl.MAX_RENDERBUFFER_SIZE), ...gl.getParameter(gl.MAX_VIEWPORT_DIMS)); }
 function setRenderSize(w, h) {
   renderer.setPixelRatio(1); renderer.setSize(w, h, false); composer.setPixelRatio(1); composer.setSize(w, h);
@@ -7215,6 +7218,16 @@ function restoreRenderSize() {
 function hdQuality(on) {                         // pendant un rendu HD : détail maximal, quelle que soit la qualité d'affichage
   setLOD(on ? 'haute' : QUALITY[S.quality].lod);
   dof.u.uTaps.value = on ? 56 : QUALITY[S.quality].taps; PU.uTSteps.value = on ? 48 : QUALITY[S.quality].steps;
+}
+// le sommet de l'œuvre : la fenêtre de LEN secondes où l'énergie jouée est la plus forte (hors voyage d'ouverture)
+function peakWindow(rec, LEN) {
+  const fr = rec.frames, st = rec.stride || 6, tk = rec.tick || 30, n = Math.floor(fr.length / st), W = Math.round(LEN * tk), dur = rec.duration || n / tk;
+  if (dur <= LEN + 2) return null;
+  const lo = Math.min(Math.round(28 * tk), Math.max(0, n - W)), hi = Math.max(lo, Math.min(n, Math.round((dur - 2) * tk)) - W);
+  const v = i => st > 6 ? fr[i * st + 6] : fr[i * st + 3];
+  let sum = 0; for (let i = lo; i < lo + W && i < n; i++) sum += v(i); let best = sum, at = lo;
+  for (let i = lo + 1; i <= hi; i++) { sum += v(i + W - 1) - v(i - 1); if (sum > best) { best = sum; at = i; } }
+  return [at / tk, at / tk + LEN];
 }
 function pickRes(key) {
   let [w, h] = RES[key]; const m = gpuMax();
@@ -7241,6 +7254,92 @@ async function takePhoto() {
 }
 function alert8k(m) { $('xMsg').textContent = m; $('exportBox').classList.remove('hidden'); $('xForm').classList.add('hidden'); $('xRun').classList.add('hidden'); }
 
+
+/* ---- Après le spectacle : carnet de composition, fichier MIDI des notes jouées, affiche ---- */
+// lecture de l'empreinte : notes, accords, tonalités, techniques, repères, graines du public
+function readRec(rec) {
+  const fr = rec.frames, st = rec.stride || 6, tk = rec.tick || 30, n = Math.floor(fr.length / st), out = { notes: [], chords: [], keys: [], tech: { harm: 0, muted: 0, perc: 0, slide: 0, strum: 0 } };
+  if (st < 16) return out;
+  let cur = null, lastChord = 0, lastKey = 0;
+  for (let i = 0; i < n; i++) {
+    const o = i * st, fl = Math.round(fr[o + 5]), t = i / tk, m = fr[o + 8], loud = fr[o + 6] || 0;
+    if (fl & 8192) out.tech.harm++; if (fl & 16384) out.tech.muted++; if (fl & (32768 | 65536)) out.tech.perc++; if (fl & 131072) out.tech.slide++; if (fl & 262144) out.tech.strum++;
+    if (cur && (m <= 0 || t - cur.t > 4)) { cur.d = t - cur.t; out.notes.push(cur); cur = null; }
+    if ((fl & 4096) && m > 0) { if (cur) { cur.d = t - cur.t; out.notes.push(cur); } cur = { t, m: Math.round(m), v: Math.round(clamp(40 + loud * 120, 20, 127)) }; }
+    const ch = Math.round(fr[o + 10]), ky = Math.round(fr[o + 11]);
+    if (ch && ch !== lastChord) { out.chords.push([t, NOTE_NAMES[(ch - 1) >> 4] + ' ' + CHORD_NAMES[(ch - 1) & 15]]); lastChord = ch; }
+    if (ky && ky !== lastKey) { out.keys.push([t, NOTE_NAMES[(ky - 1) >> 1] + ((ky - 1) & 1 ? ' mineur' : ' majeur')]); lastKey = ky; }
+  }
+  if (cur) { cur.d = Math.min(2, n / tk - cur.t); out.notes.push(cur); }
+  return out;
+}
+// MIDI de format 0, 960 tics par noire à 60 battements par minute : une seconde = une noire, les temps restent exacts
+function midiOf(notes, name) {
+  const ev = []; for (const x of notes) { ev.push([Math.round(x.t * 960), 0x90, x.m, x.v]); ev.push([Math.round((x.t + Math.max(.05, x.d)) * 960), 0x80, x.m, 0]); }
+  ev.sort((a, b) => a[0] - b[0] || (a[1] === 0x80 ? -1 : 1));
+  const b = [], vl = v => { const s = [v & 127]; while ((v >>= 7)) s.unshift((v & 127) | 128); b.push(...s); };
+  const nm = new TextEncoder().encode(name.slice(0, 60));
+  vl(0); b.push(0xff, 0x03); vl(nm.length); b.push(...nm);
+  vl(0); b.push(0xff, 0x51, 3, 0x0f, 0x42, 0x40);                       // 1 000 000 µs par noire
+  vl(0); b.push(0xc0, 24);                                               // guitare nylon
+  let last = 0; for (const [t, c, m, v] of ev) { vl(t - last); last = t; b.push(c, m, v); }
+  vl(0); b.push(0xff, 0x2f, 0);
+  const hd = [0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, 960 >> 8, 960 & 255], len = b.length;
+  return new Blob([new Uint8Array([...hd, 0x4d, 0x54, 0x72, 0x6b, len >>> 24, (len >> 16) & 255, (len >> 8) & 255, len & 255, ...b])], { type: 'audio/midi' });
+}
+function makeCarnet(rec) {
+  const R = readRec(rec), F = rec.fiche || {}, esc = x => String(x == null ? '' : x).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+  const pub = (rec.events || []).filter(e => e.type === 'seed').map(e => (e.spec && e.spec.name) || 'Graine ' + e.id), marks = (rec.events || []).filter(e => e.type === 'mark').map(e => e.k / (rec.tick || 30));
+  const pk = peakWindow(rec, Math.min(30, Math.max(8, (rec.duration || 60) / 6))), date = new Date(rec.date).toLocaleString('fr-CA', { dateStyle: 'long', timeStyle: 'short' });
+  const pcs = new Array(12).fill(0); for (const x of R.notes) pcs[((x.m % 12) + 12) % 12]++;
+  const top = pcs.map((n, i) => [n, NOTE_NAMES[i]]).sort((a, b) => b[0] - a[0]).slice(0, 5).filter(x => x[0]).map(x => x[1] + ' (' + x[0] + ')').join(', ');
+  const rng = R.notes.length ? [Math.min(...R.notes.map(x => x.m)), Math.max(...R.notes.map(x => x.m))].map(m => NOTE_NAMES[m % 12] + (Math.floor(m / 12) - 1)).join(' à ') : '—';
+  const row = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`, line = a => a.map(([t, v]) => `<span><b>${mmss(t)}</b> ${esc(v)}</span>`).join('');
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Carnet — ${esc(rec.name)}</title><style>body{font:15px/1.6 Georgia,serif;max-width:760px;margin:40px auto;padding:0 20px;color:#222}h1{font-weight:400;font-size:40px;margin:0}h2{font-weight:400;border-bottom:1px solid #ccc;margin-top:34px}.sub{color:#666;font-style:italic}table{border-collapse:collapse;width:100%}th{text-align:left;font-weight:400;color:#666;width:34%;padding:4px 0;vertical-align:top}td{padding:4px 0}.tl span{display:inline-block;margin:0 14px 4px 0}.tl b{font-family:monospace;font-weight:400;color:#888}img{width:100%;border-radius:6px;margin:18px 0}@media print{body{margin:0}}</style></head><body>
+<p class="sub">Herba Stellaris · carnet de composition</p><h1>${esc(rec.name)}</h1>${F.sub ? `<p class="sub">${esc(F.sub)}</p>` : ''}
+${rec.thumb ? `<img src="${rec.thumb}" alt="">` : ''}
+<table>${row('Interprète', esc(F.artist || '—'))}${row('Date', esc(date))}${row('Lieu', esc((rec.venue && rec.venue.name) || '—'))}${rec.site ? row('Site lunaire', esc(rec.site)) : ''}${row('Durée', mmss(rec.duration || 0))}${row('Monde', esc(F.monde || 'organique'))}${row('Flore', (rec.plants || 0) + ' végétaux, ' + (rec.varieties || 0) + ' variétés')}${row('Sommet de l’œuvre', pk ? mmss(pk[0]) + ' à ' + mmss(pk[1]) : '—')}</table>
+<h2>Le jeu</h2><table>${row('Notes reconnues', R.notes.length)}${row('Tessiture', rng)}${row('Notes les plus jouées', top || '—')}${row('Harmoniques', R.tech.harm)}${row('Notes étouffées', R.tech.muted)}${row('Percussions sur la caisse', R.tech.perc)}${row('Glissés', R.tech.slide)}${row('Rasgueados', R.tech.strum)}</table>
+<h2>Tonalités</h2><p class="tl">${line(R.keys) || '—'}</p>
+<h2>Accords</h2><p class="tl">${line(R.chords.slice(0, 400)) || '—'}</p>
+${marks.length ? `<h2>Repères posés pendant le jeu</h2><p class="tl">${marks.map(t => `<span><b>${mmss(t)}</b></span>`).join('')}</p>` : ''}
+${pub.length ? `<h2>Les graines du public</h2><p>${pub.map(esc).join(' · ')}</p>` : ''}
+<p class="sub" style="margin-top:40px">Le fichier MIDI joint reprend les notes reconnues (une seconde par noire, à 60 battements par minute), pour les retrouver dans un logiciel de partition ou de musique.</p></body></html>`;
+  const base = slug(rec.name);
+  download(new Blob([html], { type: 'text/html' }), base + '-carnet.html');
+  setTimeout(() => download(midiOf(R.notes, rec.name), base + '.mid'), 600);
+  status('Carnet et fichier MIDI enregistrés (' + R.notes.length + ' notes).');
+}
+// affiche 2:3 : l'image du sommet de l'œuvre, rendue en haute définition, puis le titre composé à la main
+async function makePoster(rec) {
+  if (mode === 'live') return;
+  status('Affiche : rendu du sommet de l’œuvre…'); closeGallery();
+  const pk = peakWindow(rec, 10) || [Math.max(0, (rec.duration || 40) * .6), 0], T = pk[0] + 5, w = 1800, h = 1600;
+  const scope0 = S.scope, mode0 = mode; S.scope = false; mode = 'hd'; setUI();
+  AE.stop(); setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; sim.manualEnd = !!rec.manualEnd; world.venue = rec.venue || { ...VENUE_DEF }; world.fiche = rec.fiche || null; sim.fx = rec.fx || 0; recFrames = rec.frames; recStride = rec.stride || 6; EVIDX = indexEvents(rec.events); current = rec;
+  offline = true; hdQuality(true); setRenderSize(w, h);
+  let img = null;
+  try {
+    await new Promise(r => setTimeout(r, 30)); stepRecorded(T - 1);
+    for (let k = 0; k < 30; k++) { const t = T - 1 + k / 30; stepRecorded(t); renderT = t; updateVisuals(1 / 30, false); }   // une seconde de mouvement pour que tout se pose
+    composer.render(1 / 30); renderNames();
+    img = document.createElement('canvas'); img.width = w; img.height = h; img.getContext('2d').drawImage(canvas, 0, 0, w, h);
+  } finally { S.scope = scope0; hdQuality(false); restoreRenderSize(); offline = false; mode = mode0 === 'hd' ? 'idle' : 'idle'; setUI(); }
+  const W = 1800, H = 2700, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'), F = rec.fiche || {};
+  g.fillStyle = '#05060a'; g.fillRect(0, 0, W, H); g.drawImage(img, 0, 0, W, 1600);
+  const fd = g.createLinearGradient(0, 1250, 0, 1600); fd.addColorStop(0, 'rgba(5,6,10,0)'); fd.addColorStop(1, '#05060a'); g.fillStyle = fd; g.fillRect(0, 1250, W, 350);
+  g.textAlign = 'center'; const fit = (t, font, max) => { g.font = font; const m = g.measureText(t).width; if (m > max) g.font = font.replace(/(\d+)px/, (x, n) => Math.floor(n * max / m) + 'px'); };
+  g.fillStyle = 'rgba(243,234,216,.7)'; g.font = '300 34px Inter, sans-serif'; try { g.letterSpacing = '14px'; } catch (e) {} g.fillText('HERBA STELLARIS', W / 2, 1720); try { g.letterSpacing = '0px'; } catch (e) {}
+  g.fillStyle = '#f6eedd'; g.shadowColor = 'rgba(255,226,180,.45)'; g.shadowBlur = 40; fit(rec.name, '400 230px Corinthia, "Cormorant Garamond", serif', W - 200); g.fillText(rec.name, W / 2, 1980); g.shadowBlur = 0;
+  if (F.sub) { g.fillStyle = 'rgba(243,234,216,.85)'; fit(F.sub, 'italic 300 64px "Cormorant Garamond", serif', W - 240); g.fillText(F.sub, W / 2, 2090); }
+  if (F.artist) { g.fillStyle = 'rgba(243,234,216,.6)'; g.font = '300 30px Inter, sans-serif'; g.fillText('MUSIQUE ET GUITARE', W / 2, 2240); g.fillStyle = '#f6eedd'; fit(F.artist, '400 84px "Cormorant Garamond", serif', W - 240); g.fillText(F.artist, W / 2, 2330); }
+  const d = new Date(rec.date).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' });
+  g.fillStyle = 'rgba(243,234,216,.7)'; fit([rec.venue && rec.venue.name, d].filter(Boolean).join('  ·  '), '300 40px "Cormorant Garamond", serif', W - 200); g.fillText([rec.venue && rec.venue.name, d].filter(Boolean).join('  ·  '), W / 2, 2470);
+  g.fillStyle = 'rgba(243,234,216,.45)'; g.font = '300 28px Inter, sans-serif'; { const ps = rec.publicSeeds || 0; g.fillText(`${rec.plants || 0} végétaux` + (ps ? ` · ${ps} graine${ps > 1 ? 's' : ''} du public` : '') + ' · une flore qui n’existera qu’une fois', W / 2, 2560); }
+  await new Promise(r => c.toBlob(b => { download(b, slug(rec.name) + '-affiche.png'); r(); }, 'image/png'));
+  status('Affiche enregistrée (1800 × 2700 px, format 2:3, prête à imprimer en 30 × 45 cm à 150 ppp).');
+}
+
 let MuxerLib = null;
 async function loadMuxer() {
   if (!MuxerLib) MuxerLib = await import(URL.createObjectURL(new Blob([MUXER_SRC], { type: 'text/javascript' })));
@@ -7254,7 +7353,7 @@ function openExport(rec) {
   const m = gpuMax(); $('xGpu').textContent = m >= 7680 ? 'Ta carte graphique accepte le 8K natif.' : `Ta carte graphique plafonne à ${m} px de large : le rendu « 8K » sera réduit à cette taille.`;
 }
 async function runExport() {
-  const rec = hdJob.rec, key = $('xRes').value, fps = +$('xFps').value;
+  const rec = hdJob.rec, key = $('xRes').value, fps = +$('xFps').value, LEN = +$('xLen').value || 0, CUT = LEN ? peakWindow(rec, LEN) : null;
   const [w, h] = pickRes(key);
   $('xMsg').textContent = '';
   if (!window.VideoEncoder || !window.VideoFrame) { $('xMsg').textContent = 'Ce navigateur ne sait pas encoder de vidéo image par image (WebCodecs). Utilise Chrome ou Edge récents.'; return; }
@@ -7269,7 +7368,7 @@ async function runExport() {
   if (!vc) { $('xMsg').textContent = `Aucun encodeur vidéo disponible pour ${w}×${h} sur cette machine. Essaie une résolution plus basse.`; return; }
   const M = await loadMuxer();
   // 2. destination : directement sur le disque si possible (un fichier 8K peut peser plusieurs Go)
-  let target, writable = null, fname = slug(rec.name) + '-' + w + 'x' + h + '-' + fps + 'ips.webm';
+  let target, writable = null, fname = slug(rec.name) + (CUT ? '-extrait-' + LEN + 's' : '') + '-' + w + 'x' + h + '-' + fps + 'ips.webm';
   if (window.showSaveFilePicker) {
     try { const fh = await showSaveFilePicker({ suggestedName: fname, types: [{ description: 'Vidéo WebM', accept: { 'video/webm': ['.webm'] } }] }); writable = await fh.createWritable(); target = new M.FileSystemWritableFileStreamTarget(writable); }
     catch (e) { if (e.name === 'AbortError') return; }
@@ -7293,9 +7392,13 @@ async function runExport() {
   if (abuf) {
     const aenc = new AudioEncoder({ output: (c, m) => muxer.addAudioChunk(c, m), error: e => failed = e });
     aenc.configure({ codec: 'opus', sampleRate: 48000, numberOfChannels: 2, bitrate: 256000 });
-    const L = abuf.getChannelData(0), R = abuf.getChannelData(1), N = 48000;
-    for (let i = 0; i < abuf.length; i += N) {
-      const n = Math.min(N, abuf.length - i), data = new Float32Array(n * 2);
+    let L = abuf.getChannelData(0), R = abuf.getChannelData(1); const N = 48000;
+    if (CUT) {               // extrait : la fenêtre seule, avec un fondu d'une seconde à chaque bout
+      const a = Math.floor(CUT[0] * 48000), b = Math.min(L.length, Math.floor(CUT[1] * 48000)), f = 48000;
+      L = L.slice(a, b); R = R.slice(a, b); for (let i = 0; i < L.length; i++) { const g = Math.min(1, i / f, (L.length - 1 - i) / f); L[i] *= g; R[i] *= g; }
+    }
+    for (let i = 0; i < L.length; i += N) {
+      const n = Math.min(N, L.length - i), data = new Float32Array(n * 2);
       data.set(L.subarray(i, i + n), 0); data.set(R.subarray(i, i + n), n);
       const ad = new AudioData({ format: 'f32-planar', sampleRate: 48000, numberOfFrames: n, numberOfChannels: 2, timestamp: Math.round(i / 48000 * 1e6), data });
       aenc.encode(ad); ad.close();
@@ -7303,18 +7406,20 @@ async function runExport() {
     await aenc.flush(); aenc.close();
   }
   // 4. images : la simulation est rejouée pas à pas, chaque image calculée à pleine résolution
-  const duration = abuf ? abuf.duration : rec.duration, total = Math.ceil(duration * fps);
+  const duration = CUT ? CUT[1] - CUT[0] : abuf ? abuf.duration : rec.duration, total = Math.ceil(duration * fps), T0 = CUT ? CUT[0] : 0;
   $('xForm').classList.add('hidden'); $('xRun').classList.remove('hidden');
   hdJob.cancel = false; mode = 'hd'; setUI(); closeGallery();
   AE.stop(); setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; sim.manualEnd = !!rec.manualEnd; world.venue = rec.venue || { ...VENUE_DEF }; world.fiche = rec.fiche || null; sim.fx = rec.fx || 0; recFrames = rec.frames; recStride = rec.stride || 6; EVIDX = indexEvents(rec.events); current = rec;
+  const scope0 = S.scope; if (key === 'vert') S.scope = false;          // vertical : pas de bandes cinéma
   offline = true; hdQuality(true); setRenderSize(w, h);
+  if (T0) stepRecorded(T0);
   const t0 = performance.now();
   try {
     for (let i = 0; i < total && !hdJob.cancel && !failed; i++) {
-      const T = i / fps;
+      const T = T0 + i / fps;
       stepRecorded(T); renderT = T;
       updateVisuals(1 / fps, false); composer.render(1 / fps); renderNames(); renderOverlay(1 / fps);
-      const vf = new VideoFrame(canvas, { timestamp: Math.round(T * 1e6), duration: Math.round(1e6 / fps) });
+      const vf = new VideoFrame(canvas, { timestamp: Math.round((T - T0) * 1e6), duration: Math.round(1e6 / fps) });
       venc.encode(vf, { keyFrame: i % (fps * 2) === 0 }); vf.close();
       while (venc.encodeQueueSize > 2) await new Promise(r => setTimeout(r, 5));
       if (i % 2 === 0 || i === total - 1) {
@@ -7326,7 +7431,7 @@ async function runExport() {
     }
     await venc.flush(); venc.close();
   } catch (e) { failed = failed || e; }
-  hdQuality(false); restoreRenderSize(); offline = false; mode = 'idle'; setUI();
+  S.scope = scope0; hdQuality(false); restoreRenderSize(); offline = false; mode = 'idle'; setUI();
   if (hdJob.cancel || failed) {
     if (writable) try { await writable.abort(); } catch (e) {}
     $('xMsg').textContent = failed ? 'Le rendu s’est interrompu : ' + (failed.message || failed) : 'Rendu annulé.';
