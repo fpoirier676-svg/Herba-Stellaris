@@ -1,7 +1,7 @@
 // Herba Stellaris — mise en cache pour jouer sans réseau.
 // Les pages du site : le réseau d'abord (toujours la dernière version), le cache seulement hors ligne.
 // Les bibliothèques et polices : le cache d'abord, rafraîchi en arrière-plan.
-const CACHE = 'herba-v11';
+const CACHE = 'herba-v12';
 const CORE = ['./', './index.html', './capteur.html', './public.html',
   'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',
   'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js',

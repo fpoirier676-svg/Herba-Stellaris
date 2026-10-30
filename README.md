@@ -166,6 +166,24 @@ le mode jeu du projecteur ; la mire (touche M) pour mesurer le décalage restant
 Les nouvelles œuvres sont calculées 60 fois par seconde (au lieu de 30) et enregistrent, en plus du son, la hauteur, l'accord,
 la tonalité, la tension, le bend et le vibrato : la galerie et les exports les rejouent à l'identique.
 
+## Dramaturgie d'une composition
+Sur l'accueil, la carte **La composition** est la fiche de l'œuvre : **titre** (vide : le nom du site lunaire), **sous-titre ou
+dédicace**, **interprète**. Quatre cases règlent ce qui apparaît dans l'image :
+- **Écran d'attente** : tant que la fenêtre de projection est ouverte sur l'accueil, l'écran affiche *Herba Stellaris*, le titre,
+  l'interprète, le lieu, et un QR code « Préparez votre graine ». Le public compose sa graine avant le début ; il la sème dès l'ouverture du semis.
+- **Carton de titre** : à l'arrivée sur la Lune, après le voyage depuis la salle, le titre apparaît comme au cinéma
+  (titre, sous-titre, « une composition de… », site lunaire et date du ciel), puis s'efface.
+- **Cartons d'actes** : la composition traverse cinq actes. Après le prélude (le voyage), viennent **I Éveil**, **II Croissance**,
+  **III Apogée** et **IV Conclusion**. Chaque acte s'annonce discrètement en bas à gauche, quelques secondes. Les actes suivent le jardin
+  (germination, croissance, maturité ou floraison) : ils n'avancent qu'un à la fois, jamais en arrière, et durent au moins 25 secondes.
+  La conclusion vient quand tu la déclenches. L'acte en cours s'affiche aussi sur ton téléphone.
+- **Générique final** : pendant la contemplation en orbite, le titre, l'interprète, le lieu, la date et le bilan du jardin, puis
+  « Merci d'avoir semé » et le **nom de chaque spectateur**, avec la couleur de sa graine. À la fin, ce tableau reste affiché sur la projection
+  jusqu'à la composition suivante.
+
+Ces cartons font partie de l'œuvre : la galerie et les exports vidéo les rejouent à l'identique. Le QR code du public est désormais
+**dessiné dans l'image** (en haut à gauche pendant la composition), donc visible sur la projection.
+
 ## Les graines du public
 
 **Graines du public** (carte 3 de l'accueil, Q, la régie ou le téléphone-capteur) affiche un QR code. Chaque spectateur compose sa graine

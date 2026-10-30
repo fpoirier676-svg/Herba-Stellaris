@@ -53,6 +53,7 @@
   #intro .cscroll { max-height:46vh; overflow:auto; padding-right:6px; margin-top:6px; }
   #intro #phoneHome .pgrid { grid-template-columns:150px 1fr; gap:14px; margin:6px 0; } #intro #phoneHome #qr { width:150px; height:150px; padding:7px; }
   #intro .go { margin-top:8px; } #intro #btnGo { padding:17px 34px; font-size:12px; }
+  #intro .card.fiche { grid-column:1 / -1; } #intro .frow { display:flex; gap:8px; flex-wrap:wrap; } #intro .frow .vin { flex:1; min-width:200px; } #intro .frow.chks { gap:4px 22px; margin-top:6px; }
   #intro .vin { font:inherit; font-size:11px; color:var(--ink); background:rgba(0,0,0,.4); border:1px solid var(--line); padding:7px; margin-top:4px; box-sizing:border-box; }
   #intro .ready { display:flex; flex-wrap:wrap; justify-content:center; gap:6px 14px; width:min(1240px,96vw); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin-top:4px; }
   #intro .ready b { font-weight:500; color:var(--ink); letter-spacing:.2em; margin-right:6px; }
@@ -2567,6 +2568,11 @@ var qrcode = function() {
   <h1>Herba Stellaris</h1>
   <p class="sub">Chaque composition fait naître une flore lunaire qui n'existera qu'une fois</p>
   <div class="prep">
+   <section class="card fiche">
+    <h5><b>✦</b> La composition</h5>
+    <div class="frow"><input id="fTitle" class="vin" placeholder="Titre de l’œuvre (vide : le nom du site lunaire)" maxlength="60"><input id="fSub" class="vin" placeholder="Sous-titre ou dédicace (facultatif)" maxlength="80"><input id="fArtist" class="vin" placeholder="Interprète" maxlength="50"></div>
+    <div class="frow chks"><label class="chk"><input type="checkbox" id="fCard"> Carton de titre</label><label class="chk"><input type="checkbox" id="fActs"> Cartons d’actes</label><label class="chk"><input type="checkbox" id="fCred"> Générique final avec les noms du public</label><label class="chk"><input type="checkbox" id="fAttract"> Écran d’attente sur la projection</label></div>
+   </section>
    <section class="card">
     <h5><b>1</b> Le son</h5>
     <div class="seg" id="srcSeg"><button data-src="ordi" class="on">Ordinateur · GX-1</button><button data-src="phone">Téléphone</button><button data-src="file">Fichier audio</button></div>
@@ -5152,7 +5158,7 @@ function startWorld(seed, startMs, intro, dawn) { world = buildWorld(seed, start
 
 async function startLive(kind, file) {
   const seed = (crypto.getRandomValues(new Uint32Array(1))[0]) >>> 0;
-  setTick(LIVE_TICK); startWorld(seed, Date.now(), true, !S.cycle); frames = []; recEvents = []; LIVE_EV.length = 0; LIVE_MARKS.length = 0; PUB.clients.clear(); ZM.sent = 0; ZM.sentT = 0; sim.manualEnd = true; world.venue = { ...S.venue }; sim.lat = S.latency / 1000; sim.predict = true;
+  setTick(LIVE_TICK); startWorld(seed, Date.now(), true, !S.cycle); frames = []; recEvents = []; LIVE_EV.length = 0; LIVE_MARKS.length = 0; PUB.clients.clear(); ZM.sent = 0; ZM.sentT = 0; sim.manualEnd = true; world.venue = { ...S.venue }; world.fiche = { ...S.fiche }; sim.lat = S.latency / 1000; sim.predict = true;
   if (kind === 'mic') await AE.useMic(); else if (kind === 'phone') await AE.useRemote(PH.stream); else await AE.useFile(file);
   liveT0 = AE.ctx.currentTime; AE.silentFor = 0; AE.heard = 0; AE.silStart = null; AE.lastNow = 0;
   if (AE.el) AE.el.onended = () => { if (mode === 'live') finishLive(true); };
@@ -5177,7 +5183,7 @@ async function finishLive(save) {
   showEpilogue(rec);
 }
 function makeRec(audio, thumb) { return {
-    id: Date.now().toString(36) + '-' + sim.W.seed.toString(36), name: sim.W.name, date: new Date().toISOString(), seed: sim.W.seed, startUTC: sim.W.startMs,
+    id: Date.now().toString(36) + '-' + sim.W.seed.toString(36), name: (world.fiche && world.fiche.title) || sim.W.name, fiche: world.fiche || null, date: new Date().toISOString(), seed: sim.W.seed, startUTC: sim.W.startMs,
     stride: FSTRIDE, tick: TICK, manualEnd: true, venue: world.venue, events: recEvents.slice(), lat: S.latency / 1000, tscale: sim.tscale, dawn: sim.dawn, publicSeeds: sim.pubN, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), varieties: new Set(sim.plants.map(p => p.var)).size, frames: new Float32Array(frames), audio, thumb,
   }; }
 /* ---- Sauvegarde de secours : toutes les 10 s pendant une composition ; reprise après un plantage ---- */
@@ -5253,7 +5259,7 @@ const speciesLine = c => Object.keys(SPECIES).filter(k => c[k]).map(k => c[k] + 
 
 async function startReplay(rec, exportVideo) {
   closeGallery(); AE.ensure(); AE.stop();
-  setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; sim.manualEnd = !!rec.manualEnd; world.venue = rec.venue || { ...VENUE_DEF };
+  setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; sim.manualEnd = !!rec.manualEnd; world.venue = rec.venue || { ...VENUE_DEF }; world.fiche = rec.fiche || null;
   recFrames = rec.frames; recStride = rec.stride || 6; EVIDX = indexEvents(rec.events); current = rec; replayEl = null;
   if (rec.audio) {
     const el = new window.Audio(URL.createObjectURL(rec.audio)); replayEl = el;
@@ -5945,7 +5951,7 @@ function drawPublicQR() {
   $('pubUrl').textContent = url.replace(/^https?:\/\//, '');
 }
 function togglePublic() {
-  PUB.on = !PUB.on; $('pubBox').classList.toggle('hidden', !PUB.on);
+  PUB.on = !PUB.on;
   if (PUB.on && !ensurePeer(drawPublicQR)) $('pubUrl').textContent = 'Liaison indisponible : cet ordinateur doit être connecté à internet.';
   drawPublicQR();
 }
@@ -6052,7 +6058,7 @@ function tempoBPM() { const bt = sim && sim.beats; if (!bt || bt.length < 5) ret
 function sendStatus() {
   if (!PH.conn || !PH.conn.open) return;
   const live = mode === 'live' && sim, pubs = sim ? [...sim.seeds.values()] : [];
-  const scene = live ? { act: gardenStage(), chord: GT.chordName || '', key: GT.keyName || '', note: GT.note ? NOTE_NAMES[((GT.note.m0 % 12) + 12) % 12] + (Math.floor(GT.note.m0 / 12) - 1) : '', bpm: tempoBPM(), lvl: +(sim.loud || 0).toFixed(2),
+  const scene = live ? { act: (sim.act ? ACTS[sim.act.i] + ' · ' : '') + gardenStage(), chord: GT.chordName || '', key: GT.keyName || '', note: GT.note ? NOTE_NAMES[((GT.note.m0 % 12) + 12) % 12] + (Math.floor(GT.note.m0 / 12) - 1) : '', bpm: tempoBPM(), lvl: +(sim.loud || 0).toFixed(2),
     seeds: pubs.length, falling: pubs.filter(q => q.state === 'fall').length, zoom: zoomLabel(ZM.v), intro: !sim.introDone, rep: !!S.rehearsal, marks: LIVE_MARKS.length, last: LIVE_MARKS.length ? LIVE_MARKS[LIVE_MARKS.length - 1] : 0 } : null;
   try { PH.conn.send({ scene, rep: !!S.rehearsal, mode, t: mode === 'live' ? liveTime() : 0, site: world ? world.name : '', plants: sim ? sim.plants.length : 0, epi: !!epiShownAt, fin: mode !== 'live' ? 'none' : !sim.introDone ? 'wait' : sim.finale ? 'on' : 'ready', finLeft: mode === 'live' && sim.finale ? Math.max(0, Math.ceil(FINALE_LEN + FINALE_HOLD - (sim.t - sim.finaleT0))) : 0 }); } catch (e) {}
 }
@@ -6769,6 +6775,153 @@ function renderInstruments(dt) {
   renderer.setScissorTest(false); renderer.setViewport(0, 0, W, H); renderer.autoClear = ac;
 }
 let frameN = 0, lastFrameT = 0, frameDur = 16;
+
+/* =====================================================================
+   DRAMATURGIE — fiche de composition, carton de titre, actes, générique, écran d'attente, QR du public
+   Tout est dessiné dans l'image : visible sur la projection, et rejoué à l'identique (sauf le QR, propre au direct)
+   ===================================================================== */
+const FICHE_DEF = { title: '', sub: '', artist: 'Fabien Poirier', card: true, acts: true, cred: true, attract: true };
+S.fiche = (() => { try { return { ...FICHE_DEF, ...JSON.parse(localStorage.getItem('herba-fiche') || '{}') }; } catch (e) { return { ...FICHE_DEF }; } })();
+try {
+  const F = S.fiche, map = { fTitle: 'title', fSub: 'sub', fArtist: 'artist' }, chk = { fCard: 'card', fActs: 'acts', fCred: 'cred', fAttract: 'attract' };
+  const save = () => { try { localStorage.setItem('herba-fiche', JSON.stringify(F)); } catch (e) {} };
+  for (const id in map) { $(id).value = F[map[id]] || ''; $(id).addEventListener('input', e => { F[map[id]] = e.target.value.replace(/[\u0000-\u001f]/g, '').trim(); save(); }); }
+  for (const id in chk) { $(id).checked = !!F[chk[id]]; $(id).addEventListener('change', e => { F[chk[id]] = e.target.checked; save(); }); }
+} catch (e) { __showErr('fiche : ' + e.message); }
+const ACTS = ['Prélude', 'Éveil', 'Croissance', 'Apogée', 'Conclusion'], ROMAN = ['', 'I', 'II', 'III', 'IV'];
+// l'acte avance d'un pas à la fois, jamais en arrière, et dure au moins 25 s (sauf la conclusion, immédiate)
+function actStep() {
+  if (!sim) return null; const A = sim.act || (sim.act = { i: 0, t: 0 });
+  let c = 0;
+  if (sim.finale) c = 4;
+  else if (sim.introDone) { const g = gardenStage(); c = g === 'Floraison' || g === 'Canopée' || g === 'Maturité' ? 3 : g === 'Croissance' ? 2 : 1; }
+  if (c === 4 && A.i < 4) { A.i = 4; A.t = sim.t; }
+  else if (c > A.i && (A.i === 0 || sim.t - A.t >= 25)) { A.i++; A.t = sim.t; }
+  return A;
+}
+// évalué avec la simulation (4 fois par seconde), jamais au rythme de l'affichage : identique en direct, en rejeu et à l'export
+{ const st0 = Sim.prototype.step; Sim.prototype.step = function (...a) { const r = st0.apply(this, a); if (this === sim && this.tick % 15 === 0) actStep(); return r; }; }
+const fade = (t, a, b, fi, fo) => (fi > 0 ? smoothstep(a, a + fi, t) : t >= a ? 1 : 0) * (fo > 0 ? 1 - smoothstep(b - fo, b, t) : t < b ? 1 : 0);
+const OVL = { scene: new THREE.Scene(), cam: new THREE.OrthographicCamera(0, 1, 1, 0, -1, 1), v2: new THREE.Vector2() };
+{
+  const mk = () => { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 32; const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).translate(.5, .5, 0), new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0, depthTest: false, depthWrite: false, toneMapped: false })); m.visible = false; OVL.scene.add(m); return { cv, cx: cv.getContext('2d'), t, m, key: '' }; };
+  OVL.card = mk(); OVL.qr = mk(); OVL.card.m.renderOrder = 1; OVL.qr.m.renderOrder = 2;   // le QR toujours par-dessus le voile du carton
+}
+const SERIF = '"Cormorant Garamond", Georgia, serif', SCRIPT = 'Corinthia, "Cormorant Garamond", Georgia, serif', SANS = 'Inter, system-ui, sans-serif';
+function ovlPaint(o, key, w, h, draw) {
+  const k = key + '|' + (document.fonts ? document.fonts.status : '') + '|' + Math.round(w) + 'x' + Math.round(h);
+  if (o.key === k) return; const cw = o.cv.width, ch = o.cv.height; fitCanvas(o, w, h);
+  const c = o.cx; c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, o.cv.width, o.cv.height); draw(c, o.cv.width, o.cv.height);
+  if (o.cv.width === cw && o.cv.height === ch) o.t.needsUpdate = true; o.key = k;
+}
+function txt(c, s, x, y, font, fill, opt = {}) {
+  c.font = font; c.textAlign = opt.align || 'center'; c.textBaseline = 'alphabetic';
+  try { c.letterSpacing = opt.ls || '0px'; } catch (e) {}
+  if (opt.max) { const m = c.measureText(s).width; if (m > opt.max) { const px = parseFloat(/(\d+(\.\d+)?)px/.exec(font)[1]); c.font = font.replace(/\d+(\.\d+)?px/, (px * opt.max / m).toFixed(1) + 'px'); } }
+  c.shadowColor = opt.glow || 'rgba(0,0,0,.65)'; c.shadowBlur = opt.blur || 0; c.fillStyle = fill; c.fillText(s, x, y); c.shadowBlur = 0;
+  try { c.letterSpacing = '0px'; } catch (e) {}
+}
+function veil(c, w, h, cy, r, a) { const g = c.createRadialGradient(w / 2, cy, 0, w / 2, cy, r); g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, w, h); }
+const skyDate = () => { try { return new Date(sim.W.startMs).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return ''; } };
+function drawTitle(c, w, h, F) {
+  const u = h / 100, title = F.title || sim.W.name, ink = '#f6eedd', soft = 'rgba(243,234,216,.78)';
+  veil(c, w, h, h * .52, h * .62, .42);
+  txt(c, 'HERBA STELLARIS', w / 2, h * .34, `300 ${2.3 * u}px ${SANS}`, soft, { ls: (.7 * u).toFixed(1) + 'px' });
+  txt(c, title, w / 2, h * .53, `400 ${15 * u}px ${SCRIPT}`, ink, { max: w * .86, glow: 'rgba(255,226,180,.45)', blur: 3 * u });
+  if (F.sub) txt(c, F.sub, w / 2, h * .615, `italic 300 ${3.8 * u}px ${SERIF}`, soft, { max: w * .8, blur: u });
+  if (F.artist) txt(c, 'une composition de ' + F.artist, w / 2, h * .70, `300 ${3 * u}px ${SERIF}`, soft, { max: w * .8, blur: u });
+  txt(c, (F.title ? sim.W.name + ' · ' : '') + 'ciel du ' + skyDate(), w / 2, h * .755, `300 ${1.8 * u}px ${SANS}`, 'rgba(243,234,216,.6)', { ls: (.25 * u).toFixed(1) + 'px', max: w * .8 });
+}
+function drawAct(c, w, h, i) {
+  const u = h / 100, x = w * .065, y = h * .86;
+  const g = c.createLinearGradient(0, h * .7, 0, h); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.4)'); c.fillStyle = g; c.fillRect(0, h * .7, w * .5, h * .3);
+  txt(c, ROMAN[i], x, y - 9.6 * u, `300 ${3.2 * u}px ${SERIF}`, 'rgba(243,234,216,.8)', { align: 'left', ls: (.4 * u).toFixed(1) + 'px', blur: u });
+  txt(c, ACTS[i], x, y, `400 ${9.5 * u}px ${SCRIPT}`, '#f6eedd', { align: 'left', glow: 'rgba(255,226,180,.4)', blur: 2.5 * u });
+  const lg = c.createLinearGradient(x, 0, x + w * .2, 0); lg.addColorStop(0, 'rgba(243,234,216,.7)'); lg.addColorStop(1, 'rgba(243,234,216,0)'); c.fillStyle = lg; c.fillRect(x, y + 2 * u, w * .2, Math.max(1, .15 * u));
+}
+function creditNames() { const out = []; if (sim) for (const sd of sim.seeds.values()) if (sd.spec && (sd.state !== 'fall' || sd.plant)) out.push({ n: sd.spec.name || 'Graine ' + sd.id, col: sd.col }); return out.slice(0, 120); }
+function drawCredits(c, w, h, F) {
+  const u = h / 100, title = F.title || sim.W.name, soft = 'rgba(243,234,216,.8)', v = world.venue || {};
+  veil(c, w, h, h * .5, h * .75, .5);
+  txt(c, 'HERBA STELLARIS', w / 2, h * .25, `300 ${2.1 * u}px ${SANS}`, soft, { ls: (.7 * u).toFixed(1) + 'px' });
+  txt(c, title, w / 2, h * .42, `400 ${12 * u}px ${SCRIPT}`, '#f6eedd', { max: w * .86, glow: 'rgba(255,226,180,.45)', blur: 3 * u });
+  if (F.sub) txt(c, F.sub, w / 2, h * .495, `italic 300 ${3.4 * u}px ${SERIF}`, soft, { max: w * .8, blur: u });
+  if (F.artist) { txt(c, 'MUSIQUE ET GUITARE', w / 2, h * .59, `300 ${1.7 * u}px ${SANS}`, 'rgba(243,234,216,.6)', { ls: (.5 * u).toFixed(1) + 'px' }); txt(c, F.artist, w / 2, h * .645, `400 ${4.2 * u}px ${SERIF}`, '#f6eedd', { max: w * .8, blur: u }); }
+  const live = sim.plants.filter(p => !p.dead).length, pub = creditNames().length;
+  txt(c, [v.name, sim.W.name + ' · ciel du ' + skyDate()].filter(Boolean).join(' — '), w / 2, h * .73, `300 ${2.1 * u}px ${SERIF}`, soft, { max: w * .86 });
+  txt(c, `${live} végétaux` + (pub ? ` · ${pub} graine${pub > 1 ? 's' : ''} du public` : '') + ' · une flore qui n’existera qu’une fois', w / 2, h * .775, `300 ${1.7 * u}px ${SANS}`, 'rgba(243,234,216,.55)', { ls: (.2 * u).toFixed(1) + 'px', max: w * .86 });
+}
+function drawNamesCredit(c, w, h, names) {
+  const u = h / 100, n = names.length; veil(c, w, h, h * .5, h * .8, .55);
+  txt(c, 'LES GRAINES DU PUBLIC', w / 2, h * .2, `300 ${2.1 * u}px ${SANS}`, 'rgba(243,234,216,.75)', { ls: (.6 * u).toFixed(1) + 'px' });
+  txt(c, 'Merci d’avoir semé', w / 2, h * .3, `400 ${7 * u}px ${SCRIPT}`, '#f6eedd', { glow: 'rgba(255,226,180,.4)', blur: 2 * u });
+  const cols = n <= 6 ? 1 : n <= 16 ? 2 : n <= 36 ? 3 : n <= 64 ? 4 : 6, rows = Math.ceil(n / cols), y0 = h * .39, y1 = h * .86;
+  const lh = Math.min(5.2 * u, (y1 - y0) / rows), fs = Math.min(3.4 * u, lh * .7), cw = Math.min(w * .84 / cols, 34 * u), x0 = w / 2 - cw * cols / 2;
+  names.forEach((o, k) => {
+    const col = Math.floor(k / rows), r = k % rows, cx = x0 + cw * (col + .5), y = y0 + lh * (r + .75), rgb = 'rgb(' + (o.col || [1, 1, 1]).map(x => Math.round(clamp(x, 0, 1) * 255)).join(',') + ')';
+    c.font = `400 ${fs}px ${SERIF}`; const tw = Math.min(c.measureText(o.n).width, cw * .82);
+    c.shadowColor = rgb; c.shadowBlur = fs * .6; c.fillStyle = rgb; c.beginPath(); c.arc(cx - tw / 2 - fs * .55, y - fs * .32, fs * .14, 0, 6.283); c.fill(); c.shadowBlur = 0;
+    txt(c, o.n, cx + fs * .1, y, `400 ${fs}px ${SERIF}`, '#f3ead8', { max: cw * .82, blur: fs * .3 });
+  });
+}
+function drawAttract(c, w, h, F) {
+  const u = h / 100, soft = 'rgba(243,234,216,.8)', v = S.venue || {};
+  veil(c, w, h, h * .5, h * .7, .45);
+  txt(c, 'Herba Stellaris', w * .4, h * .44, `400 ${16 * u}px ${SCRIPT}`, '#f6eedd', { max: w * .62, glow: 'rgba(255,226,180,.45)', blur: 3 * u });
+  if (F.title) txt(c, F.title, w * .4, h * .54, `italic 300 ${4.6 * u}px ${SERIF}`, soft, { max: w * .6, blur: u });
+  if (F.artist) txt(c, F.artist, w * .4, h * .61, `300 ${3 * u}px ${SERIF}`, soft, { max: w * .6, blur: u });
+  txt(c, 'LE VOYAGE VERS LA LUNE COMMENCE BIENTÔT' + (v.name ? ' — ' + v.name.toUpperCase() : ''), w * .4, h * .7, `300 ${1.8 * u}px ${SANS}`, 'rgba(243,234,216,.6)', { ls: (.45 * u).toFixed(1) + 'px', max: w * .66 });
+}
+function drawQRPanel(c, w, h, url, l1, l2) {
+  const pad = w * .08; c.fillStyle = 'rgba(4,5,8,.78)'; rrect(c, 1, 1, w - 2, h - 2, w * .06); c.fill(); c.strokeStyle = 'rgba(255,240,220,.25)'; c.lineWidth = Math.max(1, w / 220); c.stroke();
+  const qs = w - 2 * pad; c.fillStyle = '#fff'; rrect(c, pad, pad, qs, qs, w * .03); c.fill();
+  if (window.qrcode) { const q = qrcode(0, 'M'); q.addData(url); q.make(); const n = q.getModuleCount(), cs = qs / (n + 2); c.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (q.isDark(r, k)) c.fillRect(Math.floor(pad + (k + 1) * cs), Math.floor(pad + (r + 1) * cs), Math.ceil(cs), Math.ceil(cs)); }
+  const y = pad + qs, fs = w * .135;
+  txt(c, l1, w / 2, y + fs * 1.15, `400 ${fs}px ${SCRIPT}`, '#f3ead8', { max: w * .9 }); txt(c, l2, w / 2, y + fs * 2.05, `400 ${fs}px ${SCRIPT}`, '#f3ead8', { max: w * .9 });
+  txt(c, url.replace(/^https?:\/\//, '').replace(/#.*$/, ''), w / 2, h - pad * .7, `300 ${w * .042}px ${SANS}`, 'rgba(243,234,216,.55)', { max: w * .9 });
+}
+function renderOverlay(dt) {
+  const sz = renderer.getSize(OVL.v2), W = sz.x, H = sz.y, dpr = renderer.getPixelRatio();
+  if (S.output === 'dome') { OVL.card.m.visible = OVL.qr.m.visible = false; return; }
+  const bars = S.scope && S.output === 'cinema', vis = bars ? Math.min(1, (W / H) / 2.39) : 1, e = (1 - vis) * .5 * H, ih = H - 2 * e;
+  const F = world && world.fiche, inPlay = (mode === 'live' || mode === 'replay' || mode === 'hd') && sim && F;
+  let key = null, a = 0, draw = null, credits = false;
+  if (inPlay) {
+    const A = sim.act, t = sim.t;
+    if (F.card && sim.introDone) { const x = fade(t - sim.introDoneAt, 6.5, 16.5, 2, 2.2);   // le titre, comme au cinéma : après la séquence d'ouverture, à l'arrivée sur la Lune
+      if (x > 0) { key = 'titre'; a = x; draw = (c, w, h) => drawTitle(c, w, h, F); } }
+    if (F.acts && A && A.i >= 1) { const d = A.i === 1 ? (F.card ? 18.5 : 3) : A.i === 4 ? 1.5 : .8, x = fade(t - A.t, d, d + 5.5, 1, 1.3); if (x > 0) { key = 'acte' + A.i; a = x; draw = (c, w, h) => drawAct(c, w, h, A.i); } }
+    if (F.cred && sim.finale) {
+      const hh = t - sim.finaleT0 - FINALE_LEN, names = creditNames(), split = names.length ? 5.5 : 1e9;
+      if (hh >= 0 && hh < split) { key = 'gen'; a = fade(hh, 0, split, 1.4, names.length ? 1 : 0); draw = (c, w, h) => drawCredits(c, w, h, F); credits = true; }
+      else if (hh >= split) { key = 'noms' + names.length; a = fade(hh, split, 1e9, 1, 0); draw = (c, w, h) => drawNamesCredit(c, w, h, names); credits = true; }
+    }
+  } else if (mode === 'idle' && PROJ && !PROJ.closed && sim && world && world.fiche && world.fiche.cred && sim.finale) {     // tableau final : l'œuvre reste nommée à l'écran
+    const F2 = world.fiche; key = 'gen'; a = 1; draw = (c, w, h) => drawCredits(c, w, h, F2); credits = true;
+  } else if (mode === 'intro' && PROJ && !PROJ.closed && S.fiche.attract) {
+    key = 'attente' + S.fiche.title + S.fiche.artist + (S.venue && S.venue.name); a = 1; draw = (c, w, h) => drawAttract(c, w, h, S.fiche);
+  }
+  const o = OVL.card; o.m.visible = !!draw && a > .004;
+  if (o.m.visible) { ovlPaint(o, key, W * dpr, ih * dpr, draw); o.m.position.set(0, e, 0); o.m.scale.set(W, ih, 1); o.m.material.opacity = a; }
+  // QR du public : dans l'image, donc visible sur la projection (en direct seulement)
+  const pid = PH.id || PH.want, attract = mode === 'intro' && PROJ && !PROJ.closed && S.fiche.attract;
+  const q = OVL.qr, qOn = !!pid && (mode === 'live' ? PUB.on : attract) && !credits && !(sim && sim.zoom > .7) && publicBase();
+  if (qOn) {
+    const url = publicBase().split('#')[0] + '#' + pid, qw = Math.round(attract ? ih * .36 : ih * .2), qh = Math.round(qw * 1.34);
+    ovlPaint(q, url + (attract ? 'A' : 'L'), qw * dpr, qh * dpr, (c, w, h) => drawQRPanel(c, w, h, url, attract ? 'Préparez' : 'Semez une graine', attract ? 'votre graine' : 'sur la Lune'));
+    q.a = Math.min(1, (q.a || 0) + Math.max(dt, 1 / 60) * 2.5);
+    if (attract) q.m.position.set(W * .76 - qw / 2, e + (ih - qh) / 2, 0); else q.m.position.set(W * .014 + ih * .01, H - e - qh - ih * .025, 0);
+    q.m.scale.set(qw, qh, 1); q.m.material.opacity = q.a; q.m.visible = true;
+  } else { q.a = 0; q.m.visible = false; }
+  if (!o.m.visible && !q.m.visible) return;
+  OVL.cam.left = 0; OVL.cam.right = W; OVL.cam.top = H; OVL.cam.bottom = 0; OVL.cam.updateProjectionMatrix();
+  const ac = renderer.autoClear; renderer.autoClear = false; renderer.setRenderTarget(null); renderer.render(OVL.scene, OVL.cam); renderer.autoClear = ac;
+}
+// le public peut préparer sa graine pendant l'écran d'attente : la liaison s'ouvre dès que la projection est ouverte
+setInterval(() => { try { if (mode === 'intro' && PROJ && !PROJ.closed && S.fiche.attract && !(PH.id || PH.want)) ensurePeer(drawPublicQR); } catch (e) {} }, 3000);
+
 function frame() {
   const fs0 = performance.now();
   if (!offline) {
@@ -6785,7 +6938,7 @@ function frame() {
       cv.getContext('2d').drawImage(canvas, 0, (canvas.height - sh) / 2, sw, sh, 0, 0, tw, th);
       const r = wantThumb; wantThumb = null; r(cv.toDataURL('image/jpeg', .85));
     }
-    if (!ctxLost) { renderNames(); renderInstruments(dt); drawRetour(); }
+    if (!ctxLost) { renderNames(); renderInstruments(dt); renderOverlay(dt); drawRetour(); }
   } else clock.getDelta();
   lastFrameT = performance.now(); frameDur += (lastFrameT - fs0 - frameDur) * .1;
   schedule();
@@ -6903,14 +7056,14 @@ async function runExport() {
   const duration = abuf ? abuf.duration : rec.duration, total = Math.ceil(duration * fps);
   $('xForm').classList.add('hidden'); $('xRun').classList.remove('hidden');
   hdJob.cancel = false; mode = 'hd'; setUI(); closeGallery();
-  AE.stop(); setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; sim.manualEnd = !!rec.manualEnd; world.venue = rec.venue || { ...VENUE_DEF }; recFrames = rec.frames; recStride = rec.stride || 6; EVIDX = indexEvents(rec.events); current = rec;
+  AE.stop(); setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; sim.manualEnd = !!rec.manualEnd; world.venue = rec.venue || { ...VENUE_DEF }; world.fiche = rec.fiche || null; recFrames = rec.frames; recStride = rec.stride || 6; EVIDX = indexEvents(rec.events); current = rec;
   offline = true; hdQuality(true); setRenderSize(w, h);
   const t0 = performance.now();
   try {
     for (let i = 0; i < total && !hdJob.cancel && !failed; i++) {
       const T = i / fps;
       stepRecorded(T); renderT = T;
-      updateVisuals(1 / fps, false); composer.render(1 / fps);
+      updateVisuals(1 / fps, false); composer.render(1 / fps); renderNames(); renderOverlay(1 / fps);
       const vf = new VideoFrame(canvas, { timestamp: Math.round(T * 1e6), duration: Math.round(1e6 / fps) });
       venc.encode(vf, { keyFrame: i % (fps * 2) === 0 }); vf.close();
       while (venc.encodeQueueSize > 2) await new Promise(r => setTimeout(r, 5));
