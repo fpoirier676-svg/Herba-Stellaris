@@ -165,7 +165,12 @@ L'ouverture part de **la salle de spectacle** : la caméra est au-dessus de la v
 lumière marque la salle ; elle s'élève jusqu'à voir la Terre entière, se retourne et file vers la Lune. À la **conclusion**, elle quitte
 le jardin lunaire, traverse l'espace et redescend au-dessus de la salle, où l'œuvre se termine. Le lieu se règle dans la carte 3 de
 l'accueil (nom, latitude, longitude) ; par défaut **Bar à Pitons, 110 rue Price Ouest, Chicoutimi**.
-La Terre est rendue en **8K** (jour et villes la nuit), la Lune aussi en **8K**, avec un micro-relief qui apparaît quand on s'en approche ; les cartes HD se chargent sur l'accueil (jamais pendant une composition) et la ligne « Haute définition » de la carte 3 l'indique. En qualité *Fluide*, ou si la carte graphique ne gère pas le 8K, la définition standard est gardée. Pendant le retour vers la Terre, la musique ne fait plus bouger l'image : la conclusion se pose en douceur. Rendu de la Terre : le relief, les océans et leurs reflets, les nuages et leur ombre, les villes la nuit et un liseré
+**Haute définition 4K** (pensée pour un projecteur Full HD) : Lune, villes de la Terre la nuit, nuages et **Voie lactée photographique**,
+chargées sur l'accueil (jamais pendant une composition), annoncées par la ligne « Haute définition » de la carte 3. Le sol lunaire a la teinte
+sombre du vrai régolithe, avec un grain fin qui apparaît de près ; les végétaux s'illuminent en contre-jour et la lumière court le long de
+leurs nervures ; l'image est lissée (FXAA), légèrement accentuée, et étalonnée selon le moment (nuit d'argent, aube d'ambre) avec une épaule
+douce qui évite le blanc brûlé. En qualité *Fluide*, la définition standard est gardée. Pendant le retour vers la Terre, la musique ne fait
+plus bouger l'image : la conclusion se pose en douceur. Rendu de la Terre : le relief, les océans et leurs reflets, les nuages et leur ombre, les villes la nuit et un liseré
 ambré au terminateur. Le point de la salle pulse avec la musique.
 
 ## Zoom sur la Lune à la pédale d'expression
@@ -239,5 +244,5 @@ Le micro du téléphone exige une page en `https` : c'est la raison de la public
 
 ## Crédits des images
 
-Cartes 8K de la Lune et de la Terre : **Solar System Scope** (https://www.solarsystemscope.com/textures/), d'après les données de la NASA,
+Cartes de la Lune, de la Terre et du ciel étoilé (Voie lactée) : **Solar System Scope** (https://www.solarsystemscope.com/textures/), d'après les données de la NASA,
 sous licence Creative Commons Attribution 4.0 International.

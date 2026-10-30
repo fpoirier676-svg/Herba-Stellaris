@@ -894,18 +894,38 @@ const dof = new DOFPass(camera); composer.addPass(dof);
 const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .35, .35, 1.6);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
+// lissage des bords (FXAA) : tiges, arêtes des cristaux et étiquettes ne scintillent plus
+const fxaa = new ShaderPass({ uniforms: { tDiffuse: { value: null }, uTexel: { value: new THREE.Vector2(1 / 1920, 1 / 1080) } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uTexel; varying vec2 vUv;
+    float L(vec3 c){ return dot(c,vec3(.299,.587,.114)); }
+    void main(){ vec3 cM=texture2D(tDiffuse,vUv).rgb; float lM=L(cM);
+      float lNW=L(texture2D(tDiffuse,vUv+vec2(-1.,-1.)*uTexel).rgb), lNE=L(texture2D(tDiffuse,vUv+vec2(1.,-1.)*uTexel).rgb), lSW=L(texture2D(tDiffuse,vUv+vec2(-1.,1.)*uTexel).rgb), lSE=L(texture2D(tDiffuse,vUv+vec2(1.,1.)*uTexel).rgb);
+      float mn=min(lM,min(min(lNW,lNE),min(lSW,lSE))), mx=max(lM,max(max(lNW,lNE),max(lSW,lSE)));
+      if(mx-mn<max(.0312,mx*.125)){ gl_FragColor=vec4(cM,1.); return; }
+      vec2 dir=vec2(-((lNW+lNE)-(lSW+lSE)),(lNW+lSW)-(lNE+lSE)); float red=max((lNW+lNE+lSW+lSE)*.03125,.0078125);
+      dir=clamp(dir/(min(abs(dir.x),abs(dir.y))+red),-8.,8.)*uTexel;
+      vec3 a=.5*(texture2D(tDiffuse,vUv+dir*(1./3.-.5)).rgb+texture2D(tDiffuse,vUv+dir*(2./3.-.5)).rgb);
+      vec3 b=a*.5+.25*(texture2D(tDiffuse,vUv-dir*.5).rgb+texture2D(tDiffuse,vUv+dir*.5).rgb); float lb=L(b);
+      gl_FragColor=vec4((lb<mn||lb>mx)?a:b,1.); }` });
+composer.addPass(fxaa);
 const cine = new ShaderPass({
   uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uAberr: { value: .0012 }, uGrain: { value: .05 }, uVig: { value: .85 },
-    uBars: { value: 1 }, uAspect: { value: innerWidth / innerHeight }, uFade: { value: 0 }, uSat: { value: 1.22 } },
+    uBars: { value: 1 }, uAspect: { value: innerWidth / innerHeight }, uFade: { value: 0 }, uSat: { value: 1.22 },
+    uTexel: { value: new THREE.Vector2(1 / 1920, 1 / 1080) }, uSharp: { value: .32 }, uGain: { value: new THREE.Vector3(1, 1, 1) }, uLift: { value: new THREE.Vector3(0, 0, 0) } },
   vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uTime,uAberr,uGrain,uVig,uBars,uAspect,uFade,uSat,uPanelA,uMsgA; uniform vec4 uFlash; uniform sampler2D tPanel,tMsg; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uTime,uAberr,uGrain,uVig,uBars,uAspect,uFade,uSat,uPanelA,uMsgA,uSharp; uniform vec2 uTexel; uniform vec3 uGain,uLift; uniform vec4 uFlash; uniform sampler2D tPanel,tMsg; varying vec2 vUv;
     float hash(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }
     void main(){
       vec2 uv=vUv, c=uv-.5; vec2 ca=c*vec2(uAspect,1.);
       float r2=dot(ca,ca)/(uAspect*uAspect*.25+.25);
       vec2 off=c*uAberr*(.3+r2*2.5);
       vec3 col=vec3(texture2D(tDiffuse,uv+off).r,texture2D(tDiffuse,uv).g,texture2D(tDiffuse,uv-off).b);
+      { vec3 nb=(texture2D(tDiffuse,uv+vec2(uTexel.x,0.)).rgb+texture2D(tDiffuse,uv-vec2(uTexel.x,0.)).rgb+texture2D(tDiffuse,uv+vec2(0.,uTexel.y)).rgb+texture2D(tDiffuse,uv-vec2(0.,uTexel.y)).rgb)*.25;
+        col=max(col+(col-nb)*uSharp,0.); }                                            // accentuation douce : la haute définition se voit
+      col=col*uGain+uLift*(1.-col);                                                      // étalonnage du moment (nuit d'argent, aube d'ambre, climax d'or)
+      { vec3 x=max(col-.78,0.); col=min(col,.78)+(1.-exp(-x*3.2))*.22; }               // épaule douce : plus de blanc brûlé
       col*=mix(1.,smoothstep(1.2,.12,r2),uVig);
       float lum=dot(col,vec3(.299,.587,.114));
       col+=(hash(uv*vec2(1731.,977.)+fract(uTime*13.17))-.5)*uGrain*(1.-lum*.5);
@@ -1061,11 +1081,13 @@ SKY.group.matrixAutoUpdate = false; scene.add(SKY.group);
 
   // Voie lactée (contours d3-celestial rasterisés)
   SKY.mwMat = new THREE.ShaderMaterial({
-    uniforms: { tMW: { value: loadTex(SKYIMG.mw) }, uGain: { value: 1 } }, side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    uniforms: { tMW: { value: loadTex(SKYIMG.mw) }, uGain: { value: 1 }, uPhoto: { value: 0 } }, side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     vertexShader: `varying vec3 vD; void main(){ vD=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
-    fragmentShader: SNOISE + `uniform sampler2D tMW; uniform float uGain; varying vec3 vD;
+    fragmentShader: SNOISE + `uniform sampler2D tMW; uniform float uGain,uPhoto; varying vec3 vD;
       void main(){ vec3 d=normalize(vD); float ra=degrees(atan(d.y,d.x)); float dec=degrees(asin(clamp(d.z,-1.,1.)));
-        float m=texture2D(tMW,vec2((ra+180.)/360.,.5+dec/180.)).r;
+        vec2 uv=vec2((ra+180.)/360.,.5+dec/180.), gx=dFdx(uv), gy=dFdy(uv); gx.x-=floor(gx.x+.5); gy.x-=floor(gy.x+.5);
+        if(uPhoto>.5){ vec3 p=textureGrad(tMW,uv,gx,gy).rgb; gl_FragColor=vec4(p*.42*uGain,1.); return; }   // photographie réelle du ciel (Solar System Scope, CC BY 4.0)
+        float m=texture2D(tMW,uv).r;
         float g=.75+.25*snoise(d*40.)+.15*snoise(d*120.);
         vec3 c=mix(vec3(.55,.62,.85),vec3(1.,.9,.75),smoothstep(.4,.9,m))*m*g*.05*uGain; gl_FragColor=vec4(c,1.); }`
   });
@@ -1138,7 +1160,7 @@ SKY.group.matrixAutoUpdate = false; scene.add(SKY.group);
   SKY.glare.renderOrder = -6; scene.add(SKY.glare);
 }
 const _m4 = new THREE.Matrix4(), _db = new THREE.Vector2();
-function updatePxs() { const hpx = renderer.getDrawingBufferSize(_db).y; PU.uPxs.value = hpx / 720; dof.u.uMaxBlur.value = 14 * hpx / 720; }
+function updatePxs() { const b = renderer.getDrawingBufferSize(_db), hpx = b.y; PU.uPxs.value = hpx / 720; dof.u.uMaxBlur.value = 14 * hpx / 720; fxaa.uniforms.uTexel.value.set(1 / b.x, 1 / b.y); cine.uniforms.uTexel.value.set(1 / b.x, 1 / b.y); }
 let CEL = null;      // état céleste courant
 function celestial(W, ms) {
   const s = Astro.sky(ms), B = Astro.siteBasis(s.frame, W.lat, W.lon);
@@ -1267,7 +1289,7 @@ function buildWorld(seed, startMs, dawn) {
   const P = geo.attributes.position, warp = c => 1300 * (.085 * c + .915 * c * c * c);
   for (let i = 0; i < P.count; i++) { const x = warp(P.getX(i)), z = warp(P.getZ(i)); P.setXYZ(i, x, h(x, z), z); }
   geo.computeVertexNormals();
-  const groundMat = new THREE.MeshStandardMaterial({ color: 0x8c8983, roughness: 1, metalness: 0 });
+  const groundMat = new THREE.MeshStandardMaterial({ color: 0x5b5955, roughness: 1, metalness: 0 });   // régolithe : gris sombre, comme l'asphalte
   groundMat.onBeforeCompile = sh => {
     addTerrainShadow(sh);
     Object.assign(sh.uniforms, { tGlow: PU.tGlow, uGlowR: PU.uGlowR, uBio: PU.uBio, uTime: PU.uTime, uShock: PU.uShock, uShockCol: PU.uShockCol, uFoot: PU.uFoot, uFootN: PU.uFootN });
@@ -1291,8 +1313,8 @@ function buildWorld(seed, startMs, dawn) {
           if(mk>m){ m=mk; tread=step(.5,fract(u*26.)); } }
         return m; }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
-        float alb=mix(.7,1.16,fbm(vTWPos.xz*.012))*mix(.9,1.06,vn(vTWPos.xz*2.7));
-        float near=1.-smoothstep(25.,60.,length(vViewPosition));
+        float near=1.-smoothstep(25.,60.,length(vViewPosition)), close=1.-smoothstep(4.,14.,length(vViewPosition));
+        float alb=mix(.66,1.16,fbm(vTWPos.xz*.012))*mix(.88,1.07,vn(vTWPos.xz*2.7))*mix(1.,mix(.8,1.14,vn(vTWPos.xz*9.)),near)*mix(1.,mix(.86,1.1,vn(vTWPos.xz*31.)),close);   // poussière, gravillons, grain
         float trd=0.; float fp=uFootN>1&&near>0.?foot(vTWPos.xz,trd):0.;
         alb*=1.-fp*(.16+.14*trd);
         vec2 guv=vec2(vTWPos.x/(2.*uGlowR)+.5,.5-vTWPos.z/(2.*uGlowR)); vec4 GL=(guv.x>0.&&guv.x<1.&&guv.y>0.&&guv.y<1.)?texture2D(tGlow,guv):vec4(0.);
@@ -1303,7 +1325,7 @@ function buildWorld(seed, startMs, dawn) {
           roughnessFactor=mix(roughnessFactor,.06,gl); }`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         { float fade=1.-smoothstep(30.,110.,length(vViewPosition)); float e=.06;
-          #define HB(q) (vn((q)*.9)*.55+vn((q)*2.3)*.22+vn((q)*5.1)*.08+mcr(q))
+          #define HB(q) (vn((q)*.9)*.55+vn((q)*2.3)*.22+vn((q)*5.1)*.08+vn((q)*12.)*.03*fade+mcr(q))
           vec2 q=vTWPos.xz;
           float gx=(HB(q+vec2(e,0.))-HB(q-vec2(e,0.)))/(2.*e), gz=(HB(q+vec2(0.,e))-HB(q-vec2(0.,e)))/(2.*e);
           vec3 nw=normalize(normalize(vWN)-vec3(gx,0.,gz)*.55*fade);
@@ -1782,7 +1804,7 @@ function floraMaterial(key, glsl, emisPre, phys, rim) {
         vEmis+=base*bodyGlow*(.3+.7*uDay)*step(.001,segF);           // couleur dans la masse des minéraux translucides          // lumière traversant feuilles et pétales
         vRim=iCol2*${rim}*(.35+.65*uDay+uBio*.3)*step(.001,segF); vLeaf=segLeaf;
       `);
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uDay; varying vec3 vCol; varying vec2 vMat; varying vec3 vEmis; varying vec3 vRim; varying vec3 vLeaf; float lfRib=0., lfVein=0., lfEdge=0.;')
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uDay; uniform float uTime; varying vec3 vCol; varying vec2 vMat; varying vec3 vEmis; varying vec3 vRim; varying vec3 vLeaf; float lfRib=0., lfVein=0., lfEdge=0.;')
       .replace('#include <color_fragment>', `diffuseColor.rgb=vCol;
         if(vLeaf.z>.5){ float a=vLeaf.x, b=vLeaf.y;                              // nervure centrale, nervures secondaires, bord translucide
           lfRib=exp(-pow(b*26.,2.))*(1.-smoothstep(.75,1.,abs(a)));
@@ -1791,7 +1813,10 @@ function floraMaterial(key, glsl, emisPre, phys, rim) {
           diffuseColor.rgb*=1.-.28*lfRib-.18*lfVein; }`)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor=vMat.x;')
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor=vMat.y;')
-      .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance=vEmis*(1.+lfRib*1.2+lfVein*.8)+vRim*pow(1.-abs(dot(normal,normalize(vViewPosition))),2.5)+vCol*lfEdge*.22*(.3+.7*uDay)+vEmis*lfEdge*.6;');
+.replace('#include <emissivemap_fragment>', `float vpul=.55+.45*sin(uTime*3.6-vLeaf.x*11.);                                       // la lumière court le long des nervures
+        totalEmissiveRadiance=vEmis*(1.+lfRib*1.2+lfVein*.8*vpul*2.)+vRim*pow(1.-abs(dot(normal,normalize(vViewPosition))),2.5)+vCol*lfEdge*.22*(.3+.7*uDay)+vEmis*lfEdge*.6;
+        { vec3 sv=normalize((viewMatrix*vec4(uSunL,0.)).xyz); float bl=pow(max(dot(-normalize(vViewPosition),sv),0.),5.);   // contre-jour : le soleil traverse feuilles et pétales
+          totalEmissiveRadiance+=(vCol*1.5+vec3(.18,.15,.1))*bl*uDay*(.35+.65*vLeaf.z)*(1.-.6*lfRib)*(.6+.8*lfEdge)*.9; }`);
   };
   return m;
 }
@@ -3159,20 +3184,20 @@ function status(m) { $('status').textContent = m; }
 const HD = { state: 'off', done: [] };
 function loadHD() {
   if (HD.state !== 'off' || !/^https?:$/.test(location.protocol) || S.quality === 'fluide') return;
-  const max = renderer.capabilities.maxTextureSize; if (max < 8192) { HD.state = 'trop grand'; return; }
+  const max = renderer.capabilities.maxTextureSize; if (max < 4096) { HD.state = 'trop grand'; return; }
   HD.state = 'chargement'; const an = renderer.capabilities.getMaxAnisotropy();
-  const jobs = [['hd/lune_8k.jpg', SPACE.moonMat.uniforms.tMoon, true, 'Lune'], ['hd/terre_jour_8k.jpg', SKY.earthMat.uniforms.tDay, true, 'Terre'], ['hd/terre_nuit_8k.jpg', SKY.earthMat.uniforms.tNight, false, 'villes'], ['hd/nuages_4k.jpg', SKY.earthMat.uniforms.tCloud, false, 'nuages']];
+  const jobs = [['hd/lune_4k.jpg', SPACE.moonMat.uniforms.tMoon, true, 'Lune'], ['hd/voie_lactee_4k.jpg', SKY.mwMat.uniforms.tMW, true, 'Voie lactée', () => { SKY.mwMat.uniforms.uPhoto.value = 1; }], ['hd/terre_nuit_4k.jpg', SKY.earthMat.uniforms.tNight, false, 'villes'], ['hd/nuages_4k.jpg', SKY.earthMat.uniforms.tCloud, false, 'nuages']];
   const next = () => {
     const j = jobs.shift(); if (!j) { HD.state = 'ok'; updHD(); return; }
     if (mode !== 'intro') { jobs.unshift(j); setTimeout(next, 5000); return; }          // jamais pendant une composition : on attend l'accueil
     texLoader.load(new URL(j[0], location.href).href, t => {
       if (j[2]) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = an; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter;
-      renderer.initTexture(t); const old = j[1].value; j[1].value = t; if (old && old !== t) old.dispose(); HD.done.push(j[3]); updHD(); setTimeout(next, 300);
+      renderer.initTexture(t); const old = j[1].value; j[1].value = t; if (old && old !== t) old.dispose(); if (j[4]) j[4](); HD.done.push(j[3]); updHD(); setTimeout(next, 300);
     }, undefined, () => { HD.state = 'partiel'; updHD(); setTimeout(next, 300); });
   };
   updHD(); setTimeout(next, 200);
 }
-function updHD() { const e = document.getElementById('hdMsg'); if (e) e.textContent = HD.state === 'ok' ? 'Haute définition : Lune et Terre en 8K' : HD.state === 'chargement' ? 'Chargement de la haute définition… ' + HD.done.join(', ') : HD.state === 'trop grand' ? 'Carte graphique limitée : définition standard' : HD.state === 'partiel' ? 'Haute définition partielle : ' + HD.done.join(', ') : ''; }
+function updHD() { const e = document.getElementById('hdMsg'); if (e) e.textContent = HD.state === 'ok' ? 'Haute définition 4K : Lune, Terre, Voie lactée' : HD.state === 'chargement' ? 'Chargement de la haute définition… ' + HD.done.join(', ') : HD.state === 'trop grand' ? 'Carte graphique limitée : définition standard' : HD.state === 'partiel' ? 'Haute définition partielle : ' + HD.done.join(', ') : ''; }
 setTimeout(loadHD, 2500);
 /* ---- Accueil : préparer le son, la pédale et la scène avant la composition ---- */
 S.src = 'ordi'; S.file = null;
@@ -4123,6 +4148,10 @@ function updateVisuals(dt, withUI) {
       const u = landedGrain.material.uniforms; u.uPx.value = vh / 1080; u.uSize.value = 26 + 12 * f.bass + 6 * Math.sin(renderT * 3); u.uI.value = 3.2; u.uOn.value = on; u.uCol.value.setRGB(...mixC([1, .86, .55], world.palette.a, .35)); }
   }
   bloom.strength = .32 + f.bass * .18 + f.vol * .1 + .12 * (sim.arc || 0);
+  { const C = CEL, night = C ? C.night : 0, el = C ? C.el / D2R : 20, dawn = C ? Math.exp(-Math.pow((el - 3) / 6, 2)) * (1 - night) : 0, gold = C ? smoothstep(8, 30, el) * (1 - night) : 0, G = cine.uniforms.uGain.value, Lf = cine.uniforms.uLift.value;
+    const sp = inSpace ? 1 : 0;
+    G.set(1 + .06 * dawn + .01 * gold - .05 * night, 1 + .01 * dawn + .005 * gold - .01 * night, 1 - .08 * dawn - .005 * gold + .07 * night).lerp(new THREE.Vector3(1, 1, 1), sp);
+    Lf.set(.006 * dawn, .004 * night, .016 * night + .004).multiplyScalar(1 - sp); cine.uniforms.uSharp.value = S.quality === 'fluide' ? .18 : .32; }
   cine.uniforms.uTime.value = renderT; cine.uniforms.uGrain.value = S.grain; cine.uniforms.uBars.value = S.scope && S.output === 'cinema' ? 1 : 0;
 
   if (withUI) {
