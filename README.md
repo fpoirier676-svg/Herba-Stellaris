@@ -97,6 +97,12 @@ principale devient la **régie** : aperçu, temps, phrase, plantes, Soleil, nive
 note, accord, tonalité, tension, zoom, pédale, spectateurs. **Mire de synchronisation** (M) : un éclair à chaque attaque, pour mesurer
 la latence et la reporter dans *Latence de la chaîne*.
 
+**Calage du projecteur**, dans la fenêtre de projection : **G** affiche une **mire de calage** : cadre de l'image, zone sûre à 90 %,
+cercle qui doit rester rond, barres de couleur, rampe de gris et cinq carrés presque noirs à distinguer du noir.
+**K** passe en **correction des coins** : glisse les quatre cercles sur les coins de l'écran, ou choisis un coin avec **1 à 4**
+puis ajuste-le aux **flèches** (**Maj** pour un réglage fin). **R** réinitialise ; **K** ou **Échap** termine.
+Le réglage est mémorisé pour la soirée suivante. Les mêmes commandes existent en boutons dans la régie.
+
 ### Instruments de scène
 Sur l'image projetée (touche **I**, ou la case dans la carte 3) : un **égaliseur à 48 bandes** tout en bas (dans la bande noire du format
 cinéma), pour voir la musique agir sur le jardin ; en haut à droite, le **nombre de végétaux**, d'espèces et de graines du public, le
@@ -105,8 +111,23 @@ est un point lumineux à sa place, à la hauteur de sa croissance. Les instrumen
 
 ### Pendant le spectacle (clavier)
 1 à 9 : plans (ensemble, ras du sol, grue, plongée, cime, canopée, ciel, Terre, contre-jour) · **A** lève le Soleil · **E** conclut ·
-**Q** graines du public · **N** noms du public · **S** mode Scène · **+ / −** zoom, **0** retour au sol · **I** instruments de scène · **H** commandes · **F** plein écran.
+**Q** graines du public · **N** noms du public · **S** mode Scène · **+ / −** zoom, **0** retour au sol · **I** instruments de scène · **H** commandes · **F** plein écran · **G** mire de calage et **K** coins (dans la fenêtre de projection).
 Tout est inscrit dans l'empreinte : la galerie et les exports rejouent l'œuvre à l'identique.
+
+### Soir de spectacle : le panneau « Prêt pour le spectacle »
+Sur l'accueil, une ligne de voyants vérifie tout d'un coup d'œil : son, pédale, fenêtre de projection, fluidité (images par seconde),
+haute définition, liaison, **réseau public**, ton téléphone, semis du public et espace de stockage.
+Le **réseau public** est un vrai essai : l'ordinateur vérifie qu'il joint le serveur relais, celui qui permet aux téléphones sur
+données cellulaires de rejoindre la composition. En orange (« relais bloqué »), le Wi-Fi de la salle filtre ce relais ; partage
+alors la connexion de ton téléphone à l'ordinateur, ou invite le public à utiliser le Wi-Fi de la salle.
+Côté spectateur, si la liaison tarde, le téléphone l'explique (« essayez le Wi-Fi de la salle, ou l'inverse ») et réessaie seul.
+
+**Reprise après incident** : pendant une composition, l'œuvre en cours est mise à l'abri toutes les 10 secondes (empreinte et son).
+Si l'ordinateur plante ou si la page se ferme, la réouverture propose « Une composition interrompue a été retrouvée » :
+*La conserver dans la galerie* (elle y entre avec la mention « reprise ») ou *L'ignorer*. Le mode répétition n'est pas mis à l'abri.
+Si le micro ou l'interface audio se débranche, l'application tente de le retrouver toutes les 2 secondes pendant 2 minutes.
+
+Testé avec **50 spectateurs** simultanés qui sèment et lèvent leur téléphone : le jardin reste fluide et lisible.
 
 ### Sorties et robustesse
 - **Sortie de projection** : *Cinéma 2.39*, *Plein cadre* (écrans ultra-larges), *Dôme 180°* (fisheye domemaster, centre relevé de 20°).

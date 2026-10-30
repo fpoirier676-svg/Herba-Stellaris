@@ -214,12 +214,17 @@ function connect() {
   peer = peer && !peer.destroyed ? peer : new Peer();
   const go = () => {
     conn = peer.connect(target, { metadata: { role: 'public' }, reliable: true });
-    conn.on('open', () => { retry = 0; say(''); conn.send({ cid, type: 'hello' }); refresh(); });
+    const c0 = conn, wd = setTimeout(() => {                               // la liaison n'aboutit pas : on l'explique et on réessaie
+      if (c0.open || conn !== c0) return;
+      say('La liaison tarde à s’établir…<br><i>Si vous êtes sur données cellulaires, essayez le Wi-Fi de la salle (ou l’inverse). Nouvel essai automatique.</i>');
+      try { c0.close(); } catch (e) {} setTimeout(connect, 1500);
+    }, 14000);
+    conn.on('open', () => { clearTimeout(wd); retry = 0; say(''); conn.send({ cid, type: 'hello' }); refresh(); });
     conn.on('data', d => onMsg(d || {}));
     conn.on('close', () => { refresh(); say('Liaison interrompue… <i>reconnexion</i>'); setTimeout(connect, 2000 + 1000 * Math.min(retry++, 8)); });
   };
   if (peer.open) go(); else peer.on('open', go);
-  peer.on('error', () => { say('La composition n’est pas joignable pour l’instant.<br><i>Nouvel essai dans un instant…</i>'); setTimeout(() => { try { peer.destroy(); } catch (e) {} peer = null; connect(); }, 4000); });
+  peer.on('error', e => { say((e && e.type === 'network' ? 'Pas d’accès à internet sur ce téléphone pour l’instant.' : e && e.type === 'peer-unavailable' ? 'La composition n’est pas encore ouverte.' : 'La composition n’est pas joignable pour l’instant.') + '<br><i>Nouvel essai dans un instant…</i>'); setTimeout(() => { try { peer.destroy(); } catch (e) {} peer = null; connect(); }, 4000); });
 }
 function onMsg(d) {
   if ((d.msg === 'hello' || d.msg === 'state') && d.site) $('sub').innerHTML = 'Une flore naît en ce moment sur la Lune,<br>au site <b>' + d.site + '</b>. Une graine par personne.';

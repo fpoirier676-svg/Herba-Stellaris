@@ -16,7 +16,7 @@
   #regie video { width:100%; aspect-ratio:16/9; background:#000; display:block; margin-bottom:10px; }
   #regie .rg-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px 12px; font-variant-numeric:tabular-nums; margin-bottom:10px; }
   #regie .rg-grid div span { display:block; font-size:9px; letter-spacing:.12em; text-transform:uppercase; opacity:.5; }
-  #regie .rg-btns { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; } #regie .rg-btns button { font-size:10px; padding:8px 10px; letter-spacing:.06em; }
+  #regie .rg-btns { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; } #regie .rg-btns button { font-size:10px; padding:8px 10px; letter-spacing:.06em; } #regie .rg-btns button.on { background:#9fe8ff; color:#04121a; }
   #regie .rg-msg { color:#e8b98a; min-height:16px; }
   #pubBox { position:fixed; right:26px; bottom:26px; z-index:30; background:rgba(4,5,8,.72); border:1px solid rgba(255,240,220,.16); border-radius:14px; padding:14px 16px; width:190px; text-align:center; backdrop-filter:blur(6px); }
   #pubQR svg { width:150px; height:150px; background:#fff; border-radius:6px; padding:4px; }
@@ -54,6 +54,11 @@
   #intro #phoneHome .pgrid { grid-template-columns:150px 1fr; gap:14px; margin:6px 0; } #intro #phoneHome #qr { width:150px; height:150px; padding:7px; }
   #intro .go { margin-top:8px; } #intro #btnGo { padding:17px 34px; font-size:12px; }
   #intro .vin { font:inherit; font-size:11px; color:var(--ink); background:rgba(0,0,0,.4); border:1px solid var(--line); padding:7px; margin-top:4px; box-sizing:border-box; }
+  #intro .ready { display:flex; flex-wrap:wrap; justify-content:center; gap:6px 14px; width:min(1240px,96vw); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin-top:4px; }
+  #intro .ready b { font-weight:500; color:var(--ink); letter-spacing:.2em; margin-right:6px; }
+  #intro .ready span { white-space:nowrap; } #intro .ready i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:0; background:#5b5b5b; }
+  #intro .ready .ok i { background:#9fe3c8; box-shadow:0 0 8px #9fe3c8; } #intro .ready .warn i { background:#e8b98a; } #intro .ready .bad i { background:#ff6a5e; }
+  #secours { margin-top:8px; padding:10px 14px; border:1px solid #e8b98a88; background:rgba(40,25,10,.6); color:#f3d9a4; font-size:12px; max-width:900px; }
   #intro .help { max-width:760px; color:var(--faint); font-size:10px; line-height:1.7; letter-spacing:.04em; }
   #status { min-height:18px; color:#e8b98a; font-size:12px; max-width:560px; line-height:1.6; }
 
@@ -2620,8 +2625,10 @@ var qrcode = function() {
     </div>
    </section>
   </div>
+  <div id="ready" class="ready"></div>
   <div class="row go"><button class="primary" id="btnGo">Commencer la composition</button><button id="btnRep" title="Jouer sans rien enregistrer ; recommencer depuis le téléphone">Répéter</button><button id="btnGal1">Galerie des créations</button></div>
   <div id="status"></div>
+  <div id="secours" class="hidden"><span></span> <button class="small" data-a="keep">La conserver dans la galerie</button> <button class="small" data-a="drop">L’ignorer</button></div>
   <div class="xnote help">Pendant la composition, l’écran reste vide de toute commande. H affiche ou masque les commandes · E lance le final · A lève le Soleil · 1 à 9 changent de plan · le bouton « Conclure » du téléphone-capteur (ou E) fait décoller la conclusion, puis l’œuvre est conservée.</div>
  </div>
 </div>
@@ -2670,7 +2677,7 @@ var qrcode = function() {
   <div class="rg-btns" id="rgShots"></div>
   <div class="rg-btns">
     <button id="rgAube">Aube (A)</button><button id="rgFin">Final (E)</button><button id="rgPub">Graines public (Q)</button>
-    <button id="rgStage">Mode Scène (S)</button><button id="rgMire">Mire (M)</button><button id="rgClose">Fermer la projection</button>
+    <button id="rgStage">Mode Scène (S)</button><button id="rgMire">Mire (M)</button><button id="rgCal">Mire de calage (G)</button><button id="rgKey">Coins (K)</button><button id="rgClose">Fermer la projection</button>
   </div>
   <label class="rg-zoom" style="display:flex;align-items:center;gap:10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin:4px 0 8px">Zoom <input type="range" id="rgZoom" min="0" max="1" step="0.005" value="0" style="flex:1"></label>
   <div class="rg-msg" id="rgMsg"></div>
@@ -2900,6 +2907,7 @@ const AE = {
     if (S.inDev) a.deviceId = { exact: S.inDev };
     try { this.stream = await navigator.mediaDevices.getUserMedia({ audio: a }); } catch (e) { delete a.deviceId; this.stream = await navigator.mediaDevices.getUserMedia({ audio: a }); }
     try { const st = this.stream.getAudioTracks()[0].getSettings(); this.inLat = st.latency || 0; this.inLabel = this.stream.getAudioTracks()[0].label; } catch (e) {}
+    try { this.stream.getAudioTracks()[0].addEventListener('ended', () => { if (mode === 'live') audioLost(); }); } catch (e) {}
     this.source = this.ctx.createMediaStreamSource(this.stream);
     this.source.connect(this.analyser); if (this.wk) this.source.connect(this.wk);
     this.startRecorder(this.stream);
@@ -2912,6 +2920,11 @@ const AE = {
     this.attachRemote(stream);
     this.startRecorder(this.recDest.stream);
     this.active = true;
+  },
+  relink(st) {                                                   // nouvelle entrée après une coupure : l'analyse reprend, l'œuvre continue
+    try { this.source && this.source.disconnect(); } catch (e) {}
+    this.stream = st; this.source = this.ctx.createMediaStreamSource(st); this.source.connect(this.analyser); if (this.wk) this.source.connect(this.wk);
+    try { st.getAudioTracks()[0].addEventListener('ended', () => { if (mode === 'live') audioLost(); }); } catch (e) {}
   },
   attachRemote(stream) {
     try { this.source && this.source.disconnect(); } catch (e) {}
@@ -4958,7 +4971,7 @@ class Sim {
   spawnPublic() { this.spawn(this.f.bass, this.f.mid, this.f.high, this.f.cent, true); }
   spawn(bass, mid, high, cent, pub, spec, at, scol) {
     const r = this.rL, W = this.W;
-    const v = spec ? this.pickVariety(f => f === spec.fam) : this.pickVariety(f => f !== 'mycelium'), sp = v.fam, P = this.phrase;
+    const v = (spec && this.pickVariety(f => f === spec.fam)) || this.pickVariety(f => f !== 'mycelium'), sp = v.fam, P = this.phrase;
     if (!P.fam) P.fam = sp;
     let px, pz;
     if (at) { px = at[0]; pz = at[1]; }
@@ -5153,16 +5166,88 @@ async function finishLive(save) {
   if (mode !== 'live') return;
   mode = 'idle'; setUI(); keepAwake(false); if (uiHidden && !S.stage) toggleUI();
   const audio = await AE.finishRecording(); AE.stop();
+  if (!save) secoursClear();
   if (S.rehearsal) { mode = 'intro'; setUI(); status('Répétition terminée : rien n’a été enregistré.' + (LIVE_MARKS.length ? ' Repères posés : ' + LIVE_MARKS.map(mmss).join(', ') + '.' : '')); sendStatus(); return; }
   if (!save) return;
   const thumb = await new Promise(res => wantThumb = res);
-  const rec = {
-    id: Date.now().toString(36) + '-' + sim.W.seed.toString(36), name: sim.W.name, date: new Date().toISOString(), seed: sim.W.seed, startUTC: sim.W.startMs,
-    stride: FSTRIDE, tick: TICK, manualEnd: true, venue: world.venue, events: recEvents.slice(), lat: S.latency / 1000, tscale: sim.tscale, dawn: sim.dawn, publicSeeds: sim.pubN, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), varieties: new Set(sim.plants.map(p => p.var)).size, frames: new Float32Array(frames), audio, thumb,
-  };
+  const rec = makeRec(audio, thumb);
+  secoursClear();
+
   try { await DB.put(rec); } catch (e) { memStore.set(rec.id, rec); }
   showEpilogue(rec);
 }
+function makeRec(audio, thumb) { return {
+    id: Date.now().toString(36) + '-' + sim.W.seed.toString(36), name: sim.W.name, date: new Date().toISOString(), seed: sim.W.seed, startUTC: sim.W.startMs,
+    stride: FSTRIDE, tick: TICK, manualEnd: true, venue: world.venue, events: recEvents.slice(), lat: S.latency / 1000, tscale: sim.tscale, dawn: sim.dawn, publicSeeds: sim.pubN, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), varieties: new Set(sim.plants.map(p => p.var)).size, frames: new Float32Array(frames), audio, thumb,
+  }; }
+/* ---- Sauvegarde de secours : toutes les 10 s pendant une composition ; reprise après un plantage ---- */
+const SEC = { last: 0, busy: false };
+// l'entrée audio a disparu (câble USB débranché…) : on garde l'image, on réessaie toutes les 2 s, sans perdre l'œuvre
+async function audioLost() {
+  if (AE.relinking) return; AE.relinking = true; $('rgMsg').textContent = 'Entrée audio perdue : reconnexion…';
+  for (let i = 0; i < 60 && mode === 'live'; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    try { const a = { echoCancellation: false, noiseSuppression: false, autoGainControl: false }; if (S.inDev) a.deviceId = { exact: S.inDev };
+      const st = await navigator.mediaDevices.getUserMedia({ audio: a }); AE.relink(st); $('rgMsg').textContent = 'Entrée audio rétablie.'; break; } catch (e) {}
+  }
+  AE.relinking = false;
+}
+function secoursDB() { return new Promise((res, rej) => { const r = indexedDB.open('herba-secours', 1); r.onupgradeneeded = () => r.result.createObjectStore('s'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function secoursPut(v) { const db = await secoursDB(); await new Promise((res, rej) => { const tx = db.transaction('s', 'readwrite'); tx.objectStore('s').put(v, 'en-cours'); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); db.close(); }
+async function secoursGet() { const db = await secoursDB(); const v = await new Promise(res => { const q = db.transaction('s').objectStore('s').get('en-cours'); q.onsuccess = () => res(q.result); q.onerror = () => res(null); }); db.close(); return v; }
+async function secoursClear() { try { await secoursPut(null); } catch (e) {} }
+async function secoursTick() {
+  if (mode !== 'live' || S.rehearsal || SEC.busy || performance.now() - SEC.last < 10000 || !sim) return;
+  SEC.busy = true; SEC.last = performance.now();
+  try { const audio = AE.chunks && AE.chunks.length ? new Blob(AE.chunks, { type: AE.recMime || 'audio/webm' }) : null; const r = makeRec(audio, null); r.secours = true; await secoursPut(r); } catch (e) {}
+  SEC.busy = false;
+}
+setInterval(secoursTick, 2000);
+async function secoursOffer() {
+  let r = null; try { r = await secoursGet(); } catch (e) {} if (!r || !r.frames || !r.frames.length || (r.duration || 0) < 10) return;
+  const box = $('secours'); box.classList.remove('hidden');
+  box.querySelector('span').textContent = `Une composition interrompue a été retrouvée : ${r.name}, ${mmss(r.duration || 0)}, ${new Date(r.date).toLocaleString('fr-CA')}.`;
+  box.querySelector('[data-a=keep]').onclick = async () => { delete r.secours; r.name += ' (reprise)'; try { await DB.put(r); } catch (e) { memStore.set(r.id, r); } await secoursClear(); box.classList.add('hidden'); status('L’œuvre interrompue est dans la galerie.'); };
+  box.querySelector('[data-a=drop]').onclick = async () => { await secoursClear(); box.classList.add('hidden'); };
+}
+setTimeout(secoursOffer, 1500);
+// essai réseau : le relais (TURN) est-il joignable depuis la salle ? sans lui, certains téléphones sur données cellulaires ne passent pas
+const NET = { st: null, t: 0 };
+async function netProbe() {
+  if (!window.RTCPeerConnection) return;
+  NET.t = Date.now(); const got = { host: 0, srflx: 0, relay: 0 };
+  let pc; try {
+    pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' }] });
+    pc.createDataChannel('essai'); pc.onicecandidate = e => { if (e.candidate) { const t = (/ typ (\w+)/.exec(e.candidate.candidate) || [])[1]; if (t in got) got[t]++; } };
+    await pc.setLocalDescription(await pc.createOffer());
+    await new Promise(r => { const t0 = Date.now(); (function w() { if (got.relay || Date.now() - t0 > 8000 || pc.iceGatheringState === 'complete') return r(); setTimeout(w, 200); })(); });
+  } catch (e) {} try { pc && pc.close(); } catch (e) {}
+  NET.st = navigator.onLine === false ? 'off' : got.relay ? 'relay' : got.srflx ? 'srflx' : 'host';
+}
+setTimeout(netProbe, 2500); setInterval(() => { if (mode === 'intro') netProbe(); }, 120000);
+// prêt pour le spectacle : tout se vérifie d'un coup d'œil sur l'accueil
+const RDY = { fps: 0, n: 0, t0: 0, store: null };
+(function fpsLoop(t) { requestAnimationFrame(fpsLoop); if (!RDY.t0) RDY.t0 = t; RDY.n++; if (t - RDY.t0 > 1000) { RDY.fps = RDY.n * 1000 / (t - RDY.t0); RDY.n = 0; RDY.t0 = t; } })(0);
+try { navigator.storage && navigator.storage.estimate().then(e => { RDY.store = (e.quota - e.usage) / 1e6; }); } catch (e) {}
+function updReady() {
+  if (mode !== 'intro') return;
+  const it = [];
+  const src = S.src === 'phone' ? (PH.stream ? ['ok', 'micro du téléphone'] : ['bad', 'téléphone non relié']) : S.src === 'file' ? (S.file ? ['ok', 'fichier choisi'] : ['bad', 'aucun fichier']) :
+    (TST.an ? (/aucun signal/.test($('tMsg').textContent) ? ['bad', 'aucun signal'] : /sature/.test($('tMsg').textContent) ? ['warn', 'saturation'] : ['ok', 'signal correct']) : (/gx|boss/i.test(($('inDev').selectedOptions[0] || {}).text || '') ? ['warn', 'GX-1 choisi, à tester'] : ['warn', 'à tester']));
+  it.push(['Son', ...src]);
+  it.push(['Pédale', ...(BOSS.on ? ['ok', 'GX-1 en ligne'] : ZM.bind ? ['warn', 'à activer'] : ['warn', 'non réglée'])]);
+  it.push(['Projection', ...(PROJ && !PROJ.closed ? ['ok', 'fenêtre ouverte'] : ['warn', 'fenêtre fermée'])]);
+  it.push(['Fluidité', ...(RDY.fps >= 55 ? ['ok', Math.round(RDY.fps) + ' i/s'] : RDY.fps >= 40 ? ['warn', Math.round(RDY.fps) + ' i/s'] : ['bad', Math.round(RDY.fps) + ' i/s'])]);
+  it.push(['Haute déf.', ...(HD.state === 'ok' ? ['ok', '4K'] : HD.state === 'chargement' ? ['warn', 'en cours'] : ['warn', 'standard'])]);
+  it.push(['Liaison', ...(PH.id && PH.peer && !PH.peer.disconnected ? ['ok', 'serveur joint'] : PH.peer ? ['warn', 'en cours'] : ['bad', 'hors ligne'])]);
+  it.push(['Réseau public', ...(NET.st === 'relay' ? ['ok', 'relais joignable'] : NET.st === 'srflx' ? ['warn', 'relais bloqué : données cellulaires incertaines'] : NET.st === 'host' ? ['bad', 'internet bloqué'] : NET.st === 'off' ? ['bad', 'hors ligne'] : ['warn', 'essai en cours'])]);
+  it.push(['Ton téléphone', ...(PH.conn && PH.conn.open ? ['ok', 'relié'] : ['warn', 'non relié'])]);
+  it.push(['Public', ...(PUB.on ? ['ok', 'semis ouvert'] : ['warn', 'semis fermé (Q)'])]);
+  if (RDY.store != null) it.push(['Stockage', ...(RDY.store > 300 ? ['ok', Math.round(RDY.store / 1000) + ' Go libres'] : ['bad', Math.round(RDY.store) + ' Mo libres'])]);
+  const okN = it.filter(x => x[1] === 'ok').length;
+  $('ready').innerHTML = `<span><b>Prêt pour le spectacle</b>${okN}/${it.length}</span>` + it.map(([k, c, v]) => `<span class="${c}"><i></i>${k} : ${v}</span>`).join('');
+}
+setInterval(updReady, 1000);
 function countSpecies() { const c = {}; for (const k in SPECIES) c[k] = 0; if (sim) for (const p of sim.plants) c[p.sp]++; return c; }
 const speciesLine = c => Object.keys(SPECIES).filter(k => c[k]).map(k => c[k] + ' ' + SPECIES[k].court).join(' · ') || 'aucun spécimen';
 
@@ -5645,16 +5730,99 @@ function updateLabels(C) {
   box.innerHTML = html;
 }
 
+
+/* ---- Calage du projecteur : mire géométrique et correction des quatre coins (trapèze) ---- */
+const KEY = {
+  w: null, on: false, cal: false, sel: 0,
+  // décalages des coins en fraction de l'image : haut-gauche, haut-droite, bas-droite, bas-gauche
+  c: (() => { try { const v = JSON.parse(localStorage.getItem('herba-coins')); if (v && v.length === 4) return v; } catch (e) {} return [[0, 0], [0, 0], [0, 0], [0, 0]]; })(),
+  save() { try { localStorage.setItem('herba-coins', JSON.stringify(this.c)); } catch (e) {} },
+  active() { return this.c.some(p => p[0] || p[1]); },
+  setup(w) {
+    this.w = w; const d = w.document;
+    const cv = d.createElement('canvas'); cv.id = 'calage'; d.body.appendChild(cv);
+    const m = d.createElement('div'); m.id = 'kmsg'; d.body.appendChild(m);
+    this.h = [0, 1, 2, 3].map(i => { const e = d.createElement('div'); e.className = 'kc'; e.textContent = i + 1; d.body.appendChild(e);
+      e.addEventListener('pointerdown', ev => { ev.preventDefault(); this.sel = i; this.drag = { i, x: ev.clientX, y: ev.clientY, c: this.c[i].slice() }; e.setPointerCapture(ev.pointerId); this.apply(); });
+      e.addEventListener('pointermove', ev => { const g = this.drag; if (!g) return; const W = w.innerWidth, H = w.innerHeight; this.c[g.i] = [clamp(g.c[0] + (ev.clientX - g.x) / W, -.4, .4), clamp(g.c[1] + (ev.clientY - g.y) / H, -.4, .4)]; this.apply(); });
+      e.addEventListener('pointerup', () => { this.drag = null; this.save(); });
+      return e; });
+    this.apply();
+  },
+  dst(W, H) { const b = [[0, 0], [W, 0], [W, H], [0, H]]; return b.map((p, i) => [p[0] + this.c[i][0] * W, p[1] + this.c[i][1] * H]); },
+  // homographie du rectangle W×H vers le quadrilatère, en matrix3d CSS
+  matrix(W, H) {
+    const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = this.dst(W, H);
+    const dx1 = x1 - x2, dx2 = x3 - x2, dy1 = y1 - y2, dy2 = y3 - y2, sx = x0 - x1 + x2 - x3, sy = y0 - y1 + y2 - y3;
+    const den = dx1 * dy2 - dx2 * dy1; if (Math.abs(den) < 1e-9) return null;
+    const g = (sx * dy2 - dx2 * sy) / den, h = (dx1 * sy - sx * dy1) / den;
+    const a = x1 - x0 + g * x1, b = x3 - x0 + h * x3, c = x0, d = y1 - y0 + g * y1, e = y3 - y0 + h * y3, f = y0;
+    // carré unité → quadrilatère ; on compose avec la mise à l'échelle 1/W, 1/H
+    const A = a / W, B = b / H, D = d / W, E = e / H, G = g / W, Hh = h / H;
+    return `matrix3d(${A},${D},0,${G},${B},${E},0,${Hh},0,0,1,0,${c},${f},0,1)`;
+  },
+  apply() {
+    const w = this.w; if (!w || w.closed) return; const d = w.document, W = w.innerWidth, H = w.innerHeight;
+    const m = this.active() ? this.matrix(W, H) : null, tf = m || '';
+    canvas.style.transformOrigin = '0 0'; canvas.style.transform = tf; d.body.style.background = '#000';
+    const cv = d.getElementById('calage');
+    if (cv) { cv.style.display = this.cal ? 'block' : 'none'; cv.style.transformOrigin = '0 0'; cv.style.transform = tf; if (this.cal) this.drawCal(cv, W, H); }
+    const P = this.dst(W, H);
+    if (this.h) this.h.forEach((e, i) => { e.style.display = this.on ? 'block' : 'none'; e.style.left = P[i][0] + 'px'; e.style.top = P[i][1] + 'px'; e.classList.toggle('sel', i === this.sel); });
+    const k = d.getElementById('kmsg'); if (k) { k.style.display = this.on ? 'block' : 'none'; k.innerHTML = 'Correction des coins — glisse les cercles sur les coins de l’écran<br>ou touches 1 à 4 puis flèches (Maj = fin) · R : réinitialiser · K ou Échap : terminer'; }
+    d.body.classList.toggle('kedit', this.on);
+    if ($('rgKey')) { $('rgKey').classList.toggle('on', this.on); $('rgCal').classList.toggle('on', this.cal); }
+  },
+  drawCal(cv, W, H) {
+    const r = Math.min(2, this.w.devicePixelRatio || 1); cv.width = W * r; cv.height = H * r; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    const g = cv.getContext('2d'); g.setTransform(r, 0, 0, r, 0, 0);
+    g.fillStyle = '#05070a'; g.fillRect(0, 0, W, H);
+    const st = Math.min(W, H) / 12; g.lineWidth = 1; g.strokeStyle = 'rgba(160,200,230,.45)';
+    for (let x = W / 2 % st; x < W; x += st) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+    for (let y = H / 2 % st; y < H; y += st) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+    g.strokeStyle = '#fff'; g.lineWidth = 3; g.strokeRect(1.5, 1.5, W - 3, H - 3);
+    g.setLineDash([10, 8]); g.strokeStyle = 'rgba(255,210,120,.8)'; g.lineWidth = 2; g.strokeRect(W * .05, H * .05, W * .9, H * .9); g.setLineDash([]);
+    g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.moveTo(W / 2, 0); g.lineTo(W / 2, H); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke();
+    g.beginPath(); g.arc(W / 2, H / 2, H * .42, 0, 7); g.stroke();                       // cercle : doit rester rond
+    for (const [x, y] of [[st, st], [W - st, st], [W - st, H - st], [st, H - st]]) { g.beginPath(); g.arc(x, y, st * .6, 0, 7); g.stroke(); }
+    const bars = ['#fff', '#ff0', '#0ff', '#0f0', '#f0f', '#f00', '#00f'], bw = W * .5 / bars.length, by = H * .62, bh = H * .07;
+    bars.forEach((c, i) => { g.fillStyle = c; g.fillRect(W * .25 + i * bw, by, bw, bh); });
+    for (let i = 0; i < 16; i++) { const v = Math.round(i / 15 * 255); g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(W * .25 + i * W * .5 / 16, by + bh, W * .5 / 16 + 1, bh * .7); }
+    g.fillStyle = '#000'; g.fillRect(W * .25, by + bh * 1.7, W * .25, bh * .6); for (let i = 1; i <= 5; i++) { const v = i * 4; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(W * .25 + i * W * .04, by + bh * 1.75, W * .03, bh * .5); }   // noirs : on doit distinguer les 5 carrés
+    g.fillStyle = '#cfe8ff'; g.font = `600 ${Math.round(H * .035)}px system-ui`; g.textAlign = 'center';
+    g.fillText('HERBA STELLARIS — MIRE DE CALAGE', W / 2, H * .2);
+    g.font = `400 ${Math.round(H * .022)}px system-ui`;
+    g.fillText(`${Math.round(W * (this.w.devicePixelRatio || 1))} × ${Math.round(H * (this.w.devicePixelRatio || 1))} px · cadre blanc = bord de l’image · pointillés = zone sûre 90 %`, W / 2, H * .26);
+    g.fillText('Le grand cercle doit rester rond · les 5 carrés sombres doivent se distinguer du noir', W / 2, H * .3);
+  },
+  calage(v) { this.cal = v == null ? !this.cal : v; this.apply(); },
+  edit(v) { this.on = v == null ? !this.on : v; if (this.on) this.cal = true; else this.save(); this.apply(); },
+  key(e) {
+    const k = e.key;
+    if (k === 'g' || k === 'G') { this.calage(); return true; }
+    if (k === 'k' || k === 'K') { this.edit(); return true; }
+    if (!this.on) return false;
+    if (k === 'Escape') { this.edit(false); return true; }
+    if (k >= '1' && k <= '4') { this.sel = +k - 1; this.apply(); return true; }
+    if (k === 'r' || k === 'R') { this.c = [[0, 0], [0, 0], [0, 0], [0, 0]]; this.save(); this.apply(); return true; }
+    const st = e.shiftKey ? .0005 : .004, p = this.c[this.sel];
+    const mv = { ArrowLeft: [-st, 0], ArrowRight: [st, 0], ArrowUp: [0, -st], ArrowDown: [0, st] }[k];
+    if (mv) { e.preventDefault(); p[0] = clamp(p[0] + mv[0], -.4, .4); p[1] = clamp(p[1] + mv[1], -.4, .4); this.save(); this.apply(); return true; }
+    return true;   // en mode coins, les autres touches ne déclenchent rien sur la scène
+  },
+};
+
 /* ---- Fenêtre de projection et régie ---- */
 async function openProjection() {
   if (PROJ && !PROJ.closed) { PROJ.focus(); return; }
   const w = window.open('', 'herba-projection', 'popup,width=1280,height=720');
   if (!w) { $('calibMsg').textContent = 'La fenêtre de projection a été bloquée : autorise les fenêtres surgissantes pour ce site.'; return; }
   PROJ = w;
-  w.document.open(); w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Herba Stellaris — Projection</title><style>html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:none}canvas{display:block;width:100%;height:100%}</style></head><body></body></html>'); w.document.close();
+  w.document.open(); w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Herba Stellaris — Projection</title><style>html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:none}canvas{display:block;width:100%;height:100%}#calage{position:absolute;left:0;top:0;pointer-events:none;display:none}.kc{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid #9fe8ff;border-radius:50%;box-shadow:0 0 12px #9fe8ff;display:none;cursor:move;z-index:5;color:#9fe8ff;font:600 13px system-ui;text-align:center;line-height:30px}.kc.sel{background:rgba(159,232,255,.35)}#kmsg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#cfefff;font:500 15px system-ui;background:rgba(0,10,20,.7);padding:12px 18px;border-radius:10px;display:none;text-align:center;z-index:4}body.kedit{cursor:default}</style></head><body></body></html>'); w.document.close();
   w.document.body.appendChild(canvas);
+  KEY.setup(w);
   w.addEventListener('resize', onResize);
-  w.addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') { if (w.document.fullscreenElement) w.document.exitFullscreen(); else w.document.documentElement.requestFullscreen().catch(() => {}); } else window.dispatchEvent(new KeyboardEvent('keydown', { key: e.key })); });
+  w.addEventListener('keydown', e => { if (KEY.key(e)) return; if (e.key === 'f' || e.key === 'F') { if (w.document.fullscreenElement) w.document.exitFullscreen(); else w.document.documentElement.requestFullscreen().catch(() => {}); } else window.dispatchEvent(new KeyboardEvent('keydown', { key: e.key })); });
   w.addEventListener('dblclick', () => w.document.documentElement.requestFullscreen().catch(() => {}));
   w.addEventListener('pagehide', closeProjection);
   try { if ('getScreenDetails' in window) { const sd = await window.getScreenDetails(); const o = sd.screens.find(x => x !== sd.currentScreen); if (o) { w.moveTo(o.availLeft, o.availTop); w.resizeTo(o.availWidth, o.availHeight); } } } catch (e) {}
@@ -5665,14 +5833,14 @@ async function openProjection() {
 }
 function closeProjection() {
   if (!PROJ) return; const w = PROJ; PROJ = null;
-  document.body.insertBefore(canvas, document.body.firstChild); canvas.style.width = canvas.style.height = '';
+  document.body.insertBefore(canvas, document.body.firstChild); canvas.style.width = canvas.style.height = ''; canvas.style.transform = ''; KEY.w = null;
   try { if (!w.closed) w.close(); } catch (e) {}
   $('regie').classList.add('hidden'); document.body.classList.remove('regie-on'); $('rgPrev').srcObject = null; onResize(); schedule();
 }
 ['Ensemble', 'Ras du sol', 'Grue', 'Plongée', 'Cime', 'Canopée', 'Ciel', 'Terre', 'Contre-jour'].forEach((n, i) => { const b = document.createElement('button'); b.textContent = (i + 1) + ' · ' + n; b.onclick = () => { if (mode === 'live') PEND.shot = i + 1; }; $('rgShots').appendChild(b); });
 $('rgAube').onclick = () => { if (mode === 'live') PEND.dawn = true; }; $('rgFin').onclick = () => { if (mode === 'live') PEND.end = true; };
 $('rgPub').onclick = () => togglePublic(); $('rgStage').onclick = () => setStage(!S.stage); $('rgMire').onclick = () => { S.mire = !S.mire; $('mire').checked = S.mire; };
-$('rgClose').onclick = closeProjection; $('btnProj').onclick = openProjection; $('btnProjT').onclick = openProjection;
+$('rgCal').onclick = () => KEY.calage(); $('rgKey').onclick = () => KEY.edit(); $('rgClose').onclick = closeProjection; $('btnProj').onclick = openProjection; $('btnProjT').onclick = openProjection;
 function updateRegie() {
   if (!PROJ) return;
   const C = CEL, el = C ? (C.el / D2R).toFixed(1) + '°' : '—', ph = sim.phrase ? sim.phrase.id + 1 : 1, fps = Math.round(1 / Math.max(ftAvg, 1e-3));
@@ -5698,7 +5866,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 function onResize() {
   camera.aspect = VW() / VH(); camera.updateProjectionMatrix();
   renderer.setSize(VW(), VH()); composer.setSize(VW(), VH());
-  cine.uniforms.uAspect.value = VW() / VH(); updatePxs();
+  cine.uniforms.uAspect.value = VW() / VH(); updatePxs(); KEY.apply();
 }
 addEventListener('resize', onResize);
 
