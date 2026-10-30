@@ -184,6 +184,18 @@ dédicace**, **interprète**. Quatre cases règlent ce qui apparaît dans l'imag
 Ces cartons font partie de l'œuvre : la galerie et les exports vidéo les rejouent à l'identique. Le QR code du public est désormais
 **dessiné dans l'image** (en haut à gauche pendant la composition), donc visible sur la projection.
 
+### Signatures du fingerstyle
+En plus des harmoniques, notes étouffées, percussions sur la caisse, glissés, rasgueados, liaisons, vibratos et bends :
+- **Tapping** : des notes rapides et liées dans l'aigu (au moins 4 en 0,6 s, peu d'attaques) font tomber des **étoiles filantes** dans la canopée.
+- **Slap** : une note grave dont l'attaque claque aussi dans l'aigu donne un **battement de cœur**. Une onde part du centre et tout le jardin pulse.
+- **Retour d'un motif** : quand une phrase de 5 notes revient (mêmes intervalles, au moins 3 s plus tard), les plantes qui l'avaient
+  fleurie la première fois **se rallument**, reliées en constellation. C'est la mémoire du jardin.
+- **Ton téléphone** affiche la technique reconnue à l'instant (*Jeu*) et l'**arc de la pièce**, son intensité depuis le début,
+  pour voir la forme de la composition pendant que tu la joues.
+
+Ces effets sont calculés à partir de l'empreinte, donc rejoués à l'identique. Les œuvres enregistrées avant leur arrivée gardent
+leur rendu d'origine. Les seuils seront affinés pendant la séance d'écoute.
+
 ## Les graines du public
 
 **Graines du public** (carte 3 de l'accueil, Q, la régie ou le téléphone-capteur) affiche un QR code. Chaque spectateur compose sa graine

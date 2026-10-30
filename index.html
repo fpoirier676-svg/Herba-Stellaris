@@ -2505,7 +2505,7 @@ class Sim {
         }
       }
     }
-    if (n && this.introDone) this.guitar(t, live, { noteOn, harm, muted, percLo, percHi, slide, strum });
+    if (n && this.introDone) this.guitar(t, live, { noteOn, harm, muted, percLo, percHi, slide, strum, onset, onHigh });
     if (evs) for (const e of evs) this.event(e, t);
     this.updateSeeds(t, live);
     this.zoom += (this.zoomT - this.zoom) * (1 - Math.exp(-DT / .14));        // zoom à la pédale, lissé
@@ -2584,6 +2584,7 @@ class Sim {
       if (e.percHi) emitSparks(r, p.x, p.y + p.height * p.growth * .5, p.z, 12, [1, .85, .6], t);
     }
     if (e.strum) for (let k = 0; k < 3; k++) { const p = live[Math.floor(r() * n)]; emitSparks(r, p.x, p.y + p.height * p.growth * .8, p.z, 16, p.col, t); }   // rasgueado : un éventail d'étincelles
+    if ((this.fx || 0) >= 6) this.signatures(t, live, e, loud, r);
   }
   // ---- Événements extérieurs : graines des spectateurs, pédale de zoom
   event(e, t) {
@@ -2872,7 +2873,7 @@ function startWorld(seed, startMs, intro, dawn) { world = buildWorld(seed, start
 
 async function startLive(kind, file) {
   const seed = (crypto.getRandomValues(new Uint32Array(1))[0]) >>> 0;
-  setTick(LIVE_TICK); startWorld(seed, Date.now(), true, !S.cycle); frames = []; recEvents = []; LIVE_EV.length = 0; PUB.gardenImg = null; PUB.gardenAsked = false; PUB.collSent = null; MOD.pending.length = 0; LIVE_MARKS.length = 0; PUB.clients.clear(); ZM.sent = 0; ZM.sentT = 0; sim.manualEnd = true; world.venue = { ...S.venue }; world.fiche = { ...S.fiche }; sim.lat = S.latency / 1000; sim.predict = true;
+  setTick(LIVE_TICK); startWorld(seed, Date.now(), true, !S.cycle); frames = []; recEvents = []; LIVE_EV.length = 0; PUB.gardenImg = null; PUB.gardenAsked = false; PUB.collSent = null; MOD.pending.length = 0; LIVE_MARKS.length = 0; PUB.clients.clear(); ZM.sent = 0; ZM.sentT = 0; sim.manualEnd = true; world.venue = { ...S.venue }; world.fiche = { ...S.fiche }; sim.fx = FX_LEVEL; sim.lat = S.latency / 1000; sim.predict = true;
   if (kind === 'mic') await AE.useMic(); else if (kind === 'phone') await AE.useRemote(PH.stream); else await AE.useFile(file);
   liveT0 = AE.ctx.currentTime; AE.silentFor = 0; AE.heard = 0; AE.silStart = null; AE.lastNow = 0;
   if (AE.el) AE.el.onended = () => { if (mode === 'live') finishLive(true); };
@@ -2898,7 +2899,7 @@ async function finishLive(save) {
   showEpilogue(rec);
 }
 function makeRec(audio, thumb) { return {
-    id: Date.now().toString(36) + '-' + sim.W.seed.toString(36), name: (world.fiche && world.fiche.title) || sim.W.name, fiche: world.fiche || null, date: new Date().toISOString(), seed: sim.W.seed, startUTC: sim.W.startMs,
+    id: Date.now().toString(36) + '-' + sim.W.seed.toString(36), name: (world.fiche && world.fiche.title) || sim.W.name, fiche: world.fiche || null, fx: sim.fx || 0, date: new Date().toISOString(), seed: sim.W.seed, startUTC: sim.W.startMs,
     stride: FSTRIDE, tick: TICK, manualEnd: true, venue: world.venue, events: recEvents.slice(), lat: S.latency / 1000, tscale: sim.tscale, dawn: sim.dawn, publicSeeds: sim.pubN, duration: sim.t, lunarT: sim.lunarT, plants: sim.plants.length, species: countSpecies(), varieties: new Set(sim.plants.map(p => p.var)).size, frames: new Float32Array(frames), audio, thumb,
   }; }
 /* ---- Sauvegarde de secours : toutes les 10 s pendant une composition ; reprise après un plantage ---- */
@@ -2974,7 +2975,7 @@ const speciesLine = c => Object.keys(SPECIES).filter(k => c[k]).map(k => c[k] + 
 
 async function startReplay(rec, exportVideo) {
   closeGallery(); AE.ensure(); AE.stop();
-  setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; sim.manualEnd = !!rec.manualEnd; world.venue = rec.venue || { ...VENUE_DEF }; world.fiche = rec.fiche || null;
+  setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; sim.manualEnd = !!rec.manualEnd; world.venue = rec.venue || { ...VENUE_DEF }; world.fiche = rec.fiche || null; sim.fx = rec.fx || 0;
   recFrames = rec.frames; recStride = rec.stride || 6; EVIDX = indexEvents(rec.events); current = rec; replayEl = null;
   if (rec.audio) {
     const el = new window.Audio(URL.createObjectURL(rec.audio)); replayEl = el;
@@ -3777,7 +3778,7 @@ function tempoBPM() { const bt = sim && sim.beats; if (!bt || bt.length < 5) ret
 function sendStatus() {
   if (!PH.conn || !PH.conn.open) return;
   const live = mode === 'live' && sim, pubs = sim ? [...sim.seeds.values()] : [];
-  const scene = live ? { act: (sim.act ? ACTS[sim.act.i] + ' · ' : '') + gardenStage(), chord: GT.chordName || '', key: GT.keyName || '', note: GT.note ? NOTE_NAMES[((GT.note.m0 % 12) + 12) % 12] + (Math.floor(GT.note.m0 / 12) - 1) : '', bpm: tempoBPM(), lvl: +(sim.loud || 0).toFixed(2),
+  const scene = live ? { tech: sim.tech && sim.t - sim.tech[1] < 2.5 ? sim.tech[0] : '', arc: (sim.arcH || []).slice(-120), act: (sim.act ? ACTS[sim.act.i] + ' · ' : '') + gardenStage(), chord: GT.chordName || '', key: GT.keyName || '', note: GT.note ? NOTE_NAMES[((GT.note.m0 % 12) + 12) % 12] + (Math.floor(GT.note.m0 / 12) - 1) : '', bpm: tempoBPM(), lvl: +(sim.loud || 0).toFixed(2),
     seeds: pubs.length, falling: pubs.filter(q => q.state === 'fall').length, zoom: zoomLabel(ZM.v), intro: !sim.introDone, rep: !!S.rehearsal, marks: LIVE_MARKS.length, last: LIVE_MARKS.length ? LIVE_MARKS[LIVE_MARKS.length - 1] : 0 } : null;
   try { PH.conn.send({ scene, mod: MOD.pending.slice(0, 6), modOn: !!S.modNames, rep: !!S.rehearsal, mode, t: mode === 'live' ? liveTime() : 0, site: world ? world.name : '', plants: sim ? sim.plants.length : 0, epi: !!epiShownAt, fin: mode !== 'live' ? 'none' : !sim.introDone ? 'wait' : sim.finale ? 'on' : 'ready', finLeft: mode === 'live' && sim.finale ? Math.max(0, Math.ceil(FINALE_LEN + FINALE_HOLD - (sim.t - sim.finaleT0))) : 0 }); } catch (e) {}
 }
@@ -4501,6 +4502,56 @@ function renderInstruments(dt) {
 let frameN = 0, lastFrameT = 0, frameDur = 16;
 
 
+
+/* ---- Signatures du fingerstyle : tapping, slap, retour des motifs ----
+   Calculées par la simulation à partir de l'empreinte (attaques, notes, hauteur) : rejouées à l'identique.
+   Les seuils seront affinés pendant la séance d'écoute avec le musicien. */
+const FX_LEVEL = 6;     // niveau des effets des œuvres nouvelles ; les œuvres anciennes gardent leur rendu d'origine
+const TECH_FR = { harm: 'Harmonique', muted: 'Étouffé', percLo: 'Caisse grave', percHi: 'Caisse aiguë', slide: 'Glissé', strum: 'Rasgueado' };
+Sim.prototype.signatures = function (t, live, e, loud, r) {
+  const G = this.g, n = live.length; if (!n) return;
+  const Q = this.s6 || (this.s6 = { on: [], no: [], mel: [], motifs: new Map(), tapT: -9, slapT: -9, motT: -9, hiT: -9, tapN: 0, slapN: 0, motN: 0 });
+  for (const k in TECH_FR) if (e[k]) this.tech = [TECH_FR[k], t];
+  if (e.onset) Q.on.push(t); if (e.onHigh) Q.hiT = t;
+  if (e.noteOn && G.pitch > 0) Q.no.push([t, G.pitch]);
+  while (Q.on.length && t - Q.on[0] > .6) Q.on.shift(); while (Q.no.length && t - Q.no[0][0] > .6) Q.no.shift();
+  // tapping : au moins 4 notes en 0,6 s, liées (deux fois moins d'attaques que de notes), dans l'aigu → des étoiles filantes tombent dans la canopée
+  if (e.noteOn && Q.no.length >= 4 && Q.on.length * 2 <= Q.no.length && Q.no.reduce((a, x) => a + x[1], 0) / Q.no.length > 62 && t - Q.tapT > .12) {
+    Q.tapT = t; Q.tapN++; this.tech = ['Tapping', t];
+    const N = G.note, p = (N && N.host && !N.host.dead) ? N.host : live[Math.floor(r() * n)], top = [p.x, p.y + p.height * p.growth + .3, p.z];
+    const from = [top[0] + (r() - .5) * 4, top[1] + 5 + r() * 4, top[2] + (r() - .5) * 4];
+    emitTrail(r, from, top, [.75, .9, 1], N ? N.col : [1, 1, 1], t, false); emitSparks(r, top[0], top[1], top[2], 10, [.82, .93, 1], t);
+  }
+  // slap : une note grave dont l'attaque claque aussi dans l'aigu → un battement de cœur : onde au centre, tout le jardin pulse
+  if (e.noteOn && G.pitch > 0 && G.pitch < 52 && t - Q.hiT < .09 && loud > .22 && t - Q.slapT > .25) {
+    Q.slapT = t; Q.slapN++; this.tech = ['Slap', t];
+    const c = this.shot ? [this.shot.cx, this.shot.cz] : [0, 0];
+    this.shocks.push({ x: c[0], z: c[1], t0: t, a: 1 }); if (this.shocks.length > 6) this.shocks.shift(); emitRing(r, c[0], c[1], 1, t, this.W.h);
+    for (const p of live) p.pulse = Math.max(p.pulse || 0, .55);
+  }
+  // motifs : une phrase de 5 notes (mêmes intervalles) qui revient → les plantes qui l'avaient fleurie la première fois se rallument, reliées en constellation
+  if (e.noteOn && G.pitch > 0 && G.note && G.note.pos) {
+    Q.mel.push({ m: Math.round(G.pitch), h: G.note.host, pos: G.note.pos.slice(), col: G.note.col, t }); if (Q.mel.length > 6) Q.mel.shift();
+    if (Q.mel.length >= 5) {
+      const sq = Q.mel.slice(-5);
+      if (sq[4].t - sq[0].t < 4) {
+        const iv = []; for (let i = 1; i < 5; i++) iv.push(sq[i].m - sq[i - 1].m);
+        if (new Set(iv).size >= 2) {
+          const k = iv.join(','), o = Q.motifs.get(k);
+          if (!o) { Q.motifs.set(k, { n: 1, first: sq.map(x => ({ h: x.h, pos: x.pos, col: x.col })), last: t }); if (Q.motifs.size > 400) Q.motifs.delete(Q.motifs.keys().next().value); }
+          else if (t - o.last > 3) {
+            o.n++; o.last = t;
+            if (t - Q.motT > 4) {
+              Q.motT = t; Q.motN++; this.motifEcho = { t, n: o.n }; this.tech = ['Motif ' + (o.n === 2 ? 'repris' : 'repris ×' + (o.n - 1)), t];
+              o.first.forEach((f, i) => { if (f.h && !f.h.dead) { f.h.pulse = 1; f.h.flut = 1; } emitSparks(r, f.pos[0], f.pos[1], f.pos[2], 16, f.col, t); if (i) emitTrail(r, o.first[i - 1].pos, f.pos, o.first[i - 1].col, f.col, t, false); });
+            }
+          }
+        }
+      }
+    }
+  }
+};
+
 /* ---- Public : filtre des noms, validation par la régie, élan collectif, souvenir ---- */
 // filtre simple : insultes et termes crus courants (français et anglais), contournements usuels compris (accents, chiffres, lettres doublées)
 const BAD_ROOTS = ['connard', 'connasse', 'salope', 'salaud', 'encule', 'batard', 'putain', 'merde', 'bordel', 'niquer', 'couille', 'penis', 'vagin', 'branleur', 'branlette', 'pouffiasse', 'tapette', 'gouine', 'bougnoul', 'youpin', 'hitler', 'fuck', 'bitch', 'cunt', 'pussy', 'whore', 'slut', 'nigger', 'nigga', 'faggot', 'asshole', 'porno', 'tabarnak', 'tabarnac', 'calisse', 'ciboire', 'suicide', 'cocaine'];
@@ -4573,7 +4624,7 @@ function actStep() {
   return A;
 }
 // évalué avec la simulation (4 fois par seconde), jamais au rythme de l'affichage : identique en direct, en rejeu et à l'export
-{ const st0 = Sim.prototype.step; Sim.prototype.step = function (...a) { const r = st0.apply(this, a); if (this === sim && this.tick % 15 === 0) { actStep(); collStep(this); } return r; }; }
+{ const st0 = Sim.prototype.step; Sim.prototype.step = function (...a) { const r = st0.apply(this, a); if (this === sim && this.tick % 15 === 0) { actStep(); if ((this.fx || 0) >= 5) collStep(this); } if (this === sim && this.tick % 300 === 0) { (this.arcH || (this.arcH = [])).push(Math.round((this.arc || 0) * 100) / 100); } return r; }; }
 const fade = (t, a, b, fi, fo) => (fi > 0 ? smoothstep(a, a + fi, t) : t >= a ? 1 : 0) * (fo > 0 ? 1 - smoothstep(b - fo, b, t) : t < b ? 1 : 0);
 const OVL = { scene: new THREE.Scene(), cam: new THREE.OrthographicCamera(0, 1, 1, 0, -1, 1), v2: new THREE.Vector2() };
 {
@@ -4839,7 +4890,7 @@ async function runExport() {
   const duration = abuf ? abuf.duration : rec.duration, total = Math.ceil(duration * fps);
   $('xForm').classList.add('hidden'); $('xRun').classList.remove('hidden');
   hdJob.cancel = false; mode = 'hd'; setUI(); closeGallery();
-  AE.stop(); setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; sim.manualEnd = !!rec.manualEnd; world.venue = rec.venue || { ...VENUE_DEF }; world.fiche = rec.fiche || null; recFrames = rec.frames; recStride = rec.stride || 6; EVIDX = indexEvents(rec.events); current = rec;
+  AE.stop(); setTick(rec.tick || 30); startWorld(rec.seed, rec.startUTC || Date.parse(rec.date), true, !!rec.dawn); sim.tscale = rec.tscale || 1; sim.lat = rec.lat || 0; sim.manualEnd = !!rec.manualEnd; world.venue = rec.venue || { ...VENUE_DEF }; world.fiche = rec.fiche || null; sim.fx = rec.fx || 0; recFrames = rec.frames; recStride = rec.stride || 6; EVIDX = indexEvents(rec.events); current = rec;
   offline = true; hdQuality(true); setRenderSize(w, h);
   const t0 = performance.now();
   try {

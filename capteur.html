@@ -89,6 +89,7 @@
     <div class="vid"><video id="rv" muted playsinline autoplay></video><div id="rvMsg">Image en attente…</div></div>
     <div class="sc" id="sc"></div>
     <div class="lvl"><i id="scLvl"></i></div>
+    <canvas id="scArc" width="600" height="70" style="width:100%;height:46px;display:block;margin-top:6px"></canvas>
     <div class="row2" id="repBtns"><button id="rLift">Inviter le public à lever</button><button id="rMark">Poser un repère</button><button id="rRestart" class="hidden">Recommencer</button></div>
     <div class="note" id="scMsg" style="text-align:center;margin-top:6px"></div>
     <div id="modList" class="hidden"></div>
@@ -230,8 +231,12 @@ function onStatus(m) {
   if (S) {
     const cell = (k, v) => `<div><span>${k}</span>${v || '—'}</div>`;
     $('sc').innerHTML = cell('Temps', mmss(m.t || 0)) + cell('Acte', S.intro ? 'Voyage' : S.act) + cell('Tempo', S.bpm ? S.bpm + ' bpm' : '') + cell('Accord', S.chord) + cell('Tonalité', S.key) + cell('Note', S.note) +
-      cell('Graines', S.seeds + (S.falling ? ' · ' + S.falling + ' en chute' : '')) + cell('Zoom', S.zoom) + cell('Repères', S.marks ? S.marks + ' · ' + mmss(S.last) : '');
+      cell('Jeu', S.tech ? '<b style="color:var(--acc,#ffd89a)">' + S.tech + '</b>' : '') + cell('Graines', S.seeds + (S.falling ? ' · ' + S.falling + ' en chute' : '')) + cell('Zoom', S.zoom) + cell('Repères', S.marks ? S.marks + ' · ' + mmss(S.last) : '');
     $('scLvl').style.width = Math.round(Math.min(1, S.lvl) * 100) + '%';
+    { const cv = $('scArc'), g = cv.getContext('2d'), a = S.arc || [], W = cv.width, H = cv.height; g.clearRect(0, 0, W, H);   // l'arc de la pièce : son intensité depuis le début, un point toutes les 5 s
+      g.fillStyle = 'rgba(255,255,255,.35)'; g.font = '20px system-ui'; g.fillText('Arc de la pièce', 4, 20);
+      if (a.length > 1) { const mx = Math.max(.15, ...a); g.beginPath(); a.forEach((v, i) => { const x = i / (a.length - 1) * (W - 4) + 2, y = H - 4 - v / mx * (H - 28); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+        g.strokeStyle = '#ffd89a'; g.lineWidth = 3; g.stroke(); } }
     $('scMsg').textContent = m.fin === 'on' ? 'La conclusion décolle…' : m.fin === 'ready' ? (S.rep ? 'Répétition — rien n’est enregistré' : 'Conclusion possible') : S.intro ? 'Voyage vers la Lune…' : '';
     $('rRestart').classList.toggle('hidden', !S.rep); $('rMark').disabled = false;
   } else { $('sc').innerHTML = '<div style="grid-column:1/-1;font-size:17px;color:var(--dim)">' + (m.mode === 'idle' && m.epi ? 'Œuvre terminée' : 'Prêt — en attente de la composition') + '</div>'; $('scLvl').style.width = '0%'; $('scMsg').textContent = ''; $('rRestart').classList.add('hidden'); $('rMark').disabled = true; }
